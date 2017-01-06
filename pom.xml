@@ -5,9 +5,9 @@
 
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.reaktivity</groupId>
-  <artifactId>build-template</artifactId>
+  <artifactId>nukleus-tcp</artifactId>
   <version>develop-SNAPSHOT</version>
-  <name>Build Template for Java Projects</name>
+  <name>TCP Nukleus Implementation</name>
   <url>https://github.com/reaktivity/build-template.java</url>
   <inceptionYear>2016</inceptionYear>
 
@@ -30,9 +30,9 @@
   </developers>
 
   <scm>
-    <connection>scm:git:https://github.com/reaktivity/build-template.java</connection>
-    <developerConnection>scm:git:https://github.com/reaktivity/build-template.java</developerConnection>
-    <url>https://github.com/reaktivity/build-template.java</url>
+    <connection>scm:git:https://github.com/reaktivity/nukleus-tcp.java</connection>
+    <developerConnection>scm:git:https://github.com/reaktivity/nukleus-tcp.java</developerConnection>
+    <url>https://github.com/reaktivity/nukleus-tcp.java</url>
   </scm>
 
   <properties>
@@ -63,3 +63,4 @@
   </build>
 
 </project>
+
