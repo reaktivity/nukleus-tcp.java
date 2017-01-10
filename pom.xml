@@ -8,6 +8,7 @@
   <artifactId>nukleus-tcp</artifactId>
   <version>develop-SNAPSHOT</version>
   <name>TCP Nukleus Implementation</name>
+  <description>TCP Nukleus Implementation</description>
   <url>https://github.com/reaktivity/build-template.java</url>
 
   <licenses>
