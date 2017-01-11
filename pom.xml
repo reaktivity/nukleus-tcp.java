@@ -43,7 +43,6 @@
     <checkstyle.config.location>src/conf/checkstyle/configuration.xml</checkstyle.config.location>
     <checkstyle.suppressions.location>src/conf/checkstyle/suppressions.xml</checkstyle.suppressions.location>
 
-    <agrona.version>0.5.5</agrona.version>
     <junit.version>4.12</junit.version>
     <k3po.version>3.0.0-alpha-54</k3po.version>
     <jmh.version>1.12</jmh.version>
