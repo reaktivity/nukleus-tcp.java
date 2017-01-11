@@ -2,7 +2,7 @@ language: java
 jdk:
   - oraclejdk8
 install: true
-script: mvn -X -B -o verify
+script: mvn -X -B -o verify -Dcheckstyle.skip
 cache:
   directories:
     - $HOME/.m2
