@@ -63,6 +63,7 @@ public class ClientIT
     {
         try (ServerSocket server = new ServerSocket())
         {
+            server.setReuseAddress(true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
             server.setSoTimeout((int) SECONDS.toMillis(5));
 
@@ -87,6 +88,7 @@ public class ClientIT
     {
         try (ServerSocket server = new ServerSocket())
         {
+            server.setReuseAddress(true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
@@ -97,10 +99,10 @@ public class ClientIT
                 final OutputStream out = socket.getOutputStream();
 
                 out.write("server data".getBytes());
+
+                k3po.finish();
             }
         }
-
-        k3po.finish();
     }
 
     @Test
@@ -114,6 +116,7 @@ public class ClientIT
     {
         try (ServerSocket server = new ServerSocket())
         {
+            server.setReuseAddress(true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
@@ -127,10 +130,10 @@ public class ClientIT
                 int len1 = in.read(buf);
 
                 assertEquals("client data", new String(buf, 0, len1, UTF_8));
+
+                k3po.finish();
             }
         }
-
-        k3po.finish();
     }
 
     @Test
@@ -144,6 +147,7 @@ public class ClientIT
     {
         try (ServerSocket server = new ServerSocket())
         {
+            server.setReuseAddress(true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
@@ -166,10 +170,10 @@ public class ClientIT
 
                 assertEquals("client data 1", new String(buf1, 0, len1, UTF_8));
                 assertEquals("client data 2", new String(buf2, 0, len2, UTF_8));
+
+                k3po.finish();
             }
         }
-
-        k3po.finish();
     }
 
     @Test
@@ -183,6 +187,7 @@ public class ClientIT
     {
         try (ServerSocket server = new ServerSocket())
         {
+            server.setReuseAddress(true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
@@ -208,6 +213,7 @@ public class ClientIT
     {
         try (ServerSocket server = new ServerSocket())
         {
+            server.setReuseAddress(true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
@@ -221,9 +227,9 @@ public class ClientIT
                 int len = in.read(buf);
 
                 assertEquals(-1, len);
+
+                k3po.finish();
             }
         }
-
-        k3po.finish();
     }
 }
