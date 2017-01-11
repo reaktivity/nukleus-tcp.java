@@ -163,16 +163,16 @@ public class ClientIT
 
                 out.write("server data 1".getBytes());
 
-                byte[] buf1 = new byte[256];
-                int len1 = in.read(buf1);
+                byte[] buf = new byte[26];
+                int bytes = in.read(buf);
 
                 out.write("server data 2".getBytes());
 
-                byte[] buf2 = new byte[256];
-                int len2 = in.read(buf2);
+                bytes += in.read(buf, bytes, buf.length - bytes);
 
-                assertEquals("client data 1", new String(buf1, 0, len1, UTF_8));
-                assertEquals("client data 2", new String(buf2, 0, len2, UTF_8));
+                assertEquals(26, bytes);
+                assertEquals("client data 1", new String(buf, 0, 13, UTF_8));
+                assertEquals("client data 2", new String(buf, 13, 13, UTF_8));
 
                 k3po.finish();
             }
