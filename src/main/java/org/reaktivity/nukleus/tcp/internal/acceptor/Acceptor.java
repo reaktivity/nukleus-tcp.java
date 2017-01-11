@@ -190,8 +190,8 @@ public final class Acceptor extends TransportPoller implements Nukleus
         try
         {
             final ServerSocketChannel serverChannel = ServerSocketChannel.open();
-            serverChannel.bind(localAddress);
             serverChannel.setOption(SO_REUSEADDR, true);
+            serverChannel.bind(localAddress);
             serverChannel.configureBlocking(false);
 
             return serverChannel.register(selector, OP_ACCEPT);

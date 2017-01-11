@@ -40,7 +40,7 @@ public class ClientIT
     private final K3poRule k3po = new K3poRule()
             .setScriptRoot("org/reaktivity/specification/nukleus/tcp");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(30, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final NukleusRule nukleus = new NukleusRule("tcp")
         .directory("target/nukleus-itests")
