@@ -40,7 +40,7 @@ public class ClientIT
     private final K3poRule k3po = new K3poRule()
             .setScriptRoot("org/reaktivity/specification/nukleus/tcp");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(30, SECONDS));
 
     private final NukleusRule nukleus = new NukleusRule("tcp")
         .directory("target/nukleus-itests")
@@ -90,6 +90,7 @@ public class ClientIT
         {
             server.setReuseAddress(true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
             k3po.awaitBarrier("ROUTED_REPLY");
@@ -118,6 +119,7 @@ public class ClientIT
         {
             server.setReuseAddress(true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
             k3po.awaitBarrier("ROUTED_REPLY");
@@ -149,6 +151,7 @@ public class ClientIT
         {
             server.setReuseAddress(true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
             k3po.awaitBarrier("ROUTED_REPLY");
@@ -189,6 +192,7 @@ public class ClientIT
         {
             server.setReuseAddress(true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
             k3po.awaitBarrier("ROUTED_REPLY");
@@ -215,6 +219,7 @@ public class ClientIT
         {
             server.setReuseAddress(true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
             k3po.awaitBarrier("ROUTED_REPLY");
