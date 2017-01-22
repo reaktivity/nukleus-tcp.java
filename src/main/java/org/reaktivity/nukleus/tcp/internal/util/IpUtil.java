@@ -46,6 +46,11 @@ public final class IpUtil
     public static InetAddress inetAddress(
         TcpAddressFW address)
     {
+        if (address.length() == 0)
+        {
+            return null;
+        }
+
         switch (address.kind())
         {
         case TcpAddressFW.KIND_IPV4_ADDRESS:
@@ -57,12 +62,19 @@ public final class IpUtil
         }
     }
 
-    public static void ipAddress(
+    public static void socketAddress(
         InetSocketAddress ipAddress,
         Consumer<Consumer<OctetsFW.Builder>> ipv4Address,
         Consumer<Consumer<OctetsFW.Builder>> ipv6Address)
     {
-        InetAddress inetAddress = ipAddress.getAddress();
+        inetAddress(ipAddress.getAddress(), ipv4Address, ipv6Address);
+    }
+
+    public static void inetAddress(
+        InetAddress inetAddress,
+        Consumer<Consumer<OctetsFW.Builder>> ipv4Address,
+        Consumer<Consumer<OctetsFW.Builder>> ipv6Address)
+    {
         if (inetAddress instanceof Inet4Address)
         {
             ipv4Address.accept(o -> o.set(inetAddress.getAddress()));

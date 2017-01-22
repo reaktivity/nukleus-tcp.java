@@ -38,7 +38,8 @@ import org.reaktivity.reaktor.test.NukleusRule;
 public class ClientIT
 {
     private final K3poRule k3po = new K3poRule()
-            .setScriptRoot("org/reaktivity/specification/nukleus/tcp");
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/tcp/streams");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -54,11 +55,9 @@ public class ClientIT
 
     @Test
     @Specification({
-        "control/bind/client/initial/controller",
-        "control/bind/client/reply/controller",
-        "control/route/client/initial/controller",
-        "control/route/client/reply/controller",
-        "streams/connection.established/client/source" })
+        "${route}/output/new/controller",
+        "${streams}/connection.established/client/source"
+    })
     public void shouldEstablishConnection() throws Exception
     {
         try (ServerSocket server = new ServerSocket())
@@ -68,10 +67,11 @@ public class ClientIT
             server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_REPLY");
+            k3po.awaitBarrier("ROUTED_OUTPUT");
 
             try (Socket socket = server.accept())
             {
+                k3po.notifyBarrier("ROUTED_INPUT");
                 k3po.finish();
             }
         }
@@ -79,11 +79,9 @@ public class ClientIT
 
     @Test
     @Specification({
-        "control/bind/client/initial/controller",
-        "control/bind/client/reply/controller",
-        "control/route/client/initial/controller",
-        "control/route/client/reply/controller",
-        "streams/server.sent.data/client/source" })
+        "${route}/output/new/controller",
+        "${streams}/server.sent.data/client/source"
+    })
     public void shouldReceiveServerSentData() throws Exception
     {
         try (ServerSocket server = new ServerSocket())
@@ -93,10 +91,12 @@ public class ClientIT
             server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_REPLY");
+            k3po.awaitBarrier("ROUTED_OUTPUT");
 
             try (Socket socket = server.accept())
             {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
                 final OutputStream out = socket.getOutputStream();
 
                 out.write("server data".getBytes());
@@ -108,11 +108,9 @@ public class ClientIT
 
     @Test
     @Specification({
-        "control/bind/client/initial/controller",
-        "control/bind/client/reply/controller",
-        "control/route/client/initial/controller",
-        "control/route/client/reply/controller",
-        "streams/client.sent.data/client/source" })
+        "${route}/output/new/controller",
+        "${streams}/client.sent.data/client/source"
+    })
     public void shouldReceiveClientSentData() throws Exception
     {
         try (ServerSocket server = new ServerSocket())
@@ -122,10 +120,12 @@ public class ClientIT
             server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_REPLY");
+            k3po.awaitBarrier("ROUTED_OUTPUT");
 
             try (Socket socket = server.accept())
             {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
                 final InputStream in = socket.getInputStream();
 
                 byte[] buf = new byte[256];
@@ -140,11 +140,9 @@ public class ClientIT
 
     @Test
     @Specification({
-        "control/bind/client/initial/controller",
-        "control/bind/client/reply/controller",
-        "control/route/client/initial/controller",
-        "control/route/client/reply/controller",
-        "streams/echo.data/client/source" })
+        "${route}/output/new/controller",
+        "${streams}/echo.data/client/source"
+    })
     public void shouldEchoData() throws Exception
     {
         try (ServerSocket server = new ServerSocket())
@@ -154,10 +152,12 @@ public class ClientIT
             server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_REPLY");
+            k3po.awaitBarrier("ROUTED_OUTPUT");
 
             try (Socket socket = server.accept())
             {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
                 final InputStream in = socket.getInputStream();
                 final OutputStream out = socket.getOutputStream();
 
@@ -181,11 +181,9 @@ public class ClientIT
 
     @Test
     @Specification({
-        "control/bind/client/initial/controller",
-        "control/bind/client/reply/controller",
-        "control/route/client/initial/controller",
-        "control/route/client/reply/controller",
-        "streams/server.close/client/source" })
+        "${route}/output/new/controller",
+        "${streams}/server.close/client/source"
+    })
     public void shouldInitiateServerClose() throws Exception
     {
         try (ServerSocket server = new ServerSocket())
@@ -195,10 +193,12 @@ public class ClientIT
             server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_REPLY");
+            k3po.awaitBarrier("ROUTED_OUTPUT");
 
             try (Socket socket = server.accept())
             {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
                 socket.shutdownOutput();
                 k3po.finish();
             }
@@ -208,11 +208,9 @@ public class ClientIT
 
     @Test
     @Specification({
-        "control/bind/client/initial/controller",
-        "control/bind/client/reply/controller",
-        "control/route/client/initial/controller",
-        "control/route/client/reply/controller",
-        "streams/client.close/client/source" })
+        "${route}/output/new/controller",
+        "${streams}/client.close/client/source"
+    })
     public void shouldInitiateClientClose() throws Exception
     {
         try (ServerSocket server = new ServerSocket())
@@ -222,10 +220,12 @@ public class ClientIT
             server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_REPLY");
+            k3po.awaitBarrier("ROUTED_OUTPUT");
 
             try (Socket socket = server.accept())
             {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
                 final InputStream in = socket.getInputStream();
 
                 byte[] buf = new byte[256];

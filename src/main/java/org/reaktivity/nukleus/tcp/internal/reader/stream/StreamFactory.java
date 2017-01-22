@@ -36,12 +36,14 @@ public final class StreamFactory
     private final WindowFW windowRO = new WindowFW();
     private final ResetFW resetRO = new ResetFW();
 
+    private final int bufferSize;
     private final ByteBuffer readBuffer;
     private final AtomicBuffer atomicBuffer;
 
     public StreamFactory(
         int bufferSize)
     {
+        this.bufferSize = bufferSize;
         this.readBuffer = ByteBuffer.allocate(bufferSize).order(nativeOrder());
         this.atomicBuffer = new UnsafeBuffer(new byte[bufferSize]);
     }
@@ -103,8 +105,10 @@ public final class StreamFactory
             }
             else
             {
+                final int limit = Math.min(readableBytes, bufferSize);
+
                 readBuffer.position(0);
-                readBuffer.limit(readableBytes);
+                readBuffer.limit(limit);
 
                 int bytesRead = channel.read(readBuffer);
                 if (bytesRead == -1)

@@ -21,7 +21,9 @@ import static org.reaktivity.nukleus.tcp.internal.reader.Route.sourceMatches;
 import static org.reaktivity.nukleus.tcp.internal.reader.Route.sourceRefMatches;
 import static org.reaktivity.nukleus.tcp.internal.reader.Route.targetMatches;
 import static org.reaktivity.nukleus.tcp.internal.reader.Route.targetRefMatches;
+import static org.reaktivity.nukleus.tcp.internal.router.RouteKind.OUTPUT_NEW;
 
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -41,6 +43,7 @@ import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
+import org.reaktivity.nukleus.tcp.internal.router.RouteKind;
 
 /**
  * The {@code Readable} nukleus reads network traffic via a {@code Source} nukleus and control flow commands
@@ -82,7 +85,7 @@ public final class Reader extends Nukleus.Composite
         return String.format("reader[%s]", sourceName);
     }
 
-    public void onConnected(
+    public void onAccepted(
         long targetId,
         long correlationId,
         SocketChannel channel,
@@ -103,7 +106,40 @@ public final class Reader extends Nukleus.Composite
             final Target target = route.target();
             final long targetRef = route.targetRef();
 
-            source.doBegin(target, targetRef, targetId, correlationId, channel);
+            source.onBegin(target, targetRef, targetId, correlationId, channel);
+        }
+    }
+
+    public void onConnected(
+        long sourceRef,
+        String targetName,
+        long targetId,
+        long correlationId,
+        SocketChannel channel,
+        SocketAddress address)
+    {
+        final Predicate<Route> filter =
+                sourceMatches(sourceName)
+                 .and(addressMatches(address));
+
+        final Optional<Route> optional = routesByRef.values().stream()
+            .flatMap(rs -> rs.stream())
+            .filter(filter)
+            .findFirst();
+
+        if (optional.isPresent())
+        {
+            final Route route = optional.get();
+            final Target target = route.target();
+            final long targetRef = route.targetRef();
+
+            source.onBegin(target, targetRef, targetId, correlationId, channel);
+        }
+        else if (RouteKind.match(sourceRef) == OUTPUT_NEW)
+        {
+            final Target target = targetsByName.computeIfAbsent(targetName, this::newTarget);
+
+            source.onBegin(target, 0L, targetId, correlationId, channel);
         }
     }
 
@@ -112,7 +148,7 @@ public final class Reader extends Nukleus.Composite
         long sourceRef,
         String targetName,
         long targetRef,
-        SocketAddress address)
+        InetSocketAddress address)
     {
         try
         {
@@ -122,7 +158,7 @@ public final class Reader extends Nukleus.Composite
             routesByRef.computeIfAbsent(sourceRef, this::newRoutes)
                        .add(newRoute);
 
-            acceptor.doRegister(correlationId, sourceName, address);
+            acceptor.doRegister(correlationId, sourceName, sourceRef, address);
         }
         catch (Exception ex)
         {
@@ -136,7 +172,7 @@ public final class Reader extends Nukleus.Composite
         long sourceRef,
         String targetName,
         long targetRef,
-        SocketAddress address)
+        InetSocketAddress address)
     {
         final List<Route> routes = lookupRoutes(sourceRef);
 
@@ -172,7 +208,7 @@ public final class Reader extends Nukleus.Composite
             routesByRef.computeIfAbsent(sourceRef, this::newRoutes)
                        .add(newRoute);
 
-            conductor.onRoutedResponse(correlationId);
+            conductor.onRoutedResponse(correlationId, sourceRef);
         }
         catch (Exception ex)
         {

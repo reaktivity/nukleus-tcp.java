@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Predicate;
 
@@ -40,6 +41,7 @@ import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.connector.Connector;
 import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
+import org.reaktivity.nukleus.tcp.internal.router.Correlation;
 
 /**
  * The {@code Writable} nukleus reads streams data from multiple {@code Source} nuklei and monitors completion of
@@ -58,20 +60,20 @@ public final class Writer extends Nukleus.Composite
     private final Map<String, Source> sourcesByPartitionName;
     private final Map<String, Target> targetsByName;
     private final Long2ObjectHashMap<List<Route>> routesByRef;
-    private final LongFunction<SocketChannel> resolveReply;
+    private final LongFunction<Correlation> resolveCorrelation;
 
     public Writer(
         Context context,
         Conductor conductor,
         Connector connector,
         String sourceName,
-        LongFunction<SocketChannel> resolveReply)
+        LongFunction<Correlation> resolveCorrelation)
     {
         this.context = context;
         this.conductor = conductor;
         this.connector = connector;
         this.sourceName = sourceName;
-        this.resolveReply = resolveReply;
+        this.resolveCorrelation = resolveCorrelation;
         this.name = sourceName;
         this.writeBuffer = new UnsafeBuffer(new byte[context.maxMessageLength()]);
         this.sourcesByPartitionName = new HashMap<>();
@@ -128,7 +130,7 @@ public final class Writer extends Nukleus.Composite
             routesByRef.computeIfAbsent(sourceRef, this::newRoutes)
                        .add(newRoute);
 
-            conductor.onRoutedResponse(correlationId);
+            conductor.onRoutedResponse(correlationId, sourceRef);
         }
         catch (Exception ex)
         {
@@ -198,6 +200,9 @@ public final class Writer extends Nukleus.Composite
             .readonly(true)
             .build();
 
-        return include(new Source(partitionName, connector, this::lookupRoutes, resolveReply, layout, writeBuffer));
+        Function<String, Target> supplyTarget = n -> targetsByName.computeIfAbsent(n, this::newTarget);
+
+        return include(new Source(partitionName, connector, this::lookupRoutes, resolveCorrelation,
+                        supplyTarget, layout, writeBuffer));
     }
 }

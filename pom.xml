@@ -6,7 +6,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.reaktivity</groupId>
   <artifactId>nukleus-tcp</artifactId>
-  <version>0.1</version>
+  <version>0.2</version>
   <name>TCP Nukleus Implementation</name>
   <description>TCP Nukleus Implementation</description>
   <url>https://github.com/reaktivity/build-template.java</url>
@@ -46,9 +46,9 @@
     <junit.version>4.12</junit.version>
     <k3po.version>3.0.0-alpha-54</k3po.version>
     <jmh.version>1.12</jmh.version>
-    <nukleus.plugin.version>0.3</nukleus.plugin.version>
-    <nukleus.version>0.1</nukleus.version>
-    <nukleus.tcp.spec.version>0.1</nukleus.tcp.spec.version>
+    <nukleus.plugin.version>0.6.1</nukleus.plugin.version>
+    <nukleus.version>0.2</nukleus.version>
+    <nukleus.tcp.spec.version>0.3</nukleus.tcp.spec.version>
     <reaktor.test.version>0.1</reaktor.test.version>
     <reaktor.version>0.1</reaktor.version>
   </properties>
@@ -74,6 +74,7 @@
       <groupId>org.reaktivity</groupId>
       <artifactId>reaktor-test</artifactId>
       <version>${reaktor.test.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -120,7 +121,7 @@
         <artifactId>nukleus-maven-plugin</artifactId>
         <version>${nukleus.plugin.version}</version>
         <configuration>
-          <scopeNames>common tcp</scopeNames>
+          <scopeNames>core tcp</scopeNames>
           <packageName>org.reaktivity.nukleus.tcp.internal.types</packageName>
         </configuration>
         <executions>

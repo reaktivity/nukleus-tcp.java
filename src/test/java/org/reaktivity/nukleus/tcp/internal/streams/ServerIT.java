@@ -36,7 +36,8 @@ import org.reaktivity.reaktor.test.NukleusRule;
 public class ServerIT
 {
     private final K3poRule k3po = new K3poRule()
-            .setScriptRoot("org/reaktivity/specification/nukleus/tcp");
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/tcp/streams");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -45,24 +46,20 @@ public class ServerIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .streams("tcp", "reply");
+        .streams("tcp", "target");
 
     @Rule
     public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
 
     @Test
     @Specification({
-        "control/bind/server/initial/controller",
-        "control/bind/server/reply/controller",
-        "control/route/server/initial/controller",
-        "control/route/server/reply/controller",
-        "streams/connection.established/server/target",
-        "streams/connection.established/server/reply"
-        })
+        "${route}/input/new/controller",
+        "${streams}/connection.established/server/target"
+    })
     public void shouldEstablishConnection() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_REPLY");
+        k3po.awaitBarrier("ROUTED_INPUT");
 
         new Socket("127.0.0.1", 0x1f90).close();
 
@@ -71,16 +68,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "control/bind/server/initial/controller",
-        "control/bind/server/reply/controller",
-        "control/route/server/initial/controller",
-        "control/route/server/reply/controller",
-        "streams/server.sent.data/server/target",
-        "streams/server.sent.data/server/reply" })
+        "${route}/input/new/controller",
+        "${streams}/server.sent.data/server/target"
+    })
     public void shouldReceiveServerSentData() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_REPLY");
+        k3po.awaitBarrier("ROUTED_INPUT");
 
         try (Socket socket = new Socket("127.0.0.1", 0x1f90))
         {
@@ -97,15 +91,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "control/bind/server/initial/controller",
-        "control/route/server/initial/controller",
-        "streams/client.sent.data/server/target" })
+        "${route}/input/new/controller",
+        "${streams}/client.sent.data/server/target"
+    })
     public void shouldReceiveClientSentData() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("BOUND_INITIAL");
-        k3po.notifyBarrier("BOUND_REPLY");
-        k3po.awaitBarrier("ROUTED_INITIAL");
+        k3po.awaitBarrier("ROUTED_INPUT");
 
         try (Socket socket = new Socket("127.0.0.1", 0x1f90))
         {
@@ -119,16 +111,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "control/bind/server/initial/controller",
-        "control/bind/server/reply/controller",
-        "control/route/server/initial/controller",
-        "control/route/server/reply/controller",
-        "streams/echo.data/server/target",
-        "streams/echo.data/server/reply" })
+        "${route}/input/new/controller",
+        "${streams}/echo.data/server/target"
+    })
     public void shouldEchoData() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_REPLY");
+        k3po.awaitBarrier("ROUTED_INPUT");
 
         try (Socket socket = new Socket("127.0.0.1", 0x1f90))
         {
@@ -154,16 +143,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "control/bind/server/initial/controller",
-        "control/bind/server/reply/controller",
-        "control/route/server/initial/controller",
-        "control/route/server/reply/controller",
-        "streams/server.close/server/target",
-        "streams/server.close/server/reply" })
+        "${route}/input/new/controller",
+        "${streams}/server.close/server/target"
+    })
     public void shouldInitiateServerClose() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_REPLY");
+        k3po.awaitBarrier("ROUTED_INPUT");
 
         try (Socket socket = new Socket("127.0.0.1", 0x1f90))
         {
@@ -180,16 +166,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "control/bind/server/initial/controller",
-        "control/bind/server/reply/controller",
-        "control/route/server/initial/controller",
-        "control/route/server/reply/controller",
-        "streams/client.close/server/target",
-        "streams/client.close/server/reply" })
+        "${route}/input/new/controller",
+        "${streams}/client.close/server/target"
+    })
     public void shouldInitiateClientClose() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_REPLY");
+        k3po.awaitBarrier("ROUTED_INPUT");
 
         try (Socket socket = new Socket("127.0.0.1", 0x1f90))
         {

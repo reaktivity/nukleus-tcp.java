@@ -125,7 +125,7 @@ public class Route
     public static Predicate<Route> addressMatches(
         SocketAddress address)
     {
-        Objects.requireNonNull(address);
-        return r -> address.equals(r.address);
+        // allow null address
+        return r -> Objects.equals(address, r.address);
     }
 }
