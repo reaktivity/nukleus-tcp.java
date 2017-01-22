@@ -15,12 +15,16 @@
  */
 package org.reaktivity.nukleus.tcp.internal.writer;
 
+import static org.reaktivity.nukleus.tcp.internal.writer.Route.sourceRefMatches;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.LongFunction;
+import java.util.function.Predicate;
 
 import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
@@ -31,6 +35,7 @@ import org.agrona.concurrent.ringbuffer.RingBuffer;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.tcp.internal.connector.Connector;
 import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
+import org.reaktivity.nukleus.tcp.internal.router.Correlation;
 import org.reaktivity.nukleus.tcp.internal.router.RouteKind;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.FrameFW;
@@ -50,7 +55,8 @@ public final class Source implements Nukleus
     private final String partitionName;
     private final Connector connector;
     private final LongFunction<List<Route>> lookupRoutes;
-    private final LongFunction<SocketChannel> resolveReply;
+    private final LongFunction<Correlation> resolveCorrelation;
+    private final Function<String, Target> supplyTarget;
     private final StreamsLayout layout;
     private final AtomicBuffer writeBuffer;
     private final RingBuffer streamsBuffer;
@@ -62,14 +68,16 @@ public final class Source implements Nukleus
         String partitionName,
         Connector connector,
         LongFunction<List<Route>> lookupRoutes,
-        LongFunction<SocketChannel> resolveReply,
+        LongFunction<Correlation> resolveCorrelation,
+        Function<String, Target> supplyTarget,
         StreamsLayout layout,
         AtomicBuffer writeBuffer)
     {
         this.partitionName = partitionName;
         this.connector = connector;
         this.lookupRoutes = lookupRoutes;
-        this.resolveReply = resolveReply;
+        this.resolveCorrelation = resolveCorrelation;
+        this.supplyTarget = supplyTarget;
         this.layout = layout;
         this.writeBuffer = writeBuffer;
         this.streamsBuffer = layout.streamsBuffer();
@@ -138,21 +146,55 @@ public final class Source implements Nukleus
         final long referenceId = beginRO.referenceId();
         final long correlationId = beginRO.correlationId();
 
-        switch (RouteKind.match(referenceId))
+        if (referenceId == 0L)
         {
-        case SERVER_REPLY:
-            handleBeginServerReply(buffer, index, length, streamId, referenceId, correlationId);
-            break;
-        case CLIENT_INITIAL:
-            handleBeginClientInitial(streamId, referenceId, correlationId);
-            break;
-        default:
-            doReset(streamId);
-            break;
+            handleBeginDefaultOutputEstablished(buffer, index, length, streamId, correlationId);
+        }
+        else
+        {
+            switch (RouteKind.match(referenceId))
+            {
+            case OUTPUT_NEW:
+                handleBeginOutputNew(streamId, referenceId, correlationId);
+                break;
+            case OUTPUT_ESTABLISHED:
+                handleBeginOutputEstablished(buffer, index, length, streamId, referenceId, correlationId);
+                break;
+            default:
+                doReset(streamId);
+                break;
+            }
         }
     }
 
-    private void handleBeginServerReply(
+    private void handleBeginDefaultOutputEstablished(
+        MutableDirectBuffer buffer,
+        int index,
+        int length,
+        final long streamId,
+        final long correlationId)
+    {
+        final Correlation correlation = resolveCorrelation.apply(correlationId);
+
+        if (correlation != null)
+        {
+            final SocketChannel channel = correlation.channel();
+
+            final String targetName = correlation.source();
+            final Target target = supplyTarget.apply(targetName);
+            final MessageHandler newStream = streamFactory.newStream(streamId, target, channel);
+
+            streams.put(streamId, newStream);
+
+            newStream.onMessage(BeginFW.TYPE_ID, buffer, index, length);
+        }
+        else
+        {
+            doReset(streamId);
+        }
+    }
+
+    private void handleBeginOutputEstablished(
         MutableDirectBuffer buffer,
         int index,
         int length,
@@ -161,14 +203,19 @@ public final class Source implements Nukleus
         final long correlationId)
     {
         final List<Route> routes = lookupRoutes.apply(referenceId);
-        final SocketChannel channel = resolveReply.apply(correlationId);
+        final Correlation correlation = resolveCorrelation.apply(correlationId);
+
+        final Predicate<Route> filter =
+                sourceRefMatches(referenceId);
 
         final Optional<Route> optional = routes.stream()
-              .filter(r -> validateReplyRoute(r, channel))
-              .findFirst();
+                .filter(filter)
+                .findFirst();
 
-        if (optional.isPresent())
+        if (optional.isPresent() && correlation != null)
         {
+            final SocketChannel channel = correlation.channel();
+
             final Route route = optional.get();
             final Target target = route.target();
             final MessageHandler newStream = streamFactory.newStream(streamId, target, channel);
@@ -183,7 +230,7 @@ public final class Source implements Nukleus
         }
     }
 
-    private void handleBeginClientInitial(
+    private void handleBeginOutputNew(
         final long streamId,
         final long referenceId,
         final long correlationId)
@@ -213,23 +260,6 @@ public final class Source implements Nukleus
         {
             doReset(streamId);
         }
-    }
-
-    private boolean validateReplyRoute(
-        final Route route,
-        final SocketChannel channel)
-    {
-        try
-        {
-            return route != null && channel != null && route.address().equals(channel.getLocalAddress());
-        }
-        catch (IOException ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
-        }
-
-        // unreachable
-        return false;
     }
 
     private SocketChannel newSocketChannel()

@@ -15,102 +15,71 @@
  */
 package org.reaktivity.nukleus.tcp.internal.router;
 
+import java.util.function.LongSupplier;
+
 import org.agrona.concurrent.status.AtomicCounter;
 
 public enum RouteKind
 {
-    SERVER_INITIAL
+    INPUT_NEW
     {
         @Override
-        public int kind()
-        {
-            return 0x21;
-        }
-
-        @Override
-        public final long nextRef(
-            AtomicCounter counter)
+        protected final long nextRef(
+            LongSupplier getAndIncrement,
+            LongSupplier get)
         {
             // positive, even, non-zero
-            counter.increment();
-            return counter.get() << 1L;
+            getAndIncrement.getAsLong();
+            return get.getAsLong() << 1L;
         }
     },
 
-    SERVER_REPLY
+    OUTPUT_ESTABLISHED
     {
         @Override
-        public int kind()
-        {
-            return 0x22;
-        }
-
-        @Override
-        public final long nextRef(
-            AtomicCounter counter)
+        protected final long nextRef(
+            LongSupplier getAndIncrement,
+            LongSupplier get)
         {
             // negative, even, non-zero
-            counter.increment();
-            return counter.get() << 1L | 0x8000000000000000L;
+            getAndIncrement.getAsLong();
+            return get.getAsLong() << 1L | 0x8000000000000000L;
         }
     },
 
-    CLIENT_INITIAL
+    OUTPUT_NEW
     {
         @Override
-        public int kind()
-        {
-            return 0x11;
-        }
-
-        @Override
-        public final long nextRef(
-            AtomicCounter counter)
+        protected final long nextRef(
+            LongSupplier getAndIncrement,
+            LongSupplier get)
         {
             // positive, odd
-            return (counter.increment() << 1L) | 1L;
+            return (getAndIncrement.getAsLong() << 1L) | 1L;
         }
     },
 
-    CLIENT_REPLY
+    INPUT_ESTABLISHED
     {
         @Override
-        public int kind()
-        {
-            return 0x12;
-        }
-
-        @Override
-        public final long nextRef(
-            AtomicCounter counter)
+        protected final long nextRef(
+            LongSupplier getAndIncrement,
+            LongSupplier get)
         {
             // negative, odd
-            return (counter.increment() << 1L) | 0x8000000000000001L;
+            return (getAndIncrement.getAsLong() << 1L) | 0x8000000000000001L;
         }
     };
 
-    public abstract long nextRef(
-        AtomicCounter counter);
-
-    public abstract int kind();
-
-    public static RouteKind of(
-        int kind)
+    public final long nextRef(
+        AtomicCounter counter)
     {
-        switch (kind)
-        {
-        case 0x11:
-            return CLIENT_INITIAL;
-        case 0x12:
-            return CLIENT_REPLY;
-        case 0x21:
-            return SERVER_INITIAL;
-        case 0x22:
-            return SERVER_REPLY;
-        default:
-            throw new IllegalArgumentException("Unexpected kind: " + kind);
-        }
+        return nextRef(counter::increment, counter::get);
     }
+
+    protected abstract long nextRef(
+        LongSupplier getAndIncrement,
+        LongSupplier get);
 
     public static RouteKind match(
         long referenceId)
@@ -118,13 +87,13 @@ public enum RouteKind
         switch ((int)referenceId & 0x01 | (int)(referenceId >> 32) & 0x80000000)
         {
         case 0x00000001:
-            return CLIENT_INITIAL;
+            return OUTPUT_NEW;
         case 0x80000001:
-            return CLIENT_REPLY;
+            return INPUT_ESTABLISHED;
         case 0x00000000:
-            return SERVER_INITIAL;
+            return INPUT_NEW;
         case 0x80000000:
-            return SERVER_REPLY;
+            return OUTPUT_ESTABLISHED;
         default:
             throw new IllegalArgumentException();
         }

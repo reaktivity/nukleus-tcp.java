@@ -84,6 +84,7 @@ public final class Acceptor extends TransportPoller implements Nukleus
     public void doRegister(
         long correlationId,
         String sourceName,
+        long sourceRef,
         SocketAddress address)
     {
         try
@@ -94,7 +95,7 @@ public final class Acceptor extends TransportPoller implements Nukleus
             // TODO: maintain register count
             attach(key, sourceName);
 
-            conductor.onRoutedResponse(correlationId);
+            conductor.onRoutedResponse(correlationId, sourceRef);
         }
         catch (Exception ex)
         {

@@ -15,7 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.reader;
 
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.ipAddress;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.socketAddress;
 
 import java.net.InetSocketAddress;
 
@@ -153,9 +153,9 @@ public final class Target implements Nukleus
     {
         return (buffer, offset, limit) ->
             beginExRW.wrap(buffer, offset, limit)
-                     .localAddress(a -> ipAddress(localAddress, a::ipv4Address, a::ipv6Address))
+                     .localAddress(a -> socketAddress(localAddress, a::ipv4Address, a::ipv6Address))
                      .localPort(localAddress.getPort())
-                     .remoteAddress(a -> ipAddress(remoteAddress, a::ipv4Address, a::ipv6Address))
+                     .remoteAddress(a -> socketAddress(remoteAddress, a::ipv4Address, a::ipv6Address))
                      .remotePort(remoteAddress.getPort())
                      .build()
                      .length();

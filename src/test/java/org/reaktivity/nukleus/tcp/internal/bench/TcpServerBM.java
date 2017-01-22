@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.bench;
 
+import static java.net.InetAddress.getByName;
 import static java.nio.ByteBuffer.allocateDirect;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -23,7 +24,8 @@ import static org.agrona.BitUtil.SIZE_OF_LONG;
 import static org.agrona.IoUtil.createEmptyFile;
 import static org.reaktivity.nukleus.Configuration.DIRECTORY_PROPERTY_NAME;
 import static org.reaktivity.nukleus.Configuration.STREAMS_BUFFER_CAPACITY_PROPERTY_NAME;
-import static org.reaktivity.nukleus.tcp.internal.router.RouteKind.SERVER_INITIAL;
+import static org.reaktivity.nukleus.tcp.internal.types.control.Role.INPUT;
+import static org.reaktivity.nukleus.tcp.internal.types.control.State.NEW;
 
 import java.io.File;
 import java.net.InetSocketAddress;
@@ -96,7 +98,6 @@ public class TcpServerBM
 
     private final Random random = new Random();
     private final long targetRef = random.nextLong();
-    private long sourceRef;
 
     @Setup(Level.Trial)
     public void reinit() throws Exception
@@ -111,8 +112,7 @@ public class TcpServerBM
         createEmptyFile(target.getAbsoluteFile(), length);
 
         TcpController controller = reaktor.controller(TcpController.class);
-        this.sourceRef = controller.bind(SERVER_INITIAL.kind()).get();
-        controller.route("any", sourceRef, "target", targetRef, new InetSocketAddress("localhost", 8080)).get();
+        controller.route(INPUT, NEW, "any", 8080, "target", targetRef, getByName("127.0.0.1")).get();
 
         this.streams = controller.streams("any", "target");
     }
@@ -124,7 +124,7 @@ public class TcpServerBM
         this.streams = null;
 
         TcpController controller = reaktor.controller(TcpController.class);
-        controller.unroute("any", sourceRef, "target", targetRef, new InetSocketAddress("localhost", 8080)).get();
+        controller.unroute(INPUT, NEW, "any", 8080, "target", targetRef, getByName("127.0.0.1")).get();
     }
 
     @Benchmark
