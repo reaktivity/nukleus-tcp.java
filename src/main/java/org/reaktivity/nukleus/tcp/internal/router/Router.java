@@ -287,8 +287,15 @@ public final class Router extends Nukleus.Composite
                 sourceRef = OUTPUT_NEW.nextRef(routesSourced);
             }
 
-            Writer writer = writers.computeIfAbsent(sourceName, this::newWriter);
             InetSocketAddress remoteAddress = new InetSocketAddress(targetName, (int)targetRef);
+
+            // TODO: support network device for remote address gateway route
+            targetName = "any";
+
+            Reader reader = readers.computeIfAbsent(targetName, this::newReader);
+            reader.doRouteDefault(correlationId, sourceName);
+
+            Writer writer = writers.computeIfAbsent(sourceName, this::newWriter);
             writer.doRoute(correlationId, sourceRef, targetName, targetRef, remoteAddress);
         }
         else
@@ -374,6 +381,10 @@ public final class Router extends Nukleus.Composite
         if (writer != null && address == null)
         {
             InetSocketAddress remoteAddress = new InetSocketAddress(targetName, (int)targetRef);
+
+            // TODO: support network device for remote address gateway route
+            targetName = "any";
+
             writer.doUnroute(correlationId, sourceRef, targetName, targetRef, remoteAddress);
         }
         else

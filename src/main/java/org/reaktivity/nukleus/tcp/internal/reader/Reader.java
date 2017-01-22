@@ -143,6 +143,21 @@ public final class Reader extends Nukleus.Composite
         }
     }
 
+    public void doRouteDefault(
+        long correlationId,
+        String targetName)
+    {
+        try
+        {
+            targetsByName.computeIfAbsent(targetName, this::newTarget);
+        }
+        catch (Exception ex)
+        {
+            conductor.onErrorResponse(correlationId);
+            LangUtil.rethrowUnchecked(ex);
+        }
+    }
+
     public void doRouteAccept(
         long correlationId,
         long sourceRef,
