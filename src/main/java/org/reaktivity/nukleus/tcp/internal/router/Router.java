@@ -67,7 +67,7 @@ public final class Router extends Nukleus.Composite
         this.correlations = new Long2ObjectHashMap<>();
         this.readers = new HashMap<>();
         this.writers = new HashMap<>();
-        routesSourced = context.counters().routesSourced();
+        this.routesSourced = context.counters().routesSourced();
     }
 
     public void setConductor(Conductor conductor)
