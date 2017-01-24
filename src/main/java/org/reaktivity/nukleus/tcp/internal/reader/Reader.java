@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.function.Predicate;
 
+import org.agrona.CloseHelper;
 import org.agrona.LangUtil;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
@@ -86,6 +87,7 @@ public final class Reader extends Nukleus.Composite
     }
 
     public void onAccepted(
+        long sourceRef,
         long targetId,
         long correlationId,
         SocketChannel channel,
@@ -95,8 +97,9 @@ public final class Reader extends Nukleus.Composite
                 sourceMatches(sourceName)
                  .and(addressMatches(address));
 
-        final Optional<Route> optional = routesByRef.values().stream()
-            .flatMap(rs -> rs.stream())
+        final List<Route> routes = routesByRef.getOrDefault(sourceRef, EMPTY_ROUTES);
+
+        final Optional<Route> optional = routes.stream()
             .filter(filter)
             .findFirst();
 
@@ -107,6 +110,10 @@ public final class Reader extends Nukleus.Composite
             final long targetRef = route.targetRef();
 
             source.onBegin(target, targetRef, targetId, correlationId, channel);
+        }
+        else
+        {
+            CloseHelper.close(channel);
         }
     }
 

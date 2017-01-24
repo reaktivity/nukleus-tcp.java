@@ -20,6 +20,7 @@ import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static org.agrona.CloseHelper.quietClose;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.NetworkChannel;
 import java.nio.channels.SelectionKey;
@@ -148,9 +149,10 @@ public final class Acceptor extends TransportPoller implements Nukleus
             channel.configureBlocking(false);
 
             final String sourceName = attachment(selectionKey);
-            final SocketAddress address = channel.getLocalAddress();
+            final InetSocketAddress address = localAddress(channel);
+            final long sourceRef = address.getPort();
 
-            router.onAccepted(sourceName, channel, address);
+            router.onAccepted(sourceName, sourceRef, channel, address);
         }
         catch (Exception ex)
         {
@@ -227,6 +229,12 @@ public final class Acceptor extends TransportPoller implements Nukleus
         SelectionKey selectionKey)
     {
         return (ServerSocketChannel) selectionKey.channel();
+    }
+
+    private static InetSocketAddress localAddress(
+        SocketChannel channel) throws IOException
+    {
+        return (InetSocketAddress) channel.getLocalAddress();
     }
 
     private static String attachment(

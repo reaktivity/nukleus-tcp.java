@@ -178,6 +178,7 @@ public final class Router extends Nukleus.Composite
 
     public void onAccepted(
         String sourceName,
+        long sourceRef,
         SocketChannel channel,
         SocketAddress address)
     {
@@ -189,7 +190,7 @@ public final class Router extends Nukleus.Composite
         correlations.put(correlationId, correlation);
 
         Reader reader = readers.computeIfAbsent(sourceName, this::newReader);
-        reader.onAccepted(targetId, correlationId, channel, address);
+        reader.onAccepted(sourceRef, targetId, correlationId, channel, address);
     }
 
     public void onConnected(
