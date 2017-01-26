@@ -142,7 +142,7 @@ public class PartialWriteIT
             Instrumentation inst,
             AgentBuilder.Listener listener)
         {
-            new AgentBuilder.Default()
+            new AgentBuilder.Default().ignore(ElementMatchers.none()).enableUnsafeBootstrapInjection()
               .with(listener)
               .type(ElementMatchers.isSubTypeOf(SocketChannel.class))
                       //.or(ElementMatchers.isSubTypeOf(ServerSocketChannel.class)))
@@ -208,12 +208,6 @@ public class PartialWriteIT
         return new AgentBuilder.Listener.Adapter()
         {
             @Override
-            public void onComplete(String arg0, ClassLoader arg1, JavaModule arg2, boolean arg3)
-            {
-                System.out.println("COMPLETE:" + arg0);
-            }
-
-            @Override
             public void onError(String typeName, ClassLoader arg1, JavaModule arg2, boolean arg3, Throwable throwable)
             {
                 System.out.println("ERROR: " + typeName);
@@ -223,7 +217,9 @@ public class PartialWriteIT
             @Override
             public void onIgnored(TypeDescription arg0, ClassLoader arg1, JavaModule arg2, boolean arg3)
             {
-                System.out.println("IGNORED:" + arg0);
+                if (arg0.getSimpleName().contains("SocketChannelImpl")) {
+                    System.out.println("IGNORED:" + arg0);
+                }
             }
 
             @Override
