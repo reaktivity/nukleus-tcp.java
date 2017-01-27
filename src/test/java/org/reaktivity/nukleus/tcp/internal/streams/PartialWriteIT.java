@@ -22,13 +22,15 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
+import java.util.Queue;
 
 import org.jboss.byteman.contrib.bmunit.BMScript;
 import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
 import org.jboss.byteman.rule.helper.Helper;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -39,6 +41,13 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.NukleusRule;
 
+/**
+ * This test verifies the handling of incomplete writes, when attempts to write data to a socket channel
+ * fail to write out all of the data. In real life this would happen when a client is reading data at a lower
+ * speed than it is being written by the server. For testing purposes this test simulates the condition
+ * by rewriting the bytecode of the SocketChannelImpl.write method to make that method exhibit the behavior of
+ * incomplete writes.
+ */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 public class PartialWriteIT
 {
@@ -58,6 +67,12 @@ public class PartialWriteIT
     @Rule
     public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
 
+    @Before
+    public void resetWriteHelper()
+    {
+        TestHelper.reset();
+    }
+
     @Test
     @Specification({
         "${route}/input/new/controller",
@@ -65,9 +80,34 @@ public class PartialWriteIT
     })
     @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
-    public void shouldReceiveServerSentData() throws Exception
+    public void shouldSpinWrite() throws Exception
     {
-        TestHelper.forcePartialWrites = true;
+        for (int i=0; i < 10; i++)
+        {
+            TestHelper.addWriteResult(0);
+        }
+        shouldReceiveServerSentData();
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/server.sent.data/server/target"
+    })
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
+    @BMScript(value="PartialWriteIT.btm")
+    public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
+    {
+        TestHelper.addWriteResult(5);
+        shouldReceiveServerSentData();
+    }
+
+    /*
+         shouldWriteWhenMoreDataArrivesBeforeSocketWritable
+     */
+
+    private void shouldReceiveServerSentData() throws Exception
+    {
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
@@ -84,30 +124,10 @@ public class PartialWriteIT
         k3po.finish();
     }
 
-    @Test
-    @Specification({
-        "${route}/input/new/controller",
-        "${streams}/client.sent.data/server/target"
-    })
-    public void shouldReceiveClientSentData() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
-
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
-        {
-            final OutputStream out = socket.getOutputStream();
-
-            out.write("client data".getBytes());
-
-            k3po.finish();
-        }
-    }
-
     public static class TestHelper extends Helper
     {
+        public static Queue<Integer> writeResults;
         private static int oldLimit;
-        private static boolean forcePartialWrites = false;
 
         protected TestHelper(org.jboss.byteman.rule.Rule rule)
         {
@@ -116,26 +136,44 @@ public class PartialWriteIT
 
         public void preWrite(ByteBuffer b)
         {
-            if (callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
-                    true, true) && forcePartialWrites)
+            if (!callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
+                    true, true))
+            {
+                return;
+            }
+            Integer toWrite = writeResults.peek();
+            if (toWrite != null)
             {
                 oldLimit = b.limit();
-                debug(format("preWrite: forcing partial write for buffer %s, change limit from %d to %d",
-                        b, b.limit(), oldLimit / 2));
-                b.limit(oldLimit / 2);
+                int originalBytesToWrite = b.limit() - b.position();
+                debug(format("preWrite: forcing partial write for buffer %s, writing %d bytes of %d, changing limit to %d",
+                        b, toWrite, originalBytesToWrite, b.position() + toWrite));
+                b.limit(b.position() + toWrite);
             }
-
         }
 
         public void postWrite(ByteBuffer b, int returnValue)
         {
-            if (callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
-                    true, true) && forcePartialWrites)
+            if (!callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
+                    true, true))
             {
-                debug(format("postWrite: buffer after write is: %s, return value is %d, setting limit to %d",
+                return;
+            }
+            Integer toWrite = writeResults.poll();
+            if (toWrite != null)
+            {
+                debug(format("postWrite: buffer after write is: %s, return value is %d, setting limit back to %d",
                         b, returnValue, oldLimit));
                 b.limit(oldLimit);
             }
+        }
+
+        private static void addWriteResult(Integer writeResult) {
+            writeResults.add(writeResult);
+        }
+
+        private static void reset() {
+            writeResults = new ArrayDeque(20);
         }
 
     }

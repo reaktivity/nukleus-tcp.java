@@ -32,6 +32,11 @@ import org.reaktivity.nukleus.tcp.internal.writer.Target;
 
 public final class StreamFactory
 {
+    // Mina uses a value of 256 (see AbstractPollingIoProcessor.writeBuffer).
+    // Netty uses a configurable value, defaulting to 16
+    // (see https://netty.io/4.0/api/io/netty/channel/ChannelConfig.html#setWriteSpinCount(int))
+    public static final int WRITE_SPIN_COUNT = 16;
+
     private final BeginFW beginRO = new BeginFW();
     private final DataFW dataRO = new DataFW();
     private final EndFW endRO = new EndFW();
@@ -138,7 +143,16 @@ public final class StreamFactory
                 buffer.getBytes(payload.offset() + 1, writeBuffer, writableBytes);
                 writeBuffer.flip();
 
-                final int bytesWritten = channel.write(writeBuffer);
+                int bytesWritten = 0;
+
+                for (int i = WRITE_SPIN_COUNT; i > 0; i--)
+                {
+                    bytesWritten = channel.write(writeBuffer);
+                    if (bytesWritten > 0)
+                    {
+                        break;
+                    }
+                }
 
                 if (bytesWritten < writableBytes)
                 {
