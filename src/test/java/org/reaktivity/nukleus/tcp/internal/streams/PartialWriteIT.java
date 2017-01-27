@@ -63,7 +63,6 @@ public class PartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data/server/target"
     })
-    // TODO: use target/test-classes ?
     @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldReceiveServerSentData() throws Exception
