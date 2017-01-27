@@ -15,43 +15,31 @@
  */
 package org.reaktivity.nukleus.tcp.internal.streams;
 
+import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static net.bytebuddy.matcher.ElementMatchers.isPublic;
-import static net.bytebuddy.matcher.ElementMatchers.named;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.instrument.Instrumentation;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 
-import org.junit.BeforeClass;
+import org.jboss.byteman.contrib.bmunit.BMScript;
+import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
+import org.jboss.byteman.rule.helper.Helper;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.NukleusRule;
 
-import net.bytebuddy.agent.ByteBuddyAgent;
-import net.bytebuddy.agent.builder.AgentBuilder;
-import net.bytebuddy.description.type.TypeDescription;
-import net.bytebuddy.dynamic.DynamicType;
-import net.bytebuddy.dynamic.DynamicType.Builder;
-import net.bytebuddy.dynamic.scaffold.InstrumentedType;
-import net.bytebuddy.implementation.Implementation;
-import net.bytebuddy.implementation.MethodDelegation;
-import net.bytebuddy.implementation.bytecode.ByteCodeAppender;
-import net.bytebuddy.matcher.ElementMatchers;
-import net.bytebuddy.utility.JavaModule;
-
+@RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 public class PartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -70,29 +58,17 @@ public class PartialWriteIT
     @Rule
     public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
 
-    @BeforeClass
-    public static void setupByteBuddyAgent()
-    {
-        Instrumentation instrumentation = ByteBuddyAgent.install();
-        TestAgent.installOn(instrumentation, listener());
-//        try
-//        {
-//            Selector.open();
-//        }
-//        catch (IOException e)
-//        {
-//            // TODO Auto-generated catch block
-//            e.printStackTrace();
-//        }
-    }
-
     @Test
     @Specification({
         "${route}/input/new/controller",
         "${streams}/server.sent.data/server/target"
     })
+    // TODO: use target/test-classes ?
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
+    @BMScript(value="PartialWriteIT.btm")
     public void shouldReceiveServerSentData() throws Exception
     {
+        TestHelper.forcePartialWrites = true;
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
@@ -129,116 +105,40 @@ public class PartialWriteIT
         }
     }
 
-    public static final class TestAgent
+    public static class TestHelper extends Helper
     {
-        public static void premain(
-            String args,
-            Instrumentation inst)
+        private static int oldLimit;
+        private static boolean forcePartialWrites = false;
+
+        protected TestHelper(org.jboss.byteman.rule.Rule rule)
         {
-            installOn(inst, AgentBuilder.Listener.StreamWriting.toSystemOut());
+            super(rule);
         }
 
-        static void installOn(
-            Instrumentation inst,
-            AgentBuilder.Listener listener)
+        public void preWrite(ByteBuffer b)
         {
-            new AgentBuilder.Default().ignore(ElementMatchers.none()).enableUnsafeBootstrapInjection()
-              .with(listener)
-              .type(ElementMatchers.isSubTypeOf(SocketChannel.class))
-                      //.or(ElementMatchers.isSubTypeOf(ServerSocketChannel.class)))
-              .transform(new SocketChannelTransformer())
-              .installOn(inst);
-        }
-
-        private TestAgent()
-        {
-        }
-    }
-
-    private static final class SocketChannelTransformer implements AgentBuilder.Transformer
-    {
-
-        @Override
-        public Builder<?> transform(Builder<?> builder, TypeDescription arg1, ClassLoader arg2, JavaModule arg3)
-        { //hasDescriptor("(L ByteBuffer ;)I") .and(ElementMatchers.takesArguments(1))
-            return builder.method(isPublic().and(named("write").and(ElementMatchers.takesArguments(1))))
-                    // .intercept(FixedValue.value(3)); // blocks in Selector.open()
-                    .intercept(MethodDelegation.to(Write.class));
-                    //.intercept(SuperMethodCall.INSTANCE);// works
-        }
-
-    }
-
-    private static final class WriteMethod implements Implementation
-    {
-
-        @Override
-        public InstrumentedType prepare(InstrumentedType instrumentedType)
-        {
-            return instrumentedType;
-        }
-
-        @Override
-        public ByteCodeAppender appender(Target arg0)
-        {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-    }
-
-    public static class Write
-    {
-        static
-        {
-            System.out.println(Write.class.getName() + " loaded");
-        }
-
-        //@SuppressWarnings("unused") //@Origin Method zuper,
-        public static int write(ByteBuffer buffer)
-                throws IOException
-        {
-            System.out.println("Write " + buffer);
-            return 0; //(Integer) zuper.invoke(buffer);
-        }
-    }
-
-    private static AgentBuilder.Listener listener()
-    {
-        return new AgentBuilder.Listener.Adapter()
-        {
-            @Override
-            public void onError(String typeName, ClassLoader arg1, JavaModule arg2, boolean arg3, Throwable throwable)
+            if (callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
+                    true, true) && forcePartialWrites)
             {
-                System.out.println("ERROR: " + typeName);
-                throwable.printStackTrace(System.out);
+                oldLimit = b.limit();
+                debug(format("preWrite: forcing partial write for buffer %s, change limit from %d to %d",
+                        b, b.limit(), oldLimit / 2));
+                b.limit(oldLimit / 2);
             }
 
-            @Override
-            public void onIgnored(TypeDescription arg0, ClassLoader arg1, JavaModule arg2, boolean arg3)
-            {
-                if (arg0.getSimpleName().contains("SocketChannelImpl")) {
-                    System.out.println("IGNORED:" + arg0);
-                }
-            }
+        }
 
-            @Override
-            public void onTransformation(TypeDescription typeDescription, ClassLoader loader,
-                                         JavaModule arg2, boolean arg3, DynamicType dynamicType)
+        public void postWrite(ByteBuffer b, int returnValue)
+        {
+            if (callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
+                    true, true) && forcePartialWrites)
             {
-//              try
-//              {
-//                  dynamicType.saveIn(new File("target/generated-classes/bytebuddy"));
-//              }
-//              catch (IOException e)
-//              {
-//                  // TODO Auto-generated catch block
-//                  e.printStackTrace();
-//              }
-              System.out.println("TRANFORMED: " + typeDescription);
+                debug(format("postWrite: buffer after write is: %s, return value is %d, setting limit to %d",
+                        b, returnValue, oldLimit));
+                b.limit(oldLimit);
             }
+        }
 
-        };
     }
 
 }

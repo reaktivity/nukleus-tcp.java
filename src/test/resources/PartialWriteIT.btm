@@ -1,0 +1,16 @@
+RULE  enter write
+CLASS SocketChannelImpl
+METHOD write
+HELPER org.reaktivity.nukleus.tcp.internal.streams.PartialWriteIT$TestHelper
+AT ENTRY
+IF TRUE
+DO preWrite($1);
+ENDRULE
+RULE  exit write
+CLASS SocketChannelImpl
+METHOD write
+HELPER org.reaktivity.nukleus.tcp.internal.streams.PartialWriteIT$TestHelper
+AT EXIT
+IF TRUE
+DO postWrite($1, $!);
+ENDRULE
