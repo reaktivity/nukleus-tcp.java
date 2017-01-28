@@ -49,7 +49,7 @@ import org.reaktivity.reaktor.test.NukleusRule;
  * incomplete writes.
  */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-public class PartialWriteIT
+public class ServerPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
@@ -86,7 +86,7 @@ public class PartialWriteIT
         {
             TestHelper.addWriteResult(0);
         }
-        shouldReceiveServerSentData();
+        shouldReceiveServerSentData("server data");
     }
 
     @Test
@@ -99,14 +99,25 @@ public class PartialWriteIT
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
     {
         TestHelper.addWriteResult(5);
-        shouldReceiveServerSentData();
+        shouldReceiveServerSentData("server data");
     }
 
-    /*
-         shouldWriteWhenMoreDataArrivesBeforeSocketWritable
-     */
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/server.sent.data.multiple.frames/server/target"
+    })
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
+    @BMScript(value="PartialWriteIT.btm")
+    public void shouldWriteWhenMoreDataArrivesBeforeSocketWritable() throws Exception
+    {
+        TestHelper.addWriteResult(5);
+        // TODO: verify this is really forcing the desired condition: check handleWrite gets calls
+        // AFTER processData is called for the second frame
+        shouldReceiveServerSentData("server data 1server data 2");
+    }
 
-    private void shouldReceiveServerSentData() throws Exception
+    private void shouldReceiveServerSentData(String expectedData) throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
@@ -115,10 +126,20 @@ public class PartialWriteIT
         {
             final InputStream in = socket.getInputStream();
 
-            byte[] buf = new byte[256];
-            int len = in.read(buf);
+            byte[] buf = new byte[expectedData.length() + 10];
+            int offset = 0;
 
-            assertEquals("server data", new String(buf, 0, len, UTF_8));
+            int read = 0;
+            do
+            {
+                read = in.read(buf, offset, buf.length - offset);
+                if (read == -1)
+                {
+                    break;
+                }
+                offset += read;
+            } while (offset < expectedData.length());
+            assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
         }
 
         k3po.finish();
@@ -168,11 +189,13 @@ public class PartialWriteIT
             }
         }
 
-        private static void addWriteResult(Integer writeResult) {
+        private static void addWriteResult(Integer writeResult)
+        {
             writeResults.add(writeResult);
         }
 
-        private static void reset() {
+        private static void reset()
+        {
             writeResults = new ArrayDeque(20);
         }
 

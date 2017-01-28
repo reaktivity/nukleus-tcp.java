@@ -92,6 +92,39 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
+        "${streams}/server.sent.data.multiple.frames/server/target"
+    })
+    public void shouldReceiveServerSentDataMultipleFrames() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        {
+            final InputStream in = socket.getInputStream();
+
+            byte[] buf = new byte[256];
+            int offset = 0;
+
+            int read = 0;
+            do
+            {
+                read = in.read(buf, offset, buf.length - offset);
+                if (read == -1)
+                {
+                    break;
+                }
+                offset += read;
+            } while (offset < 26);
+            assertEquals("server data 1server data 2", new String(buf, 0, offset, UTF_8));
+        }
+
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
         "${streams}/client.sent.data/server/target"
     })
     public void shouldReceiveClientSentData() throws Exception
