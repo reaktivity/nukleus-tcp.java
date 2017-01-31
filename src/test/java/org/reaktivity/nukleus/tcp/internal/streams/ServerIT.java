@@ -145,6 +145,28 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
+        "${streams}/client.sent.data.multiple.frames/server/target"
+    })
+    public void shouldReceiveClientSentDataMultipleFrames() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        {
+            final OutputStream out = socket.getOutputStream();
+
+            out.write("client data 1".getBytes());
+            k3po.awaitBarrier("FIRST_DATA_FRAME_RECEIVED");
+            out.write("client data 2".getBytes());
+
+            k3po.finish();
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
         "${streams}/echo.data/server/target"
     })
     public void shouldEchoData() throws Exception

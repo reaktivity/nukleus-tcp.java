@@ -22,6 +22,8 @@ import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory.WRITE_SPIN_COUNT;
 
 import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
 
 import org.jboss.byteman.contrib.bmunit.BMScript;
@@ -37,15 +39,8 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.NukleusRule;
 
-/**
- * This test verifies the handling of incomplete writes, when attempts to write data to a socket channel
- * fail to write out all of the data. In real life this would happen when a client is reading data at a lower
- * speed than it is being written by the server. For testing purposes this test simulates the condition
- * by rewriting the bytecode of the SocketChannelImpl.write method to make that method exhibit the behavior of
- * incomplete writes.
- */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-public class ServerPartialWriteIT
+public class ClientPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
@@ -58,7 +53,7 @@ public class ServerPartialWriteIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .streams("tcp", "target");
+        .streams("tcp", "source");
 
     @Rule
     public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
@@ -71,10 +66,10 @@ public class ServerPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
-        "${streams}/server.sent.data/server/target"
+        "${route}/output/new/controller",
+        "${streams}/client.sent.data/client/source"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldSpinWrite() throws Exception
     {
@@ -82,26 +77,26 @@ public class ServerPartialWriteIT
         {
             PartialWriteBytemanHelper.addWriteResult(0);
         }
-        shouldReceiveServerSentData("server data");
+        shouldReceiveClientSentData("client data");
     }
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
-        "${streams}/server.sent.data/server/target"
+        "${route}/output/new/controller",
+        "${streams}/client.sent.data/client/source"
     })
     @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
     {
         PartialWriteBytemanHelper.addWriteResult(5);
-        shouldReceiveServerSentData("server data");
+        shouldReceiveClientSentData("client data");
     }
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
-        "${streams}/server.sent.data.multiple.frames/server/target"
+        "${route}/output/new/controller",
+        "${streams}/client.sent.data.multiple.frames/client/source"
     })
     @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
@@ -110,35 +105,43 @@ public class ServerPartialWriteIT
         PartialWriteBytemanHelper.addWriteResult(5);
         // TODO: verify this is really forcing the desired condition: check handleWrite gets called
         // AFTER processData is called for the second frame
-        shouldReceiveServerSentData("server data 1server data 2");
+        shouldReceiveClientSentData("client data 1client data 2");
     }
 
-    private void shouldReceiveServerSentData(String expectedData) throws Exception
+    private void shouldReceiveClientSentData(String expectedData) throws Exception
     {
-        k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
-
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (ServerSocket server = new ServerSocket())
         {
-            final InputStream in = socket.getInputStream();
+            server.setReuseAddress(true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
 
-            byte[] buf = new byte[expectedData.length() + 10];
-            int offset = 0;
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_OUTPUT");
 
-            int read = 0;
-            do
+            try (Socket socket = server.accept())
             {
-                read = in.read(buf, offset, buf.length - offset);
-                if (read == -1)
+                k3po.notifyBarrier("ROUTED_INPUT");
+
+                final InputStream in = socket.getInputStream();
+
+                byte[] buf = new byte[expectedData.length() + 10];
+                int offset = 0;
+
+                int read = 0;
+                do
                 {
-                    break;
-                }
-                offset += read;
-            } while (offset < expectedData.length());
-            assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+                    read = in.read(buf, offset, buf.length - offset);
+                    if (read == -1)
+                    {
+                        break;
+                    }
+                    offset += read;
+                } while (offset < expectedData.length());
+                assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+
+                k3po.finish();
+            }
         }
-
-        k3po.finish();
     }
-
 }

@@ -1,7 +1,7 @@
 RULE  enter write
 CLASS SocketChannelImpl
 METHOD write
-HELPER org.reaktivity.nukleus.tcp.internal.streams.PartialWriteIT$TestHelper
+HELPER org.reaktivity.nukleus.tcp.internal.streams.PartialWriteBytemanHelper
 AT ENTRY
 IF TRUE
 DO preWrite($1);
@@ -9,7 +9,7 @@ ENDRULE
 RULE  exit write
 CLASS SocketChannelImpl
 METHOD write
-HELPER org.reaktivity.nukleus.tcp.internal.streams.PartialWriteIT$TestHelper
+HELPER org.reaktivity.nukleus.tcp.internal.streams.PartialWriteBytemanHelper
 AT EXIT
 IF TRUE
 DO postWrite($1, $!);
