@@ -51,7 +51,6 @@ public final class StreamFactory
     public StreamFactory(
         Source source,
         int windowSize,
-        int maxMessageSize,
         int maxPartiallyWrittenStreams)
     {
         this.source = source;
@@ -147,13 +146,9 @@ public final class StreamFactory
 
                 int bytesWritten = 0;
 
-                for (int i = WRITE_SPIN_COUNT; i > 0; i--)
+                for (int i = WRITE_SPIN_COUNT; bytesWritten == 0 && i > 0; i--)
                 {
                     bytesWritten = channel.write(writeBuffer);
-                    if (bytesWritten > 0)
-                    {
-                        break;
-                    }
                 }
 
                 slot = writeSlab.written(id, slot, writeBuffer);

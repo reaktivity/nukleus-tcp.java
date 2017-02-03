@@ -24,8 +24,6 @@ public enum InternalSystemProperty
     // Maximum window size for nuklei writing data to the tcp nukleus
     WINDOW_SIZE("nukleus.tcp.window.size", "8192"),
 
-    MAXIMUM_MESSAGE_SIZE("nukleus.tcp.maximum.message.size", "8192"),
-
     MAXIMUM_STREAMS_WITH_PENDING_WRITES("nukleus.tcp.maximum.pending.write.streams");
 
     private final String name;
