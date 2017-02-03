@@ -127,6 +127,31 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
+        "${streams}/server.sent.data.and.close/server/target"
+    })
+    public void shouldReceiveServerSentDataAndClose() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        {
+            final InputStream in = socket.getInputStream();
+
+            byte[] buf = new byte[256];
+            int len = in.read(buf);
+
+            assertEquals("server data", new String(buf, 0, len, UTF_8));
+            len = in.read(buf);
+            assertEquals(-1, len);
+        }
+
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
         "${streams}/client.sent.data/server/target"
     })
     public void shouldReceiveClientSentData() throws Exception
@@ -161,6 +186,28 @@ public class ServerIT
             out.write("client data 1".getBytes());
             k3po.awaitBarrier("FIRST_DATA_FRAME_RECEIVED");
             out.write("client data 2".getBytes());
+
+            k3po.finish();
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/client.sent.data.and.close/server/target"
+    })
+    public void shouldReceiveClientSentDataAndClose() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        {
+            final OutputStream out = socket.getOutputStream();
+
+            out.write("client data".getBytes());
+
+            socket.shutdownOutput();
 
             k3po.finish();
         }

@@ -140,6 +140,37 @@ public class ClientIT
     @Test
     @Specification({
         "${route}/output/new/controller",
+        "${streams}/server.sent.data.and.close/client/source"
+    })
+    public void shouldReceiveServerSentDataAndClose() throws Exception
+    {
+        try (ServerSocket server = new ServerSocket())
+        {
+            server.setReuseAddress(true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_OUTPUT");
+
+            try (Socket socket = server.accept())
+            {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
+                final OutputStream out = socket.getOutputStream();
+
+                out.write("server data".getBytes());
+
+                socket.shutdownOutput();
+
+                k3po.finish();
+            }
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/output/new/controller",
         "${streams}/client.sent.data/client/source"
     })
     public void shouldReceiveClientSentData() throws Exception
@@ -208,6 +239,40 @@ public class ClientIT
             }
             finally
             {
+                k3po.finish();
+            }
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/output/new/controller",
+        "${streams}/client.sent.data.and.close/client/source"
+    })
+    public void shouldReceiveClientSentDataAndClose() throws Exception
+    {
+        try (ServerSocket server = new ServerSocket())
+        {
+            server.setReuseAddress(true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_OUTPUT");
+
+            try (Socket socket = server.accept())
+            {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
+                final InputStream in = socket.getInputStream();
+
+                byte[] buf = new byte[256];
+                int len = in.read(buf);
+
+                assertEquals("client data", new String(buf, 0, len, UTF_8));
+                len = in.read(buf);
+                assertEquals(-1, len);
+
                 k3po.finish();
             }
         }
