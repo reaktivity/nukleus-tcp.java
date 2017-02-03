@@ -18,11 +18,13 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory.WRITE_SPIN_COUNT;
 
 import java.io.InputStream;
 import java.net.Socket;
+import java.util.List;
 
 import org.jboss.byteman.contrib.bmunit.BMScript;
 import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
@@ -74,7 +76,7 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldSpinWrite() throws Exception
     {
@@ -90,7 +92,7 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
     {
@@ -101,17 +103,43 @@ public class ServerPartialWriteIT
     @Test
     @Specification({
         "${route}/input/new/controller",
+        "${streams}/server.sent.data/server/target"
+    })
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMScript(value="PartialWriteIT.btm")
+    public void shouldHandleMultiplePartialWrites() throws Exception
+    {
+        PartialWriteBytemanHelper.addWriteResult(2);
+        PartialWriteBytemanHelper.addWriteResult(3);
+        PartialWriteBytemanHelper.addWriteResult(1);
+        shouldReceiveServerSentData("server data");
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
         "${streams}/server.sent.data.multiple.frames/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
-    public void shouldWriteWhenMoreDataArrivesBeforeSocketWritable() throws Exception
+    public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
     {
         PartialWriteBytemanHelper.addWriteResult(5);
-        // TODO: verify this is really forcing the desired condition: check handleWrite gets called
-        // AFTER processData is called for the second frame
+        PartialWriteBytemanHelper.addWriteResult(8);
+        PartialWriteBytemanHelper.addWriteResult(5);
+        PartialWriteBytemanHelper.addWriteResult(5);
         shouldReceiveServerSentData("server data 1server data 2");
+
+        // Verify we forced the desired condition: check handleWrite got called
+        // AFTER processData was called for the second frame
+        List<String> callers = PartialWriteBytemanHelper.callers();
+        String error = "Test failed to force desired condition, caller sequence was: " + callers;
+        assertTrue(error, callers.lastIndexOf("handleWrite") >  callers.lastIndexOf("processData"));
     }
+
+    // TODO: shouldResetStreamsExceedingPartialWriteStreamsLimit
+
+    // TODO: Write exceeds window (requires new spec tests, should probably go in ServiceIT and ClientIT)
 
     private void shouldReceiveServerSentData(String expectedData) throws Exception
     {

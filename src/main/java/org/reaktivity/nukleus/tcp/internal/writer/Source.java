@@ -15,6 +15,8 @@
  */
 package org.reaktivity.nukleus.tcp.internal.writer;
 
+import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.MAXIMUM_MESSAGE_SIZE;
+import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
 import static org.reaktivity.nukleus.tcp.internal.writer.Route.sourceRefMatches;
 
 import java.io.IOException;
@@ -71,7 +73,8 @@ public final class Source implements Nukleus
         LongFunction<Correlation> resolveCorrelation,
         Function<String, Target> supplyTarget,
         StreamsLayout layout,
-        AtomicBuffer writeBuffer)
+        AtomicBuffer writeBuffer,
+        int maximumStreamsCount)
     {
         this.partitionName = partitionName;
         this.connector = connector;
@@ -82,7 +85,8 @@ public final class Source implements Nukleus
         this.writeBuffer = writeBuffer;
         this.streamsBuffer = layout.streamsBuffer();
         this.throttleBuffer = layout.throttleBuffer();
-        this.streamFactory = new StreamFactory(this, 8192, 8192); // TODO: configure 8192
+        this.streamFactory = new StreamFactory(this, WINDOW_SIZE.intValue(), MAXIMUM_MESSAGE_SIZE.intValue(),
+                maximumStreamsCount);
         this.streams = new Long2ObjectHashMap<>();
     }
 

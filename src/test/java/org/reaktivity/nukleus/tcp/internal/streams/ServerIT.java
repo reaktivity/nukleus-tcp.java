@@ -118,8 +118,10 @@ public class ServerIT
             } while (offset < 26);
             assertEquals("server data 1server data 2", new String(buf, 0, offset, UTF_8));
         }
-
-        k3po.finish();
+        finally
+        {
+            k3po.finish();
+        }
     }
 
     @Test

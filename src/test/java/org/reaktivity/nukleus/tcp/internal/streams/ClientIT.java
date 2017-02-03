@@ -109,6 +109,37 @@ public class ClientIT
     @Test
     @Specification({
         "${route}/output/new/controller",
+        "${streams}/server.sent.data.multiple.frames/client/source"
+    })
+    public void shouldReceiveServerSentDataMultipleFrames() throws Exception
+    {
+        try (ServerSocket server = new ServerSocket())
+        {
+            server.setReuseAddress(true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_OUTPUT");
+
+            try (Socket socket = server.accept())
+            {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
+                final OutputStream out = socket.getOutputStream();
+
+                out.write("server data 1".getBytes());
+                k3po.awaitBarrier("FIRST_DATA_FRAME_RECEIVED");
+                out.write("server data 2".getBytes());
+
+                k3po.finish();
+            }
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/output/new/controller",
         "${streams}/client.sent.data/client/source"
     })
     public void shouldReceiveClientSentData() throws Exception
@@ -133,6 +164,50 @@ public class ClientIT
 
                 assertEquals("client data", new String(buf, 0, len1, UTF_8));
 
+                k3po.finish();
+            }
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/output/new/controller",
+        "${streams}/client.sent.data.multiple.frames/client/source"
+    })
+    public void shouldReceiveClientSentDataMultipleFrames() throws Exception
+    {
+        try (ServerSocket server = new ServerSocket())
+        {
+            server.setReuseAddress(true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_OUTPUT");
+
+            try (Socket socket = server.accept())
+            {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
+                final InputStream in = socket.getInputStream();
+
+                byte[] buf = new byte[256];
+                int offset = 0;
+
+                int read = 0;
+                do
+                {
+                    read = in.read(buf, offset, buf.length - offset);
+                    if (read == -1)
+                    {
+                        break;
+                    }
+                    offset += read;
+                } while (offset < 26);
+                assertEquals("client data 1client data 2", new String(buf, 0, offset, UTF_8));
+            }
+            finally
+            {
                 k3po.finish();
             }
         }
