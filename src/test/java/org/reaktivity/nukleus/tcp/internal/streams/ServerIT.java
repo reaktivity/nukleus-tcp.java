@@ -167,8 +167,6 @@ public class ServerIT
 
             out.write("client data".getBytes());
 
-            socket.shutdownOutput();
-
             k3po.finish();
         }
     }

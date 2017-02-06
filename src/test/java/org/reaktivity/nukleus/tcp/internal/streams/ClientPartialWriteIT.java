@@ -170,47 +170,7 @@ public class ClientPartialWriteIT
         PartialWriteBytemanHelper.addWriteResult(2);
         PartialWriteBytemanHelper.addWriteResult(3);
         PartialWriteBytemanHelper.addWriteResult(1);
-        try (ServerSocket server = new ServerSocket())
-        {
-            server.setReuseAddress(true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
-            server.setSoTimeout((int) SECONDS.toMillis(5));
-
-            k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
-
-            try (Socket socket = server.accept())
-            {
-                k3po.notifyBarrier("ROUTED_INPUT");
-
-                final InputStream in = socket.getInputStream();
-
-                byte[] buf = new byte["client data".length() + 10];
-                int offset = 0;
-
-                int read = 0;
-                boolean closed = false;
-                do
-                {
-                    read = in.read(buf, offset, buf.length - offset);
-                    if (read == -1)
-                    {
-                        closed = true;
-                        break;
-                    }
-                    offset += read;
-                } while (offset < "client data".length());
-
-                if (!closed)
-                {
-                    closed = (in.read() == -1);
-                }
-                assertTrue("Stream was not closed", closed);
-                assertTrue("At least 2 bytes of data should have been received", offset > 2);
-                k3po.finish();
-            }
-        }
-    }
+        shouldReceiveClientSentData("client data", true);    }
 
     private void shouldReceiveClientSentData(String expectedData) throws Exception
     {

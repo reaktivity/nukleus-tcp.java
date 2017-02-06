@@ -68,7 +68,6 @@ public final class StreamFactory
 
     private final class Stream
     {
-        private static final int EOS_REQUESTED = -1;
         private final long id;
         private final Target target;
         private final SocketChannel channel;
@@ -165,7 +164,15 @@ public final class StreamFactory
             }
             else
             {
-                doFail();
+                if (slot == NO_SLOT)
+                {
+                    doFail();
+                }
+                else
+                {
+                    // send reset but defer cleanup until pending writes are completed
+                    source.doReset(id);
+                }
             }
         }
 
@@ -182,7 +189,7 @@ public final class StreamFactory
             else
             {
                 // Signal end of stream requested and ensure further data streams will result in reset
-                readableBytes = EOS_REQUESTED;
+                readableBytes = -1;
             }
         }
 
@@ -229,7 +236,7 @@ public final class StreamFactory
 
             if (slot == NO_SLOT)
             {
-                if (readableBytes == EOS_REQUESTED && slot == NO_SLOT)
+                if (readableBytes < 0) // deferred EOS and/or window was exceeded
                 {
                     doCleanup();
                 }
