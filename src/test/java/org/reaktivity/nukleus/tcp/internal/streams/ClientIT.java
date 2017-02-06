@@ -20,6 +20,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -39,6 +40,7 @@ public class ClientIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+        .addScriptRoot("streamsInvalid", "org/reaktivity/specification/nukleus/tcp/streams.invalid")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/tcp/streams");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
@@ -191,9 +193,9 @@ public class ClientIT
                 final InputStream in = socket.getInputStream();
 
                 byte[] buf = new byte[256];
-                int len1 = in.read(buf);
+                int len = in.read(buf);
 
-                assertEquals("client data", new String(buf, 0, len1, UTF_8));
+                assertEquals("client data", new String(buf, 0, len, UTF_8));
 
                 k3po.finish();
             }
@@ -270,7 +272,7 @@ public class ClientIT
                 int len = in.read(buf);
 
                 assertEquals("client data", new String(buf, 0, len, UTF_8));
-                len = in.read(buf);
+                len = in.read();
                 assertEquals(-1, len);
 
                 k3po.finish();
@@ -370,6 +372,50 @@ public class ClientIT
 
                 byte[] buf = new byte[256];
                 int len = in.read(buf);
+
+                assertEquals(-1, len);
+
+                k3po.finish();
+            }
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/output/new/controller",
+        "${streamsInvalid}/client.sent.data.close.data/client/source"
+    })
+    public void shouldResetIfDataReceivedAfterEndOfStream() throws Exception
+    {
+        try (ServerSocket server = new ServerSocket())
+        {
+            server.setReuseAddress(true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_OUTPUT");
+
+            try (Socket socket = server.accept())
+            {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
+                final InputStream in = socket.getInputStream();
+
+                byte[] buf = new byte[256];
+                int len = in.read(buf);
+
+                assertEquals("client data", new String(buf, 0, len, UTF_8));
+
+                try
+                {
+                    len = in.read(buf);
+                }
+                catch (IOException ex)
+                {
+                    System.out.println(ex);
+                    len = -1;
+                }
 
                 assertEquals(-1, len);
 

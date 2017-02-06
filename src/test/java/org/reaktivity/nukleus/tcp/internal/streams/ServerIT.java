@@ -20,6 +20,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
@@ -37,6 +38,7 @@ public class ServerIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+        .addScriptRoot("streamsInvalid", "org/reaktivity/specification/nukleus/tcp/streams.invalid")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/tcp/streams");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
@@ -165,6 +167,8 @@ public class ServerIT
 
             out.write("client data".getBytes());
 
+            socket.shutdownOutput();
+
             k3po.finish();
         }
     }
@@ -284,5 +288,40 @@ public class ServerIT
 
             k3po.finish();
         }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streamsInvalid}/server.sent.data.close.data/server/target"
+    })
+    public void shouldResetIfDataReceivedAfterEndOfStream() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        {
+            final InputStream in = socket.getInputStream();
+
+            byte[] buf = new byte[256];
+            int len = in.read(buf);
+
+            assertEquals("server data", new String(buf, 0, len, UTF_8));
+
+            try
+            {
+                len = in.read(buf);
+            }
+            catch (IOException ex)
+            {
+                System.out.println(ex);
+                len = -1;
+            }
+
+            assertEquals(-1, len);
+        }
+
+        k3po.finish();
     }
 }

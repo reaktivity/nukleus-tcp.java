@@ -46,6 +46,7 @@ public class ClientPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+        .addScriptRoot("streamsInvalid", "org/reaktivity/specification/nukleus/tcp/streams.invalid")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/tcp/streams");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
@@ -132,7 +133,91 @@ public class ClientPartialWriteIT
         assertTrue(error, callers.lastIndexOf("handleWrite") >  callers.lastIndexOf("processData"));
     }
 
+    @Test
+    @Specification({
+        "${route}/output/new/controller",
+        "${streams}/client.sent.data.and.close/client/source"
+    })
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMScript(value="PartialWriteIT.btm")
+    public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
+    {
+        PartialWriteBytemanHelper.addWriteResult(2);
+        PartialWriteBytemanHelper.addWriteResult(2);
+        PartialWriteBytemanHelper.addWriteResult(1);
+        PartialWriteBytemanHelper.addWriteResult(1);
+        PartialWriteBytemanHelper.addWriteResult(1);
+        PartialWriteBytemanHelper.addWriteResult(1);
+        shouldReceiveClientSentData("client data", true);
+
+        // Verify we forced the desired condition: check handleWrite got called
+        // AFTER processData was called for the second frame
+        List<String> callers = PartialWriteBytemanHelper.callers();
+        String error = "Test failed to force desired condition, caller sequence was: " + callers;
+        assertTrue(error, callers.lastIndexOf("handleWrite") >  callers.lastIndexOf("processData"));
+    }
+
+    @Test
+    @Specification({
+        "${route}/output/new/controller",
+        "${streamsInvalid}/client.sent.data.close.data/client/source"
+    })
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMScript(value="PartialWriteIT.btm")
+    public void shouldResetIfDataReceivedAfterEndOfStreamWithPendingWrite() throws Exception
+    {
+        PartialWriteBytemanHelper.addWriteResult(2);
+        PartialWriteBytemanHelper.addWriteResult(2);
+        PartialWriteBytemanHelper.addWriteResult(3);
+        PartialWriteBytemanHelper.addWriteResult(1);
+        try (ServerSocket server = new ServerSocket())
+        {
+            server.setReuseAddress(true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setSoTimeout((int) SECONDS.toMillis(5));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_OUTPUT");
+
+            try (Socket socket = server.accept())
+            {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
+                final InputStream in = socket.getInputStream();
+
+                byte[] buf = new byte["client data".length() + 10];
+                int offset = 0;
+
+                int read = 0;
+                boolean closed = false;
+                do
+                {
+                    read = in.read(buf, offset, buf.length - offset);
+                    if (read == -1)
+                    {
+                        closed = true;
+                        break;
+                    }
+                    offset += read;
+                } while (offset < "client data".length());
+
+                if (!closed)
+                {
+                    closed = (in.read() == -1);
+                }
+                assertTrue("Stream was not closed", closed);
+                assertTrue("At least 2 bytes of data should have been received", offset > 2);
+                k3po.finish();
+            }
+        }
+    }
+
     private void shouldReceiveClientSentData(String expectedData) throws Exception
+    {
+        shouldReceiveClientSentData(expectedData, false);
+    }
+
+    private void shouldReceiveClientSentData(String expectedData, boolean expectStreamClosed) throws Exception
     {
         try (ServerSocket server = new ServerSocket())
         {
@@ -153,16 +238,27 @@ public class ClientPartialWriteIT
                 int offset = 0;
 
                 int read = 0;
+                boolean closed = false;
                 do
                 {
                     read = in.read(buf, offset, buf.length - offset);
                     if (read == -1)
                     {
+                        closed = true;
                         break;
                     }
                     offset += read;
                 } while (offset < expectedData.length());
                 assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+
+                if (expectStreamClosed)
+                {
+                    if (!closed)
+                    {
+                        closed = (in.read() == -1);
+                    }
+                    assertTrue("Stream was not closed", closed);
+                }
 
                 k3po.finish();
             }

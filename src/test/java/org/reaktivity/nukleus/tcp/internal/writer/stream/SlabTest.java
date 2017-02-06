@@ -106,19 +106,39 @@ public class SlabTest
     @Test
     public void writtenShouldAllocateDifferentSlotsForDifferentStreams() throws Exception
     {
-        int slot1 = Slab.NO_SLOT;
         Slab slab = new Slab(10, 120);
+
+        int slot1 = Slab.NO_SLOT;
         ByteBuffer buffer = slab.get(slot1, data, 0, 5);
         slot1 = slab.written(111, slot1, buffer);
         assertTrue(slot1 >= 0);
 
         int slot2 = Slab.NO_SLOT;
         ByteBuffer buffer2 = slab.get(slot2, data, 2, 7);
-        slot2 = slab.written(111, slot2, buffer2);
+        slot2 = slab.written(112, slot2, buffer2);
         assertNotEquals(slot1, slot2);
 
         assertEquals(ByteBuffer.wrap("test ".getBytes()), slab.get(slot1));
-        assertEquals(ByteBuffer.wrap("st da".getBytes()), slab.get(slot2));
+        assertEquals(ByteBuffer.wrap("st data".getBytes()), slab.get(slot2));
+    }
+
+    @Test
+    public void writtenShouldAllocateDifferentSlotsForDifferentStreamsWithSameHashcode() throws Exception
+    {
+        Slab slab = new Slab(10, 120);
+
+        int slot1 = Slab.NO_SLOT;
+        ByteBuffer buffer = slab.get(slot1, data, 0, 5);
+        slot1 = slab.written(1, slot1, buffer);
+        assertTrue(slot1 >= 0);
+
+        int slot2 = Slab.NO_SLOT;
+        ByteBuffer buffer2 = slab.get(slot2, data, 2, 7);
+        slot2 = slab.written(17, slot2, buffer2);
+        assertNotEquals(slot1, slot2);
+
+        assertEquals(ByteBuffer.wrap("test ".getBytes()), slab.get(slot1));
+        assertEquals(ByteBuffer.wrap("st data".getBytes()), slab.get(slot2));
     }
 
     @Test
@@ -130,7 +150,8 @@ public class SlabTest
         {
             slot = Slab.NO_SLOT;
             ByteBuffer buffer = slab.get(slot, data, 0, 5);
-            slot = slab.written(111, slot, buffer);
+            int streamId = 111 + i;
+            slot = slab.written(streamId, slot, buffer);
             assertTrue(slot >= 0);
         }
         slot = Slab.NO_SLOT;

@@ -89,8 +89,8 @@ class Slab
         ByteBuffer result = null;
         if (slot != NO_SLOT)
         {
-            buffer.position(offsets[slot]);
             buffer.limit(offsets[slot] + remaining[slot]);
+            buffer.position(offsets[slot]);
             result = buffer;
         }
         return result;
@@ -127,7 +127,7 @@ class Slab
             }
             else
             {
-                // Free the slow
+                // Free the slot
                 release(slot);
                 nextSlot = NO_SLOT;
             }

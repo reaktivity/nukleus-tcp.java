@@ -68,6 +68,7 @@ public final class StreamFactory
 
     private final class Stream
     {
+        private static final int EOS_REQUESTED = -1;
         private final long id;
         private final Target target;
         private final SocketChannel channel;
@@ -75,7 +76,6 @@ public final class StreamFactory
 
         private SelectionKey key;
         private int readableBytes;
-        private boolean endPending;
 
         private Stream(
             long id,
@@ -179,6 +179,11 @@ public final class StreamFactory
                 endRO.wrap(buffer, offset, limit);
                 doCleanup();
             }
+            else
+            {
+                // Signal end of stream requested and ensure further data streams will result in reset
+                readableBytes = EOS_REQUESTED;
+            }
         }
 
         private void doFail()
@@ -189,6 +194,7 @@ public final class StreamFactory
 
         private void doCleanup()
         {
+            key.interestOps(0); // clear OP_WRITE
             try
             {
                 source.removeStream(id);
@@ -202,6 +208,7 @@ public final class StreamFactory
 
         private int handleWrite()
         {
+            key.interestOps(0); // clear OP_WRITE
             ByteBuffer writeBuffer = writeSlab.get(slot);
             if (writeBuffer == null)
             {
@@ -222,11 +229,15 @@ public final class StreamFactory
 
             if (slot == NO_SLOT)
             {
-                key.interestOps(0); // clear OP_WRITE
-                if (endPending && slot == NO_SLOT)
+                if (readableBytes == EOS_REQUESTED && slot == NO_SLOT)
                 {
                     doCleanup();
                 }
+            }
+            else
+            {
+                // Incomplete write
+                key.interestOps(SelectionKey.OP_WRITE);
             }
             return bytesWritten;
         }
