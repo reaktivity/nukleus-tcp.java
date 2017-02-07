@@ -118,7 +118,8 @@ public class ServerIT
                 }
                 offset += read;
             } while (offset < 26);
-            assertEquals("server data 1server data 2", new String(buf, 0, offset, UTF_8));
+            assertEquals("server data 1", new String(buf, 0, 13, UTF_8));
+            assertEquals("server data 2", new String(buf, 13, offset - 13, UTF_8));
         }
         finally
         {

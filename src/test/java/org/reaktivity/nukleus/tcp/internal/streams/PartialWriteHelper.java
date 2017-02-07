@@ -9,18 +9,23 @@ import java.util.List;
 import java.util.Queue;
 
 import org.jboss.byteman.rule.helper.Helper;
+import org.junit.rules.TestRule;
+import org.junit.runner.Description;
+import org.junit.runners.model.Statement;
 
 /**
  * A <a href="http://byteman.jboss.org/downloads.html">Byteman</a> Helper used to simulate partial writes at
  * the TCP level for testing purposes. It is used in conjunction with a ByteMan script (.btm) file.
  */
-public class PartialWriteBytemanHelper extends Helper
+public class PartialWriteHelper extends Helper
 {
+    public static final TestRule RULE = new Rule();
+
     private static Queue<Integer> writeResults;
     private static List<String> callers;
     private static int oldLimit;
 
-    protected PartialWriteBytemanHelper(org.jboss.byteman.rule.Rule rule)
+    protected PartialWriteHelper(org.jboss.byteman.rule.Rule rule)
     {
         super(rule);
     }
@@ -77,10 +82,31 @@ public class PartialWriteBytemanHelper extends Helper
         writeResults.add(writeResult);
     }
 
-    static void initialize()
+    private static void reset()
     {
         writeResults = new ArrayDeque<>(20);
         callers = new ArrayList<>(20);
+    }
+
+    private static class Rule implements TestRule
+    {
+
+        @Override
+        public Statement apply(Statement base, Description description)
+        {
+            return new Statement()
+            {
+
+                @Override
+                public void evaluate() throws Throwable
+                {
+                    reset();
+                    base.evaluate();
+                }
+
+            };
+        }
+
     }
 
 }

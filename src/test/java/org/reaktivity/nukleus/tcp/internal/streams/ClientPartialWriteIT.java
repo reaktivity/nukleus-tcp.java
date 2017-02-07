@@ -30,7 +30,6 @@ import java.util.List;
 
 import org.jboss.byteman.contrib.bmunit.BMScript;
 import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -58,14 +57,8 @@ public class ClientPartialWriteIT
         .counterValuesBufferCapacity(1024)
         .streams("tcp", "source");
 
-    @Rule
-    public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
-
-    @Before
-    public void initWriteHelper()
-    {
-        PartialWriteBytemanHelper.initialize();
-    }
+        @Rule
+    public final TestRule chain = outerRule(PartialWriteHelper.RULE).around(nukleus).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -78,7 +71,7 @@ public class ClientPartialWriteIT
     {
         for (int i=0; i < WRITE_SPIN_COUNT - 1; i++)
         {
-            PartialWriteBytemanHelper.addWriteResult(0);
+            PartialWriteHelper.addWriteResult(0);
         }
         shouldReceiveClientSentData("client data");
     }
@@ -92,7 +85,7 @@ public class ClientPartialWriteIT
     @BMScript(value="PartialWriteIT.btm")
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
     {
-        PartialWriteBytemanHelper.addWriteResult(5);
+        PartialWriteHelper.addWriteResult(5);
         shouldReceiveClientSentData("client data");
     }
 
@@ -105,9 +98,9 @@ public class ClientPartialWriteIT
     @BMScript(value="PartialWriteIT.btm")
     public void shouldHandleMultiplePartialWrites() throws Exception
     {
-        PartialWriteBytemanHelper.addWriteResult(2);
-        PartialWriteBytemanHelper.addWriteResult(3);
-        PartialWriteBytemanHelper.addWriteResult(1);
+        PartialWriteHelper.addWriteResult(2);
+        PartialWriteHelper.addWriteResult(3);
+        PartialWriteHelper.addWriteResult(1);
         shouldReceiveClientSentData("client data");
     }
 
@@ -120,15 +113,15 @@ public class ClientPartialWriteIT
     @BMScript(value="PartialWriteIT.btm")
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
     {
-        PartialWriteBytemanHelper.addWriteResult(5);
-        PartialWriteBytemanHelper.addWriteResult(8);
-        PartialWriteBytemanHelper.addWriteResult(5);
-        PartialWriteBytemanHelper.addWriteResult(5);
+        PartialWriteHelper.addWriteResult(5);
+        PartialWriteHelper.addWriteResult(8);
+        PartialWriteHelper.addWriteResult(5);
+        PartialWriteHelper.addWriteResult(5);
         shouldReceiveClientSentData("client data 1client data 2");
 
         // Verify we forced the desired condition: check handleWrite got called
         // AFTER processData was called for the second frame
-        List<String> callers = PartialWriteBytemanHelper.callers();
+        List<String> callers = PartialWriteHelper.callers();
         String error = "Test failed to force desired condition, caller sequence was: " + callers;
         assertTrue(error, callers.lastIndexOf("handleWrite") >  callers.lastIndexOf("processData"));
     }
@@ -142,17 +135,17 @@ public class ClientPartialWriteIT
     @BMScript(value="PartialWriteIT.btm")
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
     {
-        PartialWriteBytemanHelper.addWriteResult(2);
-        PartialWriteBytemanHelper.addWriteResult(2);
-        PartialWriteBytemanHelper.addWriteResult(1);
-        PartialWriteBytemanHelper.addWriteResult(1);
-        PartialWriteBytemanHelper.addWriteResult(1);
-        PartialWriteBytemanHelper.addWriteResult(1);
+        PartialWriteHelper.addWriteResult(2);
+        PartialWriteHelper.addWriteResult(2);
+        PartialWriteHelper.addWriteResult(1);
+        PartialWriteHelper.addWriteResult(1);
+        PartialWriteHelper.addWriteResult(1);
+        PartialWriteHelper.addWriteResult(1);
         shouldReceiveClientSentData("client data", true);
 
         // Verify we forced the desired condition: check handleWrite got called
         // AFTER processData was called for the second frame
-        List<String> callers = PartialWriteBytemanHelper.callers();
+        List<String> callers = PartialWriteHelper.callers();
         String error = "Test failed to force desired condition, caller sequence was: " + callers;
         assertTrue(error, callers.lastIndexOf("handleWrite") >  callers.lastIndexOf("processData"));
     }
@@ -166,10 +159,10 @@ public class ClientPartialWriteIT
     @BMScript(value="PartialWriteIT.btm")
     public void shouldResetIfDataReceivedAfterEndOfStreamWithPendingWrite() throws Exception
     {
-        PartialWriteBytemanHelper.addWriteResult(2);
-        PartialWriteBytemanHelper.addWriteResult(2);
-        PartialWriteBytemanHelper.addWriteResult(3);
-        PartialWriteBytemanHelper.addWriteResult(1);
+        PartialWriteHelper.addWriteResult(2);
+        PartialWriteHelper.addWriteResult(2);
+        PartialWriteHelper.addWriteResult(3);
+        PartialWriteHelper.addWriteResult(1);
         shouldReceiveClientSentData("client data", true);    }
 
     private void shouldReceiveClientSentData(String expectedData) throws Exception
