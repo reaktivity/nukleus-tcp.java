@@ -84,9 +84,9 @@ public class ServerLimitsIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streamsInvalid}/server.sent.data.exceeding.window/server/target"
+        "${streamsInvalid}/server.sent.data.and.received.reset/server/target"
     })
-    public void shouldResettWhenWindowIsExceeded() throws Exception
+    public void shouldResetWhenWindowIsExceeded() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");

@@ -150,6 +150,7 @@ public final class StreamFactory
                     bytesWritten = channel.write(writeBuffer);
                 }
 
+                int originalSlot = slot;
                 slot = writeSlab.written(id, slot, writeBuffer);
                 if (slot == OUT_OF_MEMORY)
                 {
@@ -158,6 +159,11 @@ public final class StreamFactory
                 if (bytesWritten < writableBytes)
                 {
                     key.interestOps(SelectionKey.OP_WRITE);
+                }
+                else if (originalSlot != NO_SLOT)
+                {
+                    // we just flushed out a pending write
+                    key.interestOps(0);
                 }
 
                 offerWindow(bytesWritten);
@@ -217,10 +223,6 @@ public final class StreamFactory
         {
             key.interestOps(0); // clear OP_WRITE
             ByteBuffer writeBuffer = writeSlab.get(slot);
-            if (writeBuffer == null)
-            {
-                return 0;
-            }
 
             int bytesWritten = 0;
             try

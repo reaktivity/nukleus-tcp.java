@@ -37,7 +37,7 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.NukleusRule;
 
-public class ClientILimitsIT
+public class ClientLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
@@ -83,7 +83,7 @@ public class ClientILimitsIT
     @Test
     @Specification({
         "${route}/output/new/controller",
-        "${streamsInvalid}/client.sent.data.exceeding.window/client/source"
+        "${streamsInvalid}/client.sent.data.and.received.reset/client/source"
     })
     public void shouldReceiveResetWhenWindowExceeded() throws Exception
     {
