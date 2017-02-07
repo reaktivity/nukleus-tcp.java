@@ -229,9 +229,9 @@ public final class StreamFactory
             {
                 bytesWritten = channel.write(writeBuffer);
             }
-            catch (IOException e)
+            catch (IOException ex)
             {
-                LangUtil.rethrowUnchecked(e);
+                LangUtil.rethrowUnchecked(ex);
             }
 
             slot = writeSlab.written(id, slot, writeBuffer);
