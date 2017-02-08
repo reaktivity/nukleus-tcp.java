@@ -50,7 +50,6 @@ public class ServerPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("streamsInvalid", "org/reaktivity/specification/nukleus/tcp/streams.invalid")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/tcp/streams");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
@@ -86,7 +85,7 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=true)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
     {
@@ -99,7 +98,7 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldHandleMultiplePartialWrites() throws Exception
     {
@@ -152,7 +151,7 @@ public class ServerPartialWriteIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streamsInvalid}/server.sent.data.close.data/server/target"
+        "${streams}/server.sent.data.after.end/server/target"
     })
     @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
     @BMScript(value="PartialWriteIT.btm")

@@ -42,7 +42,6 @@ public class ServerLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("streamsInvalid", "org/reaktivity/specification/nukleus/tcp/streams.invalid")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/tcp/streams");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
@@ -84,7 +83,7 @@ public class ServerLimitsIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streamsInvalid}/server.sent.data.and.received.reset/server/target"
+        "${streams}/server.sent.data.received.reset/server/target"
     })
     public void shouldResetWhenWindowIsExceeded() throws Exception
     {

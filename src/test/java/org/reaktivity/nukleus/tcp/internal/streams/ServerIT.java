@@ -38,7 +38,6 @@ public class ServerIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("streamsInvalid", "org/reaktivity/specification/nukleus/tcp/streams.invalid")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/tcp/streams");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
@@ -130,6 +129,33 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
+        "${streams}/server.sent.data.multiple.streams/server/target"
+    })
+    public void shouldReceiveServerSentDataMultipleStreams() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (Socket socket = new Socket("127.0.0.1", 0x1f90);
+             Socket socket2 = new Socket("127.0.0.1", 0x1f90))
+        {
+            InputStream in = socket.getInputStream();
+
+            byte[] buf = new byte[256];
+            int len = in.read(buf);
+            assertEquals("server data 1", new String(buf, 0, len, UTF_8));
+
+            in = socket2.getInputStream();
+            len = in.read(buf);
+            assertEquals("server data 2", new String(buf, 0, len, UTF_8));
+        }
+
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
         "${streams}/server.sent.data.and.close/server/target"
     })
     public void shouldReceiveServerSentDataAndClose() throws Exception
@@ -189,6 +215,28 @@ public class ServerIT
             out.write("client data 1".getBytes());
             k3po.awaitBarrier("FIRST_DATA_FRAME_RECEIVED");
             out.write("client data 2".getBytes());
+
+            k3po.finish();
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/client.sent.data.multiple.streams/server/target"
+    })
+    public void shouldReceiveClientSentDataMultipleStreams() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (Socket socket1 = new Socket("127.0.0.1", 0x1f90);
+             Socket socket2 = new Socket("127.0.0.1", 0x1f90))
+        {
+            final OutputStream out1 = socket1.getOutputStream();
+            final OutputStream out2 = socket2.getOutputStream();
+            out1.write("client data 1".getBytes());
+            out2.write("client data 2".getBytes());
 
             k3po.finish();
         }
@@ -292,7 +340,7 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streamsInvalid}/server.sent.data.close.data/server/target"
+        "${streams}/server.sent.data.after.end/server/target"
     })
     public void shouldResetIfDataReceivedAfterEndOfStream() throws Exception
     {

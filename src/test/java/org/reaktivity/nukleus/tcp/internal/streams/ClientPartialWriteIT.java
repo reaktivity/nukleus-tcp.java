@@ -45,7 +45,6 @@ public class ClientPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("streamsInvalid", "org/reaktivity/specification/nukleus/tcp/streams.invalid")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/tcp/streams");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
@@ -153,7 +152,7 @@ public class ClientPartialWriteIT
     @Test
     @Specification({
         "${route}/output/new/controller",
-        "${streamsInvalid}/client.sent.data.close.data/client/source"
+        "${streams}/client.sent.data.after.end/client/source"
     })
     @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
     @BMScript(value="PartialWriteIT.btm")

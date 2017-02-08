@@ -25,51 +25,39 @@ public class PartialWriteHelper extends Helper
     private static List<String> callers;
     private static int oldLimit;
 
-    protected PartialWriteHelper(org.jboss.byteman.rule.Rule rule)
+    private static ByteBuffer b;
+
+    public PartialWriteHelper(org.jboss.byteman.rule.Rule rule)
     {
         super(rule);
     }
 
-    public void preWrite(ByteBuffer b)
+    public void preWrite(String caller, Object[] parameters)
     {
-        if (callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
-                true, true)
-           ||
-            callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.handleWrite",
-                     true, true))
+        b = (ByteBuffer) parameters[1];
+        callers.add(caller);
+        Integer toWrite = writeResults.peek();
+        if (toWrite != null)
         {
-            String caller = formatStackMatching("processData|handleWrite").replaceFirst("(?s).*\\$Stream.", "")
-                    .replaceFirst("(?s)\\(.*", "");
-            callers.add(caller);
-            Integer toWrite = writeResults.peek();
-            if (toWrite != null)
-            {
-                oldLimit = b.limit();
-                int originalBytesToWrite = b.limit() - b.position();
-                toWrite = Math.min(originalBytesToWrite, toWrite);
-                debug(format("preWrite for %s: forcing partial write for buffer %s, writing %d bytes of %d, changing limit to %d",
-                        caller, b, toWrite, originalBytesToWrite, b.position() + toWrite));
-                b.limit(b.position() + toWrite);
-            }
+            oldLimit = b.limit();
+            int originalBytesToWrite = b.limit() - b.position();
+            toWrite = Math.min(originalBytesToWrite, toWrite);
+            debug(format("preWrite for %s: forcing partial write for buffer %s, writing %d bytes of %d, changing limit to %d",
+                    caller, b, toWrite, originalBytesToWrite, b.position() + toWrite));
+            b.limit(b.position() + toWrite);
         }
     }
 
-    public void postWrite(ByteBuffer b, int returnValue)
+    public void postWrite(int returnValue)
     {
-        if (callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
-                true, true)
-           ||
-            callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.handleWrite",
-                     true, true))
+        Integer toWrite = writeResults.poll();
+        if (toWrite != null)
         {
-            Integer toWrite = writeResults.poll();
-            if (toWrite != null)
-            {
-                debug(format("postWrite: buffer after write is: %s, return value is %d, setting limit back to %d",
-                        b, returnValue, oldLimit));
-                b.limit(oldLimit);
-            }
+            debug(format("postWrite: buffer after write is: %s, returnValue %d, setting limit back to %d",
+                    b, returnValue, oldLimit));
+            b.limit(oldLimit);
         }
+        b = null;
     }
 
     public static List<String> callers()
