@@ -69,6 +69,7 @@
       <groupId>org.reaktivity</groupId>
       <artifactId>reaktor</artifactId>
       <version>${reaktor.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.reaktivity</groupId>
