@@ -112,7 +112,7 @@ public class TcpServerBM
         createEmptyFile(target.getAbsoluteFile(), length);
 
         TcpController controller = reaktor.controller(TcpController.class);
-        controller.route(INPUT, NEW, "any", 8080, "target", targetRef, getByName("127.0.0.1")).get();
+        controller.routeInputNew("any", 8080, "target", targetRef, getByName("127.0.0.1")).get();
 
         this.streams = controller.streams("any", "target");
     }

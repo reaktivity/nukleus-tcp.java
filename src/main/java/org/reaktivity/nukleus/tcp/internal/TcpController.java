@@ -98,7 +98,67 @@ public final class TcpController implements Controller
         return "tcp";
     }
 
-    public CompletableFuture<Long> route(
+    public CompletableFuture<Long> routeInputNone(
+            String source,
+            long sourceRef,
+            String target,
+            long targetRef,
+            InetAddress address)
+    {
+        return route(Role.INPUT, State.NONE, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Long> routeInputNew(
+            String source,
+            long sourceRef,
+            String target,
+            long targetRef,
+            InetAddress address)
+    {
+        return route(Role.INPUT, State.NEW, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Long> routeInputEstablished(
+            String source,
+            long sourceRef,
+            String target,
+            long targetRef,
+            InetAddress address)
+    {
+        return route(Role.INPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Long> routeOutputNone(
+            String source,
+            long sourceRef,
+            String target,
+            long targetRef,
+            InetAddress address)
+    {
+        return route(Role.OUTPUT, State.NONE, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Long> routeOutputtNew(
+            String source,
+            long sourceRef,
+            String target,
+            long targetRef,
+            InetAddress address)
+    {
+        return route(Role.OUTPUT, State.NEW, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Long> routeOutputEstablished(
+            String source,
+            long sourceRef,
+            String target,
+            long targetRef,
+            InetAddress address)
+    {
+        return route(Role.OUTPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
+    }
+
+    private CompletableFuture<Long> route(
         Role role,
         State state,
         String source,

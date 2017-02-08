@@ -64,7 +64,7 @@ public class ControllerIT
         k3po.start();
 
         controller.controller(TcpController.class)
-                  .route(INPUT, NEW, "any", 8080, "target", targetRef, address)
+                  .routeInputNew("any", 8080, "target", targetRef, address)
                   .get();
 
         k3po.finish();
@@ -79,7 +79,7 @@ public class ControllerIT
         k3po.start();
 
         controller.controller(TcpController.class)
-                  .route(OUTPUT, NEW, "source", 0L, "localhost", 8080, null)
+                  .routeOutputtNew("source", 0L, "localhost", 8080, null)
                   .get();
 
         k3po.finish();
@@ -94,7 +94,7 @@ public class ControllerIT
         k3po.start();
 
         controller.controller(TcpController.class)
-                  .route(OUTPUT, ESTABLISHED, "target", 0L, "any", 0L, null)
+                  .routeOutputEstablished("target", 0L, "any", 0L, null)
                   .get();
 
         k3po.finish();
@@ -111,7 +111,7 @@ public class ControllerIT
         k3po.start();
 
         controller.controller(TcpController.class)
-                  .route(INPUT, ESTABLISHED, "any", 8080, "source", sourceRef, null)
+                  .routeInputEstablished("any", 8080, "source", sourceRef, null)
                   .get();
 
         k3po.finish();
