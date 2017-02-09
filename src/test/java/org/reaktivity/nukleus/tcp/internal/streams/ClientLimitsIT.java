@@ -32,7 +32,6 @@ import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
-import org.junit.runners.model.Statement;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.NukleusRule;
@@ -52,29 +51,9 @@ public class ClientLimitsIT
         .counterValuesBufferCapacity(1024)
         .streams("tcp", "source");
 
-    private final TestRule properties = (base, description) ->
-    {
-        return new Statement()
-        {
-
-            @Override
-            public void evaluate() throws Throwable
-            {
-                try
-                {
-                    System.setProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.propertyName(), "1");
-                    System.setProperty(WINDOW_SIZE.propertyName(), "15");
-                    base.evaluate();
-                }
-                finally
-                {
-                    System.clearProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.name());
-                    System.clearProperty(WINDOW_SIZE.propertyName());
-                }
-            }
-
-        };
-    };
+    private final TestRule properties = new SystemPropertiesRule()
+            .setProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.propertyName(), "1")
+            .setProperty(WINDOW_SIZE.propertyName(), "15");
 
     @Rule
     public final TestRule chain = outerRule(properties).around(nukleus).around(k3po).around(timeout);
@@ -106,7 +85,6 @@ public class ClientLimitsIT
                 }
                 catch (IOException ex)
                 {
-                    System.out.println(ex);
                     len = -1;
                 }
                 assertEquals(-1, len);

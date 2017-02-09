@@ -362,7 +362,6 @@ public class ServerIT
             }
             catch (IOException ex)
             {
-                System.out.println(ex);
                 len = -1;
             }
 

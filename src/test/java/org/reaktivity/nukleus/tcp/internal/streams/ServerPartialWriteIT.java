@@ -85,7 +85,7 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=true)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
     {
@@ -98,7 +98,7 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldHandleMultiplePartialWrites() throws Exception
     {
