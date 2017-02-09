@@ -194,7 +194,68 @@ public final class TcpController implements Controller
         return promise;
     }
 
-    public CompletableFuture<Void> unroute(
+    public CompletableFuture<Void> unrouteInputEstablished(
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        return unroute(Role.INPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Void> unrouteInputNew(
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        return unroute(Role.INPUT, State.NEW, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Void> unrouteInputNone(
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        return unroute(Role.INPUT, State.NONE, source, sourceRef, target, targetRef, address);
+    }
+
+
+    public CompletableFuture<Void> unrouteOutputEstablished(
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        return unroute(Role.OUTPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Void> unrouteOutputNew(
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        return unroute(Role.OUTPUT, State.NEW, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Void> unrouteOutputNone(
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        return unroute(Role.OUTPUT, State.NONE, source, sourceRef, target, targetRef, address);
+    }
+
+    private CompletableFuture<Void> unroute(
         Role role,
         State state,
         String source,
