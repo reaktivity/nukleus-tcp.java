@@ -75,7 +75,7 @@ public class ControllerIT
         k3po.start();
 
         controller.controller(TcpController.class)
-                  .routeOutputtNew("source", 0L, "localhost", 8080, null)
+                  .routeOutputNew("source", 0L, "localhost", 8080, null)
                   .get();
 
         k3po.finish();

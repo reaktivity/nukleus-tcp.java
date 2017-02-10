@@ -138,7 +138,7 @@ public final class TcpController implements Controller
         return route(Role.OUTPUT, State.NONE, source, sourceRef, target, targetRef, address);
     }
 
-    public CompletableFuture<Long> routeOutputtNew(
+    public CompletableFuture<Long> routeOutputNew(
             String source,
             long sourceRef,
             String target,
