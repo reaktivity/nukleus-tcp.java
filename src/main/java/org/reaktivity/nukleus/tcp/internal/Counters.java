@@ -22,11 +22,13 @@ public final class Counters implements AutoCloseable
 {
     private final AtomicCounter routesSourced;
     private final AtomicCounter streamsSourced;
+    private final AtomicCounter streamsResetPartialWrite;
 
     Counters(CountersManager countersManager)
     {
         routesSourced = countersManager.newCounter("routesSourced");
         streamsSourced = countersManager.newCounter("streamsSourced");
+        streamsResetPartialWrite = countersManager.newCounter("streamsResetPartialWrites");
     }
 
     @Override
@@ -44,5 +46,10 @@ public final class Counters implements AutoCloseable
     public AtomicCounter streamsSourced()
     {
         return streamsSourced;
+    }
+
+    public AtomicCounter streamsResetPartialWrite()
+    {
+        return streamsResetPartialWrite;
     }
 }

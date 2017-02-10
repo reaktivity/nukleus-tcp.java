@@ -33,6 +33,7 @@ import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.MessageHandler;
 import org.agrona.concurrent.ringbuffer.RingBuffer;
+import org.agrona.concurrent.status.AtomicCounter;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.tcp.internal.connector.Connector;
 import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
@@ -73,7 +74,8 @@ public final class Source implements Nukleus
         Function<String, Target> supplyTarget,
         StreamsLayout layout,
         AtomicBuffer writeBuffer,
-        int maximumStreamsCount)
+        int maximumStreamsCount,
+        AtomicCounter streamsResetPartialWrite)
     {
         this.partitionName = partitionName;
         this.connector = connector;
@@ -84,7 +86,7 @@ public final class Source implements Nukleus
         this.writeBuffer = writeBuffer;
         this.streamsBuffer = layout.streamsBuffer();
         this.throttleBuffer = layout.throttleBuffer();
-        this.streamFactory = new StreamFactory(this, WINDOW_SIZE.intValue(), maximumStreamsCount);
+        this.streamFactory = new StreamFactory(this, WINDOW_SIZE.intValue(), maximumStreamsCount, streamsResetPartialWrite);
         this.streams = new Long2ObjectHashMap<>();
     }
 

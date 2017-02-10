@@ -210,6 +210,6 @@ public final class Writer extends Nukleus.Composite
         });
 
         return include(new Source(partitionName, connector, this::lookupRoutes, resolveCorrelation,
-                        supplyTarget, layout, writeBuffer, maximumPendingWriteStreams));
+                   supplyTarget, layout, writeBuffer, maximumPendingWriteStreams, context.counters().streamsResetPartialWrite()));
     }
 }

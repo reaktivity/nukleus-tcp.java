@@ -26,6 +26,7 @@ import java.nio.channels.SocketChannel;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.concurrent.MessageHandler;
+import org.agrona.concurrent.status.AtomicCounter;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
@@ -47,15 +48,18 @@ public final class StreamFactory
     private final Source source;
     private final int windowSize;
     private final Slab writeSlab;
+    private final AtomicCounter streamsResetPartialWrite;
 
     public StreamFactory(
         Source source,
         int windowSize,
-        int maxPartiallyWrittenStreams)
+        int maxPartiallyWrittenStreams,
+        AtomicCounter streamsResetPartialWrite)
     {
         this.source = source;
         this.windowSize = windowSize;
         writeSlab = new Slab(maxPartiallyWrittenStreams, windowSize);
+        this.streamsResetPartialWrite = streamsResetPartialWrite;
     }
 
     public MessageHandler newStream(
@@ -154,6 +158,7 @@ public final class StreamFactory
                 slot = writeSlab.written(id, slot, writeBuffer);
                 if (slot == OUT_OF_MEMORY)
                 {
+                    streamsResetPartialWrite.increment();
                     doFail();
                     return;
                 }
