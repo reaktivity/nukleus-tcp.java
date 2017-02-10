@@ -155,6 +155,7 @@ public final class StreamFactory
                 if (slot == OUT_OF_MEMORY)
                 {
                     doFail();
+                    return;
                 }
                 if (bytesWritten < writableBytes)
                 {

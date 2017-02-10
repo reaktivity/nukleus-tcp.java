@@ -7,6 +7,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.function.Supplier;
 
 import org.jboss.byteman.rule.helper.Helper;
 import org.junit.rules.TestRule;
@@ -22,8 +23,9 @@ public class PartialWriteHelper extends Helper
     public static final TestRule RULE = new Rule();
 
     private static Queue<Integer> writeResults;
+    private static Supplier<Integer> writeResultSupplier = () -> null;
     private static List<String> callers;
-    private static int oldLimit;
+    private static Integer oldLimit;
 
     private static ByteBuffer b;
 
@@ -36,7 +38,7 @@ public class PartialWriteHelper extends Helper
     {
         b = (ByteBuffer) parameters[1];
         callers.add(caller);
-        Integer toWrite = writeResults.peek();
+        Integer toWrite = writeResults.peek() != null ? writeResults.poll() : writeResultSupplier.get();
         if (toWrite != null)
         {
             oldLimit = b.limit();
@@ -46,12 +48,16 @@ public class PartialWriteHelper extends Helper
                     caller, b, toWrite, originalBytesToWrite, b.position() + toWrite));
             b.limit(b.position() + toWrite);
         }
+        else
+        {
+            debug(format("preWrite for %s: normal write for buffer %s", caller, b));
+            oldLimit = null;
+        }
     }
 
     public void postWrite(int returnValue)
     {
-        Integer toWrite = writeResults.poll();
-        if (toWrite != null)
+        if (oldLimit != null)
         {
             debug(format("postWrite: buffer after write is: %s, returnValue %d, setting limit back to %d",
                     b, returnValue, oldLimit));
@@ -70,10 +76,16 @@ public class PartialWriteHelper extends Helper
         writeResults.add(writeResult);
     }
 
+    static void setWriteResultSupplier(Supplier<Integer> supplier)
+    {
+        writeResultSupplier = supplier;
+    }
+
     private static void reset()
     {
         writeResults = new ArrayDeque<>(20);
         callers = new ArrayList<>(20);
+        writeResultSupplier = () -> null;
     }
 
     private static class Rule implements TestRule
