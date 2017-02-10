@@ -99,100 +99,65 @@ public final class TcpController implements Controller
     }
 
     public CompletableFuture<Long> routeInputNone(
-            String source,
-            long sourceRef,
-            String target,
-            long targetRef,
-            InetAddress address)
-    {
-        return route(Role.INPUT, State.NONE, source, sourceRef, target, targetRef, address);
-    }
-
-    public CompletableFuture<Long> routeInputNew(
-            String source,
-            long sourceRef,
-            String target,
-            long targetRef,
-            InetAddress address)
-    {
-        return route(Role.INPUT, State.NEW, source, sourceRef, target, targetRef, address);
-    }
-
-    public CompletableFuture<Long> routeInputEstablished(
-            String source,
-            long sourceRef,
-            String target,
-            long targetRef,
-            InetAddress address)
-    {
-        return route(Role.INPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
-    }
-
-    public CompletableFuture<Long> routeOutputNone(
-            String source,
-            long sourceRef,
-            String target,
-            long targetRef,
-            InetAddress address)
-    {
-        return route(Role.OUTPUT, State.NONE, source, sourceRef, target, targetRef, address);
-    }
-
-    public CompletableFuture<Long> routeOutputNew(
-            String source,
-            long sourceRef,
-            String target,
-            long targetRef,
-            InetAddress address)
-    {
-        return route(Role.OUTPUT, State.NEW, source, sourceRef, target, targetRef, address);
-    }
-
-    public CompletableFuture<Long> routeOutputEstablished(
-            String source,
-            long sourceRef,
-            String target,
-            long targetRef,
-            InetAddress address)
-    {
-        return route(Role.OUTPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
-    }
-
-    private CompletableFuture<Long> route(
-        Role role,
-        State state,
         String source,
         long sourceRef,
         String target,
         long targetRef,
         InetAddress address)
     {
-        final CompletableFuture<Long> promise = new CompletableFuture<>();
-
-        long correlationId = conductorCommands.nextCorrelationId();
-
-        RouteFW routeRO = routeRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
-                                 .correlationId(correlationId)
-                                 .role(b -> b.set(role))
-                                 .state(b -> b.set(state))
-                                 .source(source)
-                                 .sourceRef(sourceRef)
-                                 .target(target)
-                                 .targetRef(targetRef)
-                                 .extension(b -> b.set(visitRouteEx(address)))
-                                 .build();
-
-        if (!conductorCommands.write(routeRO.typeId(), routeRO.buffer(), routeRO.offset(), routeRO.length()))
-        {
-            commandSendFailed(promise);
-        }
-        else
-        {
-            commandSent(correlationId, promise);
-        }
-
-        return promise;
+        return route(Role.INPUT, State.NONE, source, sourceRef, target, targetRef, address);
     }
+
+    public CompletableFuture<Long> routeInputNew(
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        return route(Role.INPUT, State.NEW, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Long> routeInputEstablished(
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        return route(Role.INPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Long> routeOutputNone(
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        return route(Role.OUTPUT, State.NONE, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Long> routeOutputNew(
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        return route(Role.OUTPUT, State.NEW, source, sourceRef, target, targetRef, address);
+    }
+
+    public CompletableFuture<Long> routeOutputEstablished(
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        return route(Role.OUTPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
+    }
+
 
     public CompletableFuture<Void> unrouteInputEstablished(
         String source,
@@ -253,42 +218,6 @@ public final class TcpController implements Controller
         InetAddress address)
     {
         return unroute(Role.OUTPUT, State.NONE, source, sourceRef, target, targetRef, address);
-    }
-
-    private CompletableFuture<Void> unroute(
-        Role role,
-        State state,
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef,
-        InetAddress address)
-    {
-        final CompletableFuture<Void> promise = new CompletableFuture<>();
-
-        long correlationId = conductorCommands.nextCorrelationId();
-
-        UnrouteFW unrouteRO = unrouteRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
-                                 .correlationId(correlationId)
-                                 .role(b -> b.set(role))
-                                 .state(b -> b.set(state))
-                                 .source(source)
-                                 .sourceRef(sourceRef)
-                                 .target(target)
-                                 .targetRef(targetRef)
-                                 .extension(b -> b.set(visitRouteEx(address)))
-                                 .build();
-
-        if (!conductorCommands.write(unrouteRO.typeId(), unrouteRO.buffer(), unrouteRO.offset(), unrouteRO.length()))
-        {
-            commandSendFailed(promise);
-        }
-        else
-        {
-            commandSent(correlationId, promise);
-        }
-
-        return promise;
     }
 
     public TcpStreams streams(
@@ -416,4 +345,77 @@ public final class TcpController implements Controller
     {
         return promise.completeExceptionally(new IllegalStateException(message).fillInStackTrace());
     }
+
+    private CompletableFuture<Long> route(
+        Role role,
+        State state,
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        final CompletableFuture<Long> promise = new CompletableFuture<>();
+
+        long correlationId = conductorCommands.nextCorrelationId();
+
+        RouteFW routeRO = routeRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
+                                 .correlationId(correlationId)
+                                 .role(b -> b.set(role))
+                                 .state(b -> b.set(state))
+                                 .source(source)
+                                 .sourceRef(sourceRef)
+                                 .target(target)
+                                 .targetRef(targetRef)
+                                 .extension(b -> b.set(visitRouteEx(address)))
+                                 .build();
+
+        if (!conductorCommands.write(routeRO.typeId(), routeRO.buffer(), routeRO.offset(), routeRO.length()))
+        {
+            commandSendFailed(promise);
+        }
+        else
+        {
+            commandSent(correlationId, promise);
+        }
+
+        return promise;
+    }
+
+    private CompletableFuture<Void> unroute(
+        Role role,
+        State state,
+        String source,
+        long sourceRef,
+        String target,
+        long targetRef,
+        InetAddress address)
+    {
+        final CompletableFuture<Void> promise = new CompletableFuture<>();
+
+        long correlationId = conductorCommands.nextCorrelationId();
+
+        UnrouteFW unrouteRO = unrouteRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
+                                 .correlationId(correlationId)
+                                 .role(b -> b.set(role))
+                                 .state(b -> b.set(state))
+                                 .source(source)
+                                 .sourceRef(sourceRef)
+                                 .target(target)
+                                 .targetRef(targetRef)
+                                 .extension(b -> b.set(visitRouteEx(address)))
+                                 .build();
+
+        if (!conductorCommands.write(unrouteRO.typeId(), unrouteRO.buffer(), unrouteRO.offset(), unrouteRO.length()))
+        {
+            commandSendFailed(promise);
+        }
+        else
+        {
+            commandSent(correlationId, promise);
+        }
+
+        return promise;
+    }
+
 }
