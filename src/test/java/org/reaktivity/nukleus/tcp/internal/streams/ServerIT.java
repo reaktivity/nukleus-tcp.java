@@ -156,9 +156,9 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streams}/server.sent.data.and.close/server/target"
+        "${streams}/server.sent.data.then.end/server/target"
     })
-    public void shouldReceiveServerSentDataAndClose() throws Exception
+    public void shouldReceiveServerSentDataAndEnd() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
@@ -245,9 +245,9 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streams}/client.sent.data.and.close/server/target"
+        "${streams}/client.sent.data.then.end/server/target"
     })
-    public void shouldReceiveClientSentDataAndClose() throws Exception
+    public void shouldReceiveClientSentDataAndEnd() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");

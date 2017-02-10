@@ -173,9 +173,9 @@ public class ClientIT
     @Test
     @Specification({
         "${route}/output/new/controller",
-        "${streams}/server.sent.data.and.close/client/source"
+        "${streams}/server.sent.data.then.end/client/source"
     })
-    public void shouldReceiveServerSentDataAndClose() throws Exception
+    public void shouldReceiveServerSentDataAndEnd() throws Exception
     {
         try (ServerSocket server = new ServerSocket())
         {
@@ -315,9 +315,9 @@ public class ClientIT
     @Test
     @Specification({
         "${route}/output/new/controller",
-        "${streams}/client.sent.data.and.close/client/source"
+        "${streams}/client.sent.data.then.end/client/source"
     })
-    public void shouldReceiveClientSentDataAndClose() throws Exception
+    public void shouldReceiveClientSentDataAndEnd() throws Exception
     {
         try (ServerSocket server = new ServerSocket())
         {

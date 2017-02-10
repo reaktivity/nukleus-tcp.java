@@ -36,7 +36,6 @@ import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
-import org.kaazing.k3po.junit.annotation.ScriptProperty;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.NukleusRule;
@@ -71,9 +70,8 @@ public class ClientPartialWriteLimitsIT
     @Test
     @Specification({
         "${route}/output/new/controller",
-        "${streams}/client.sent.data.multiple.streams/client/source"
+        "${streams}/client.sent.data.multiple.streams.second.was.reset/client/source"
     })
-    @ScriptProperty("secondStreamWriteReplyFrameType [0x40 0x00 0x00 0x01]")
     @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldResetStreamsExceedingPartialWriteStreamsLimit() throws Exception
@@ -96,7 +94,7 @@ public class ClientPartialWriteLimitsIT
             {
                 k3po.notifyBarrier("ROUTED_INPUT");
 
-                k3po.awaitBarrier("SECOND_STREAM_WRITE_REPLY_RECEIVED");
+                k3po.awaitBarrier("SECOND_STREAM_RESET_RECEIVED");
                 resetReceived.set(true);
 
                 InputStream in = socket.getInputStream();

@@ -128,7 +128,7 @@ public class ClientPartialWriteIT
     @Test
     @Specification({
         "${route}/output/new/controller",
-        "${streams}/client.sent.data.and.close/client/source"
+        "${streams}/client.sent.data.then.end/client/source"
     })
     @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
