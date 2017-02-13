@@ -7,7 +7,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 import org.jboss.byteman.rule.helper.Helper;
 import org.junit.rules.TestRule;
@@ -23,7 +23,7 @@ public class PartialWriteHelper extends Helper
     public static final TestRule RULE = new Rule();
 
     private static Queue<Integer> writeResults;
-    private static Supplier<Integer> writeResultSupplier = () -> null;
+    private static Function<String, Integer> writeResultSupplier = (caller) -> null;
     private static List<String> callers;
     private static Integer oldLimit;
 
@@ -38,7 +38,7 @@ public class PartialWriteHelper extends Helper
     {
         b = (ByteBuffer) parameters[1];
         callers.add(caller);
-        Integer toWrite = writeResults.peek() != null ? writeResults.poll() : writeResultSupplier.get();
+        Integer toWrite = writeResults.peek() != null ? writeResults.poll() : writeResultSupplier.apply(caller);
         if (toWrite != null)
         {
             oldLimit = b.limit();
@@ -76,7 +76,7 @@ public class PartialWriteHelper extends Helper
         writeResults.add(writeResult);
     }
 
-    static void setWriteResultSupplier(Supplier<Integer> supplier)
+    static void setWriteResultProvider(Function<String, Integer> supplier)
     {
         writeResultSupplier = supplier;
     }
@@ -85,7 +85,7 @@ public class PartialWriteHelper extends Helper
     {
         writeResults = new ArrayDeque<>(20);
         callers = new ArrayList<>(20);
-        writeResultSupplier = () -> null;
+        writeResultSupplier = (caller) -> null;
     }
 
     private static class Rule implements TestRule

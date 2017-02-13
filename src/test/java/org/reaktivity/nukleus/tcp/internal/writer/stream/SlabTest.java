@@ -23,22 +23,38 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.ByteBuffer;
+import java.util.function.IntConsumer;
 
 import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
+import org.jmock.Expectations;
+import org.jmock.integration.junit4.JUnitRuleMockery;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 
 public class SlabTest
 {
+    private static final String TEST_DATA = "test data";
+    private static final IntConsumer NO_OP_WINDOW_UPDATER = (value) ->
+        { };
 
     private DirectBuffer data;
+    private IntConsumer windowUpdater;
+
+    @Rule
+    public JUnitRuleMockery context = new JUnitRuleMockery()
+        {
+            {
+                windowUpdater = mock(IntConsumer.class, "offerWindow");
+            }
+        };
 
     @Before
     public void before() throws Exception
     {
         ExpandableArrayBuffer data = new ExpandableArrayBuffer(100);
-        data.putStringWithoutLengthUtf8(0, "test data");
+        data.putStringWithoutLengthUtf8(0, TEST_DATA);
         this.data = data;
     }
 
@@ -67,7 +83,7 @@ public class SlabTest
         ByteBuffer buffer = slab.get(slot, data, 0, 9);
         buffer.get();
         buffer.get();
-        slot = slab.written(111, slot, buffer);
+        slot = slab.written(111, slot, buffer, 2, NO_OP_WINDOW_UPDATER);
         assertTrue(slot >= 0);
 
         ByteBuffer buffer2 = slab.get(slot);
@@ -81,11 +97,11 @@ public class SlabTest
         int slot = Slab.NO_SLOT;
         Slab slab = new Slab(10, 120);
         ByteBuffer buffer = slab.get(slot, data, 0, 5);
-        slot = slab.written(111, slot, buffer);
+        slot = slab.written(111, slot, buffer, 0, NO_OP_WINDOW_UPDATER);
         assertTrue(slot >= 0);
 
         ByteBuffer buffer2 = slab.get(slot, data, 5, 4);
-        assertEquals(ByteBuffer.wrap("test data".getBytes()), buffer2);
+        assertEquals(ByteBuffer.wrap(TEST_DATA.getBytes()), buffer2);
     }
 
     @Test
@@ -96,11 +112,117 @@ public class SlabTest
         ByteBuffer buffer = slab.get(slot, data, 0, 5);
         buffer.get();
         buffer.get();
-        slot = slab.written(111, slot, buffer);
+        slot = slab.written(111, slot, buffer, 2, NO_OP_WINDOW_UPDATER);
         assertTrue(slot >= 0);
 
         ByteBuffer buffer2 = slab.get(slot, data, 5, 4);
         assertEquals(ByteBuffer.wrap("st data".getBytes()), buffer2);
+    }
+
+    @Test
+    public void writtenShouldNotUpdateWindowWhenNoDataWasWrittenNewSlot()
+    {
+        Slab slab = new Slab(10, 120);
+        int slot = Slab.NO_SLOT;
+        ByteBuffer buffer = slab.get(slot, data, 0, 5);
+        slot = slab.written(111, slot, buffer, 0, windowUpdater);
+        assertTrue(slot >= 0);
+    }
+
+    @Test
+    public void writtenShouldNotUpdateWindowWhenNoDataWasWrittenExistingSlot()
+    {
+        Slab slab = new Slab(10, 120);
+        int slot = Slab.NO_SLOT;
+        ByteBuffer buffer = slab.get(slot, data, 0, 5);
+        slot = slab.written(111, slot, buffer, 0, NO_OP_WINDOW_UPDATER);
+
+        buffer = slab.get(slot, data, 0, 5);
+        slot = slab.written(111, slot, buffer, 0, NO_OP_WINDOW_UPDATER);
+    }
+
+    @Test
+    public void writtenShouldUpdateWindowWhenAnyDataWasWrittenNewSlot()
+    {
+        Slab slab = new Slab(10, 120);
+        int slot = Slab.NO_SLOT;
+        ByteBuffer buffer = slab.get(slot, data, 0, 5);
+        buffer.get();
+        context.checking(new Expectations()
+        {
+            {
+                oneOf(windowUpdater).accept(1);
+            }
+        });
+        slot = slab.written(111, slot, buffer, 1, windowUpdater);
+        assertTrue(slot >= 0);
+    }
+
+    @Test
+    public void writtenShouldNotUpdateWindowWhenNotAllDataWasWrittenExistingSlot()
+    {
+        Slab slab = new Slab(10, 120);
+        int slot = Slab.NO_SLOT;
+        ByteBuffer buffer = slab.get(slot, data, 0, 5);
+        buffer.get();
+        slot = slab.written(111, slot, buffer, 1, NO_OP_WINDOW_UPDATER);
+        assertTrue(slot >= 0);
+
+        buffer = slab.get(slot);
+        buffer.position(buffer.limit() - 1);
+        final int written = TEST_DATA.length() - 2;
+        slot = slab.written(111, slot, buffer, written, windowUpdater);
+    }
+
+    @Test
+    public void writtenShouldUpdateWindowWhenAllDataWasWrittenExistingSlot()
+    {
+        Slab slab = new Slab(10, 120);
+        int slot = Slab.NO_SLOT;
+        ByteBuffer buffer = slab.get(slot, data, 0, TEST_DATA.length());
+        int written = 1;
+        buffer.position(buffer.position() + written);
+        slot = slab.written(111, slot, buffer, written, NO_OP_WINDOW_UPDATER);
+        assertTrue(slot >= 0);
+
+        buffer = slab.get(slot);
+        written = TEST_DATA.length() - 1;
+        buffer.position(buffer.position() + written);
+        context.checking(new Expectations()
+        {
+            {
+                oneOf(windowUpdater).accept(TEST_DATA.length() - 1);
+            }
+        });
+        slot = slab.written(111, slot, buffer, written, windowUpdater);
+    }
+
+    @Test
+    public void writtenShouldUpdateWindowWhenAllDataWasWrittenInPiecesExistingSlot()
+    {
+        Slab slab = new Slab(10, 120);
+        int slot = Slab.NO_SLOT;
+        ByteBuffer buffer = slab.get(slot, data, 0, TEST_DATA.length());
+        int written = 1;
+        buffer.position(buffer.position() + written);
+        slot = slab.written(111, slot, buffer, written, NO_OP_WINDOW_UPDATER);
+        assertTrue(slot >= 0);
+
+        buffer = slab.get(slot);
+        written = 3;
+        buffer.position(buffer.position() + written);
+        slot = slab.written(111, slot, buffer, written, windowUpdater);
+
+        buffer = slab.get(slot);
+        written = TEST_DATA.length() - 4;
+        buffer.position(buffer.position() + written);
+        context.checking(new Expectations()
+        {
+            {
+                oneOf(windowUpdater).accept(TEST_DATA.length() - 1);
+            }
+        });
+        slot = slab.written(111, slot, buffer, written, windowUpdater);
     }
 
     @Test
@@ -110,12 +232,12 @@ public class SlabTest
 
         int slot1 = Slab.NO_SLOT;
         ByteBuffer buffer = slab.get(slot1, data, 0, 5);
-        slot1 = slab.written(111, slot1, buffer);
+        slot1 = slab.written(111, slot1, buffer, 0, NO_OP_WINDOW_UPDATER);
         assertTrue(slot1 >= 0);
 
         int slot2 = Slab.NO_SLOT;
         ByteBuffer buffer2 = slab.get(slot2, data, 2, 7);
-        slot2 = slab.written(112, slot2, buffer2);
+        slot2 = slab.written(112, slot2, buffer2, 0, NO_OP_WINDOW_UPDATER);
         assertNotEquals(slot1, slot2);
 
         assertEquals(ByteBuffer.wrap("test ".getBytes()), slab.get(slot1));
@@ -129,12 +251,12 @@ public class SlabTest
 
         int slot1 = Slab.NO_SLOT;
         ByteBuffer buffer = slab.get(slot1, data, 0, 5);
-        slot1 = slab.written(1, slot1, buffer);
+        slot1 = slab.written(1, slot1, buffer, 0, NO_OP_WINDOW_UPDATER);
         assertTrue(slot1 >= 0);
 
         int slot2 = Slab.NO_SLOT;
         ByteBuffer buffer2 = slab.get(slot2, data, 2, 7);
-        slot2 = slab.written(17, slot2, buffer2);
+        slot2 = slab.written(17, slot2, buffer2, 0, NO_OP_WINDOW_UPDATER);
         assertNotEquals(slot1, slot2);
 
         assertEquals(ByteBuffer.wrap("test ".getBytes()), slab.get(slot1));
@@ -151,12 +273,12 @@ public class SlabTest
             slot = Slab.NO_SLOT;
             ByteBuffer buffer = slab.get(slot, data, 0, 5);
             int streamId = 111 + i;
-            slot = slab.written(streamId, slot, buffer);
+            slot = slab.written(streamId, slot, buffer, 0, NO_OP_WINDOW_UPDATER);
             assertTrue(slot >= 0);
         }
         slot = Slab.NO_SLOT;
         ByteBuffer buffer = slab.get(slot, data, 0, 5);
-        slot = slab.written(111, slot, buffer);
+        slot = slab.written(111, slot, buffer, 0, NO_OP_WINDOW_UPDATER);
         assertEquals(Slab.OUT_OF_MEMORY, slot);
     }
 

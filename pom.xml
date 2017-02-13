@@ -44,13 +44,14 @@
     <checkstyle.suppressions.location>src/conf/checkstyle/suppressions.xml</checkstyle.suppressions.location>
 
     <byteman.version>3.0.6</byteman.version>
+    <jmock.version>2.6.0</jmock.version>
     <junit.version>4.12</junit.version>
     <k3po.version>3.0.0-alpha-62</k3po.version>
     <jmh.version>1.12</jmh.version>
     <nukleus.plugin.version>0.6.1</nukleus.plugin.version>
     <nukleus.version>0.2</nukleus.version>
-    <nukleus.tcp.spec.version>develop-SNAPSHOT</nukleus.tcp.spec.version>
-    <reaktor.test.version>0.1</reaktor.test.version>
+    <nukleus.tcp.spec.version>0.5</nukleus.tcp.spec.version>
+    <reaktor.test.version>0.2</reaktor.test.version>
     <reaktor.version>0.1</reaktor.version>
   </properties>
 
@@ -118,6 +119,11 @@
       <artifactId>k3po.junit</artifactId>
       <version>${k3po.version}</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jmock</groupId>
+      <artifactId>jmock-junit4</artifactId>
+      <version>${jmock.version}</version>
     </dependency>
     <dependency>
       <groupId>org.kaazing</groupId>

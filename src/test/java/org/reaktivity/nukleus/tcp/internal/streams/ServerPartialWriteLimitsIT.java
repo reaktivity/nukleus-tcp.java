@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.MAXIMUM_STREAMS_WITH_PENDING_WRITES;
 import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
@@ -68,6 +69,53 @@ public class ServerPartialWriteLimitsIT
     @Test
     @Specification({
         "${route}/input/new/controller",
+        "${streams}/server.sent.data.multiple.frames.partial.writes/server/target"
+    })
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMScript(value="PartialWriteIT.btm")
+    public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritableWithoutOverflowingSlot() throws Exception
+    {
+        PartialWriteHelper.addWriteResult(5);
+        PartialWriteHelper.addWriteResult(6);
+        AtomicBoolean allDataWritten = new AtomicBoolean(false);
+        PartialWriteHelper.setWriteResultProvider((caller) -> allDataWritten.get() ? null : 0);
+
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        {
+            final InputStream in = socket.getInputStream();
+
+            k3po.awaitBarrier("SECOND_WRITE_COMPLETED");
+            allDataWritten.set(true);
+
+            String expectedData = "server data 1server data 2";
+            byte[] buf = new byte[expectedData.length() + 10];
+            int offset = 0;
+
+            int read = 0;
+            boolean closed = false;
+            do
+            {
+                read = in.read(buf, offset, buf.length - offset);
+                if (read == -1)
+                {
+                    closed = true;
+                    break;
+                }
+                offset += read;
+            } while (offset < expectedData.length());
+            assertFalse(closed);
+            assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+
+            k3po.finish();
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
         "${streams}/server.sent.data.multiple.streams.second.was.reset/server/target"
     })
     @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
@@ -76,7 +124,7 @@ public class ServerPartialWriteLimitsIT
     {
         PartialWriteHelper.addWriteResult(1); // avoid spin write for first stream write
         AtomicBoolean resetReceived = new AtomicBoolean(false);
-        PartialWriteHelper.setWriteResultSupplier(() -> resetReceived.get() ? null : 0);
+        PartialWriteHelper.setWriteResultProvider((caller) -> resetReceived.get() ? null : 0);
 
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");

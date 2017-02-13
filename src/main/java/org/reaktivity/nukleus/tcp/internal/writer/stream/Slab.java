@@ -19,6 +19,7 @@ import static org.agrona.BitUtil.findNextPositivePowerOfTwo;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.function.IntConsumer;
 
 import org.agrona.DirectBuffer;
 import org.agrona.collections.Hashing;
@@ -96,7 +97,7 @@ class Slab
         return result;
     }
 
-    public int written(long streamId, int slot, ByteBuffer written)
+    public int written(long streamId, int slot, ByteBuffer written, int bytesWritten, IntConsumer offerWindow)
     {
         int nextSlot = slot;
         if (slot == NO_SLOT)
@@ -113,9 +114,16 @@ class Slab
                     buffer.put(written);
                     buffer.limit(buffer.position());
                     buffer.position(offsets[nextSlot]);
+                    if (bytesWritten > 0)
+                    {
+                        offerWindow.accept(bytesWritten);
+                    }
                 }
             }
-            // else: nothing to do, continue to use the default writeBuffer
+            else if (bytesWritten > 0)
+            {
+                offerWindow.accept(bytesWritten);
+            }
         }
         else
         {
@@ -127,7 +135,9 @@ class Slab
             }
             else
             {
-                // Free the slot
+                // Free the slot, but first send a window update for all data that had ever been saved in the slot
+                int slotStart = (slot << slotSizeBits);
+                offerWindow.accept(written.position() - slotStart);
                 release(slot);
                 nextSlot = NO_SLOT;
             }

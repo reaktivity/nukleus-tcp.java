@@ -155,7 +155,7 @@ public final class StreamFactory
                 }
 
                 int originalSlot = slot;
-                slot = writeSlab.written(id, slot, writeBuffer);
+                slot = writeSlab.written(id, slot, writeBuffer, bytesWritten, this::offerWindow);
                 if (slot == OUT_OF_MEMORY)
                 {
                     streamsResetPartialWrite.increment();
@@ -171,8 +171,6 @@ public final class StreamFactory
                     // we just flushed out a pending write
                     key.interestOps(0);
                 }
-
-                offerWindow(bytesWritten);
             }
             else
             {
@@ -240,7 +238,7 @@ public final class StreamFactory
                 LangUtil.rethrowUnchecked(ex);
             }
 
-            slot = writeSlab.written(id, slot, writeBuffer);
+            slot = writeSlab.written(id, slot, writeBuffer, bytesWritten, this::offerWindow);
 
             if (slot == NO_SLOT)
             {
