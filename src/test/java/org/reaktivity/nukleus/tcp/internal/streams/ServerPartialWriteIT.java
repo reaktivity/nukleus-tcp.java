@@ -24,7 +24,7 @@ import static org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory.WR
 
 import java.io.InputStream;
 import java.net.Socket;
-import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jboss.byteman.contrib.bmunit.BMScript;
 import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
@@ -117,17 +117,24 @@ public class ServerPartialWriteIT
     @BMScript(value="PartialWriteIT.btm")
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
     {
+        // processData will be called from each of the two data frames. Make the first
+        // do a partial write, then write nothing until handleWrite is called after the
+        // second processData call, when we write everything.
+        AtomicBoolean finishWrite = new AtomicBoolean(false);
         PartialWriteHelper.addWriteResult(5);
-        PartialWriteHelper.addWriteResult(8);
-        PartialWriteHelper.addWriteResult(5);
-        PartialWriteHelper.addWriteResult(5);
+        PartialWriteHelper.setWriteResultProvider((caller) ->
+        {
+            if (caller.equals("processData"))
+            {
+                finishWrite.set(true);
+                return 0;
+            }
+            else
+            {
+                return finishWrite.get() ? null : 0;
+            }
+        });
         shouldReceiveServerSentData("server data 1server data 2");
-
-        // Verify we forced the desired condition: check handleWrite got called
-        // AFTER processData was called for the second frame
-        List<String> callers = PartialWriteHelper.callers();
-        String error = "Test failed to force desired condition, caller sequence was: " + callers;
-        assertTrue(error, callers.lastIndexOf("handleWrite") >  callers.lastIndexOf("processData"));
     }
 
     @Test
@@ -139,13 +146,44 @@ public class ServerPartialWriteIT
     @BMScript(value="PartialWriteIT.btm")
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
     {
-        PartialWriteHelper.addWriteResult(2);
-        PartialWriteHelper.addWriteResult(2);
-        PartialWriteHelper.addWriteResult(1);
-        PartialWriteHelper.addWriteResult(1);
-        PartialWriteHelper.addWriteResult(1);
-        PartialWriteHelper.addWriteResult(1);
-        shouldReceiveServerSentData("server data", true);
+        PartialWriteHelper.addWriteResult(5);
+        AtomicBoolean endWritten = new AtomicBoolean(false);
+        PartialWriteHelper.setWriteResultProvider((caller) -> endWritten.get() ? null : 0);
+        String expectedData = "server data";
+
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        {
+            final InputStream in = socket.getInputStream();
+            k3po.awaitBarrier("END_WRITTEN");
+            endWritten.set(true);
+
+            byte[] buf = new byte[expectedData.length() + 10];
+            int offset = 0;
+
+            int read = 0;
+            boolean closed = false;
+            do
+            {
+                read = in.read(buf, offset, buf.length - offset);
+                if (read == -1)
+                {
+                    closed = true;
+                    break;
+                }
+                offset += read;
+            } while (offset < expectedData.length());
+            assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+
+            if (!closed)
+            {
+                closed = (in.read() == -1);
+            }
+        }
+
+        k3po.finish();
     }
 
     @Test
@@ -157,13 +195,45 @@ public class ServerPartialWriteIT
     @BMScript(value="PartialWriteIT.btm")
     public void shouldResetIfDataReceivedAfterEndOfStreamWithPendingWrite() throws Exception
     {
-        PartialWriteHelper.addWriteResult(2);
-        PartialWriteHelper.addWriteResult(2);
-        PartialWriteHelper.addWriteResult(1);
-        PartialWriteHelper.addWriteResult(1);
-        PartialWriteHelper.addWriteResult(1);
-        PartialWriteHelper.addWriteResult(1);
-        shouldReceiveServerSentData("server data", true);
+        PartialWriteHelper.addWriteResult(6);
+        AtomicBoolean resetReceived = new AtomicBoolean(false);
+        PartialWriteHelper.setWriteResultProvider((caller) -> resetReceived.get() ? null : 0);
+
+        String expectedData = "server data";
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        {
+            k3po.awaitBarrier("RESET_RECEIVED");
+            resetReceived.set(true);
+
+            final InputStream in = socket.getInputStream();
+            byte[] buf = new byte[expectedData.length()];
+            int offset = 0;
+            int read = 0;
+            boolean closed = false;
+            do
+            {
+                read = in.read(buf, offset, buf.length - offset);
+                if (read == -1)
+                {
+                    closed = true;
+                    break;
+                }
+                offset += read;
+            } while (offset < expectedData.length());
+            assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+
+            if (!closed)
+            {
+                closed = (in.read() == -1);
+            }
+            assertTrue("Stream was not closed", closed);
+        }
+
+        k3po.finish();
+
     }
 
     private void shouldReceiveServerSentData(String expectedData) throws Exception

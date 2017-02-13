@@ -26,9 +26,9 @@ public final class Counters implements AutoCloseable
 
     Counters(CountersManager countersManager)
     {
-        routesSourced = countersManager.newCounter("routesSourced");
-        streamsSourced = countersManager.newCounter("streamsSourced");
-        streamsResetPartialWrite = countersManager.newCounter("streamsResetPartialWrites");
+        routesSourced = countersManager.newCounter("routes");
+        streamsSourced = countersManager.newCounter("streams");
+        streamsResetPartialWrite = countersManager.newCounter("streamsOverflowed");
     }
 
     @Override

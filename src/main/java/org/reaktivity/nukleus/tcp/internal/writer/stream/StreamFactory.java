@@ -265,8 +265,11 @@ public final class StreamFactory
         private void offerWindow(
             final int update)
         {
-            readableBytes += update;
-            source.doWindow(id, update);
+            if (readableBytes > -1)
+            {
+                readableBytes += update;
+                source.doWindow(id, update);
+            }
         }
     }
 }
