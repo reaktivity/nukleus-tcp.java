@@ -24,8 +24,6 @@ import static org.agrona.BitUtil.SIZE_OF_LONG;
 import static org.agrona.IoUtil.createEmptyFile;
 import static org.reaktivity.nukleus.Configuration.DIRECTORY_PROPERTY_NAME;
 import static org.reaktivity.nukleus.Configuration.STREAMS_BUFFER_CAPACITY_PROPERTY_NAME;
-import static org.reaktivity.nukleus.tcp.internal.types.control.Role.INPUT;
-import static org.reaktivity.nukleus.tcp.internal.types.control.State.NEW;
 
 import java.io.File;
 import java.net.InetSocketAddress;
@@ -112,7 +110,7 @@ public class TcpServerBM
         createEmptyFile(target.getAbsoluteFile(), length);
 
         TcpController controller = reaktor.controller(TcpController.class);
-        controller.route(INPUT, NEW, "any", 8080, "target", targetRef, getByName("127.0.0.1")).get();
+        controller.routeInputNew("any", 8080, "target", targetRef, getByName("127.0.0.1")).get();
 
         this.streams = controller.streams("any", "target");
     }
@@ -124,7 +122,7 @@ public class TcpServerBM
         this.streams = null;
 
         TcpController controller = reaktor.controller(TcpController.class);
-        controller.unroute(INPUT, NEW, "any", 8080, "target", targetRef, getByName("127.0.0.1")).get();
+        controller.unrouteInputNew("any", 8080, "target", targetRef, getByName("127.0.0.1")).get();
     }
 
     @Benchmark

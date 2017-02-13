@@ -54,7 +54,7 @@ public class ClientPartialWriteIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .streams("tcp", "source");
+        .streams("tcp", "source#partition");
 
         @Rule
     public final TestRule chain = outerRule(PartialWriteHelper.RULE).around(nukleus).around(k3po).around(timeout);

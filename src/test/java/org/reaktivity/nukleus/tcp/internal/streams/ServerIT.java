@@ -47,7 +47,7 @@ public class ServerIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .streams("tcp", "target");
+        .streams("tcp", "target#partition");
 
     @Rule
     public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);

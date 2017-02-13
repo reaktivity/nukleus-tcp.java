@@ -56,7 +56,7 @@ public class ServerPartialWriteLimitsIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .streams("tcp", "target");
+        .streams("tcp", "target#partition");
 
     private final TestRule properties = new SystemPropertiesRule()
             .setProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.propertyName(), "1")

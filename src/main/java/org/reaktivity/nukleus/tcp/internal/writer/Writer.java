@@ -95,14 +95,14 @@ public final class Writer extends Nukleus.Composite
     }
 
     public void onConnected(
-        String sourceName,
+        String partitionName,
         long sourceId,
         long sourceRef,
         String targetName,
         long correlationId,
         SocketChannel channel)
     {
-        final Source source = sourcesByPartitionName.get(sourceName);
+        final Source source = sourcesByPartitionName.get(partitionName);
         final Target target = targetsByName.computeIfAbsent(targetName, this::newTarget);
 
         source.onConnected(sourceId, sourceRef, target, channel, correlationId);

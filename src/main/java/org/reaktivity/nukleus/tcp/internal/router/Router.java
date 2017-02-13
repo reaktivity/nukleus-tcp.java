@@ -194,7 +194,7 @@ public final class Router extends Nukleus.Composite
     }
 
     public void onConnected(
-        String sourceName,
+        String partitionName,
         long sourceRef,
         long sourceId,
         String targetName,
@@ -207,19 +207,21 @@ public final class Router extends Nukleus.Composite
         // TODO: support network device for channel local address
         targetName = "any";
 
+        String sourceName = source(partitionName);
         Writer writer = writers.get(sourceName);
-        writer.onConnected(sourceName, sourceId, sourceRef, targetName, correlationId, channel);
+        writer.onConnected(partitionName, sourceId, sourceRef, targetName, correlationId, channel);
 
         Reader reader = readers.computeIfAbsent(targetName, this::newReader);
         reader.onConnected(sourceRef, sourceName, targetId, correlationId, channel, address);
     }
 
     public void onConnectFailed(
-        String sourceName,
+        String partitionName,
         long sourceId)
     {
+        String sourceName = source(partitionName);
         Writer writer = writers.get(sourceName);
-        writer.onConnectFailed(sourceName, sourceId);
+        writer.onConnectFailed(partitionName, sourceId);
     }
 
     public void onReadable(
@@ -240,7 +242,12 @@ public final class Router extends Nukleus.Composite
     private static String source(
         Path path)
     {
-        Matcher matcher = SOURCE_NAME.matcher(path.getName(path.getNameCount() - 1).toString());
+        return source(path.getName(path.getNameCount() - 1).toString());
+    }
+
+    private static String source(String partitionName)
+    {
+        Matcher matcher = SOURCE_NAME.matcher(partitionName);
         if (matcher.matches())
         {
             return matcher.group(1);
