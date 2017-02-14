@@ -129,7 +129,7 @@ public final class Connector extends TransportPoller implements Nukleus
     private void handleConnected(
         Request request)
     {
-        final AtomicCounter streamsSourced = context.counters().streamsSourced();
+        final AtomicCounter streamsSourced = context.counters().streams();
         final String sourceName = request.sourceName();
         final long sourceRef = request.sourceRef();
         final long sourceId = request.sourceId();

@@ -67,7 +67,7 @@ public final class Router extends Nukleus.Composite
         this.correlations = new Long2ObjectHashMap<>();
         this.readers = new HashMap<>();
         this.writers = new HashMap<>();
-        this.routesSourced = context.counters().routesSourced();
+        this.routesSourced = context.counters().routes();
     }
 
     public void setConductor(Conductor conductor)
@@ -182,7 +182,7 @@ public final class Router extends Nukleus.Composite
         SocketChannel channel,
         SocketAddress address)
     {
-        final AtomicCounter streamsSourced = context.counters().streamsSourced();
+        final AtomicCounter streamsSourced = context.counters().streams();
         final long targetId = streamsSourced.increment();
         final long correlationId = System.identityHashCode(channel);
         final Correlation correlation = new Correlation(sourceName, channel);

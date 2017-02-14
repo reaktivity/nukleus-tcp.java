@@ -34,6 +34,7 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.NukleusRule;
 
 public class ClientIT
@@ -51,8 +52,14 @@ public class ClientIT
         .counterValuesBufferCapacity(1024)
         .streams("tcp", "source#partition");
 
+    private final TcpCountersRule tcpCounters = new TcpCountersRule()
+            .directory("target/nukleus-itests")
+            .commandBufferCapacity(1024)
+            .responseBufferCapacity(1024)
+            .counterValuesBufferCapacity(1024);
+
     @Rule
-    public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(nukleus).around(tcpCounters).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -105,6 +112,7 @@ public class ClientIT
                 k3po.finish();
             }
         }
+        assertEquals(1, tcpCounters.counters().streams().get());
     }
 
     @Test
