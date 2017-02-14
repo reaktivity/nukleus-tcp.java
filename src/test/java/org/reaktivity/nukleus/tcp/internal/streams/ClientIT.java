@@ -113,6 +113,8 @@ public class ClientIT
             }
         }
         assertEquals(1, tcpCounters.counters().streams().get());
+        assertEquals(1, tcpCounters.counters().routes().get());
+        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
     @Test
@@ -176,6 +178,9 @@ public class ClientIT
                 k3po.finish();
             }
         }
+        assertEquals(2, tcpCounters.counters().streams().get());
+        assertEquals(1, tcpCounters.counters().routes().get());
+        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
     @Test
@@ -239,6 +244,9 @@ public class ClientIT
                 k3po.finish();
             }
         }
+        assertEquals(1, tcpCounters.counters().streams().get());
+        assertEquals(1, tcpCounters.counters().routes().get());
+        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
     @Test
@@ -318,6 +326,9 @@ public class ClientIT
                 k3po.finish();
             }
         }
+        assertEquals(2, tcpCounters.counters().streams().get());
+        assertEquals(1, tcpCounters.counters().routes().get());
+        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
     @Test
@@ -352,6 +363,7 @@ public class ClientIT
                 k3po.finish();
             }
         }
+        assertEquals(1, tcpCounters.counters().streams().get());
     }
 
     @Test

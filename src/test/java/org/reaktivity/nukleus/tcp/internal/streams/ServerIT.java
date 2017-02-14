@@ -32,6 +32,7 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.NukleusRule;
 
 public class ServerIT
@@ -49,8 +50,14 @@ public class ServerIT
         .counterValuesBufferCapacity(1024)
         .streams("tcp", "target#partition");
 
+    private final TcpCountersRule tcpCounters = new TcpCountersRule()
+            .directory("target/nukleus-itests")
+            .commandBufferCapacity(1024)
+            .responseBufferCapacity(1024)
+            .counterValuesBufferCapacity(1024);
+
     @Rule
-    public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(nukleus).around(tcpCounters).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -65,6 +72,12 @@ public class ServerIT
         new Socket("127.0.0.1", 0x1f90).close();
 
         k3po.finish();
+        assertEquals(1, tcpCounters.counters().streams().get());
+
+        // TODO: Do we not want to count routed input?
+        assertEquals(0, tcpCounters.counters().routes().get());
+
+        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
     @Test
@@ -88,6 +101,12 @@ public class ServerIT
         }
 
         k3po.finish();
+        assertEquals(1, tcpCounters.counters().streams().get());
+
+        // TODO: Do we not want to count routed input?
+        assertEquals(0, tcpCounters.counters().routes().get());
+
+        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
     @Test
@@ -151,6 +170,12 @@ public class ServerIT
         }
 
         k3po.finish();
+        assertEquals(2, tcpCounters.counters().streams().get());
+
+        // TODO: Do we not want to count routed input?
+        assertEquals(0, tcpCounters.counters().routes().get());
+
+        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
     @Test
@@ -196,6 +221,12 @@ public class ServerIT
 
             k3po.finish();
         }
+        assertEquals(1, tcpCounters.counters().streams().get());
+
+        // TODO: Do we not want to count routed input?
+        assertEquals(0, tcpCounters.counters().routes().get());
+
+        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
     @Test
@@ -240,6 +271,12 @@ public class ServerIT
 
             k3po.finish();
         }
+        assertEquals(2, tcpCounters.counters().streams().get());
+
+        // TODO: Do we not want to count routed input?
+        assertEquals(0, tcpCounters.counters().routes().get());
+
+        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
     @Test

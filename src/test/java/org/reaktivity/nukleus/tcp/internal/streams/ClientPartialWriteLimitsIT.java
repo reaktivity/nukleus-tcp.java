@@ -39,6 +39,7 @@ import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.NukleusRule;
 
 /**
@@ -64,9 +65,15 @@ public class ClientPartialWriteLimitsIT
             .setProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.propertyName(), "1")
             .setProperty(WINDOW_SIZE.propertyName(), "15");
 
+    private final TcpCountersRule tcpCounters = new TcpCountersRule()
+            .directory("target/nukleus-itests")
+            .commandBufferCapacity(1024)
+            .responseBufferCapacity(1024)
+            .counterValuesBufferCapacity(1024);
+
     @Rule
     public final TestRule chain = outerRule(PartialWriteHelper.RULE).around(properties)
-                                  .around(nukleus).around(k3po).around(timeout);
+                                  .around(nukleus).around(tcpCounters).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -122,6 +129,9 @@ public class ClientPartialWriteLimitsIT
                 k3po.finish();
             }
         }
+        assertEquals(1, tcpCounters.counters().streams().get());
+        assertEquals(1, tcpCounters.counters().routes().get());
+        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
     @Test
@@ -182,5 +192,9 @@ public class ClientPartialWriteLimitsIT
                 k3po.finish();
             }
         }
+        assertEquals(2, tcpCounters.counters().streams().get());
+        assertEquals(1, tcpCounters.counters().routes().get());
+        assertEquals(1, tcpCounters.counters().streamsOverflowed().get());
     }
+
 }
