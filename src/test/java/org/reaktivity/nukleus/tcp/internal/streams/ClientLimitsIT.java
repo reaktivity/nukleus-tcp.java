@@ -76,6 +76,7 @@ public class ClientLimitsIT
 
             try (Socket socket = server.accept())
             {
+                socket.setSoTimeout((int) SECONDS.toMillis(4));
                 k3po.notifyBarrier("ROUTED_INPUT");
                 final InputStream in = socket.getInputStream();
                 int len;

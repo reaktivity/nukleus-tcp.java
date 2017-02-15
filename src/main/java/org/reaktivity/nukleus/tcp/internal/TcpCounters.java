@@ -24,6 +24,7 @@ public final class TcpCounters implements AutoCloseable
     public TcpCounters(Configuration config)
     {
         context = new Context();
+        context.readonly(true);
         context.conclude(config);
     }
 
@@ -42,12 +43,10 @@ public final class TcpCounters implements AutoCloseable
         return context.counters().streamsOverflowed().get();
     }
 
-
     @Override
     public void close() throws Exception
     {
         context.close();
-
     }
 
 }

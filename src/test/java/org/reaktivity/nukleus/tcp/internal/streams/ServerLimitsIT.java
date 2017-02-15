@@ -69,6 +69,7 @@ public class ServerLimitsIT
 
         try (Socket socket = new Socket("127.0.0.1", 0x1f90))
         {
+            socket.setSoTimeout((int) SECONDS.toMillis(4));
             final InputStream in = socket.getInputStream();
 
             int len;
