@@ -51,6 +51,7 @@ public final class TcpCounters implements AutoCloseable
     @Override
     public void close() throws Exception
     {
+        counters.close();
         unmap(controlRO.counterLabelsBuffer().byteBuffer());
         unmap(controlRO.counterValuesBuffer().byteBuffer());
 
