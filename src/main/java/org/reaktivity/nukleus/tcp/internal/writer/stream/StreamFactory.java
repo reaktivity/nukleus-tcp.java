@@ -54,12 +54,12 @@ public final class StreamFactory
         Source source,
         int windowSize,
         int maxPartiallyWrittenStreams,
-        LongSupplier incrementOverflow2)
+        LongSupplier incrementOverflow)
     {
         this.source = source;
         this.windowSize = windowSize;
         writeSlab = new Slab(maxPartiallyWrittenStreams, windowSize);
-        this.incrementOverflow = incrementOverflow2;
+        this.incrementOverflow = incrementOverflow;
     }
 
     public MessageHandler newStream(
