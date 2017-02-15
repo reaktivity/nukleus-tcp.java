@@ -72,6 +72,7 @@ public final class StreamFactory
 
     private final class Stream
     {
+        private static final int EOS_REQUESTED = -1;
         private final long id;
         private final Target target;
         private final SocketChannel channel;
@@ -199,7 +200,7 @@ public final class StreamFactory
             else
             {
                 // Signal end of stream requested and ensure further data streams will result in reset
-                readableBytes = -1;
+                readableBytes = EOS_REQUESTED;
             }
         }
 
@@ -262,10 +263,11 @@ public final class StreamFactory
             return readableBytes >= 0;
         }
 
-        private void offerWindow(
-            final int update)
+        private void offerWindow(final int update)
         {
-            if (readableBytes > -1)
+            // If readableBytes indicates EOS has been received we must not destroy that information
+            // (and in this case there is no need to write the window update)
+            if (readableBytes != EOS_REQUESTED)
             {
                 readableBytes += update;
                 source.doWindow(id, update);

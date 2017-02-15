@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.MAXIMUM_STREAMS_WITH_PENDING_WRITES;
 import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
 
 import java.io.IOException;
@@ -53,7 +52,6 @@ public class ServerLimitsIT
         .streams("tcp", "target");
 
     private final TestRule properties = new SystemPropertiesRule()
-            .setProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.propertyName(), "1")
             .setProperty(WINDOW_SIZE.propertyName(), "15");
 
     @Rule

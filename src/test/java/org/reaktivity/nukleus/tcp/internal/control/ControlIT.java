@@ -43,18 +43,14 @@ public class ControlIT
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024);
 
-    private final TcpCountersRule tcpCounters = new TcpCountersRule()
+    private final TcpCountersRule counters = new TcpCountersRule()
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
-            .counterValuesBufferCapacity(1024)
-            .assertCounters((counters) ->
-                {
-                    assertEquals(1, counters.routes().get());
-                });
+            .counterValuesBufferCapacity(1024);
 
     @Rule
-    public final TestRule chain = outerRule(k3po).around(timeout).around(nukleus).around(tcpCounters);
+    public final TestRule chain = outerRule(k3po).around(timeout).around(nukleus).around(counters);
 
     @Test
     @Specification({
@@ -90,6 +86,7 @@ public class ControlIT
     public void shouldRouteOutputNone() throws Exception
     {
         k3po.finish();
+        assertEquals(1, counters.routes());
     }
 
     @Test
@@ -99,6 +96,7 @@ public class ControlIT
     public void shouldRouteOutputNew() throws Exception
     {
         k3po.finish();
+        assertEquals(1, counters.routes());
     }
 
     @Test
@@ -108,6 +106,7 @@ public class ControlIT
     public void shouldRouteOutputEstablished() throws Exception
     {
         k3po.finish();
+        assertEquals(1, counters.routes());
     }
 
     @Test
@@ -148,6 +147,7 @@ public class ControlIT
     public void shouldUnrouteOutputNone() throws Exception
     {
         k3po.finish();
+        assertEquals(1, counters.routes());
     }
 
     @Test
@@ -158,6 +158,7 @@ public class ControlIT
     public void shouldUnrouteOutputNew() throws Exception
     {
         k3po.finish();
+        assertEquals(1, counters.routes());
     }
 
     @Test
@@ -168,5 +169,6 @@ public class ControlIT
     public void shouldUnrouteOutputEstablished() throws Exception
     {
         k3po.finish();
+        assertEquals(1, counters.routes());
     }
 }

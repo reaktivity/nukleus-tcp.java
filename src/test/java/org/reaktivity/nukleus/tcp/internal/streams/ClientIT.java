@@ -52,14 +52,14 @@ public class ClientIT
         .counterValuesBufferCapacity(1024)
         .streams("tcp", "source#partition");
 
-    private final TcpCountersRule tcpCounters = new TcpCountersRule()
+    private final TcpCountersRule counters = new TcpCountersRule()
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
             .counterValuesBufferCapacity(1024);
 
     @Rule
-    public final TestRule chain = outerRule(nukleus).around(tcpCounters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(nukleus).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -112,9 +112,9 @@ public class ClientIT
                 k3po.finish();
             }
         }
-        assertEquals(1, tcpCounters.counters().streams().get());
-        assertEquals(1, tcpCounters.counters().routes().get());
-        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
+        assertEquals(1, counters.streams());
+        assertEquals(1, counters.routes());
+        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -178,9 +178,9 @@ public class ClientIT
                 k3po.finish();
             }
         }
-        assertEquals(2, tcpCounters.counters().streams().get());
-        assertEquals(1, tcpCounters.counters().routes().get());
-        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
+        assertEquals(2, counters.streams());
+        assertEquals(1, counters.routes());
+        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -244,9 +244,9 @@ public class ClientIT
                 k3po.finish();
             }
         }
-        assertEquals(1, tcpCounters.counters().streams().get());
-        assertEquals(1, tcpCounters.counters().routes().get());
-        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
+        assertEquals(1, counters.streams());
+        assertEquals(1, counters.routes());
+        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -326,9 +326,9 @@ public class ClientIT
                 k3po.finish();
             }
         }
-        assertEquals(2, tcpCounters.counters().streams().get());
-        assertEquals(1, tcpCounters.counters().routes().get());
-        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
+        assertEquals(2, counters.streams());
+        assertEquals(1, counters.routes());
+        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -363,7 +363,7 @@ public class ClientIT
                 k3po.finish();
             }
         }
-        assertEquals(1, tcpCounters.counters().streams().get());
+        assertEquals(1, counters.streams());
     }
 
     @Test

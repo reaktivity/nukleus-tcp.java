@@ -56,7 +56,7 @@ public class ClientPartialWriteIT
         .counterValuesBufferCapacity(1024)
         .streams("tcp", "source#partition");
 
-        @Rule
+    @Rule
     public final TestRule chain = outerRule(PartialWriteHelper.RULE).around(nukleus).around(k3po).around(timeout);
 
     @Test
@@ -117,7 +117,7 @@ public class ClientPartialWriteIT
         // second processData call, when we write everything.
         AtomicBoolean finishWrite = new AtomicBoolean(false);
         PartialWriteHelper.addWriteResult(5);
-        PartialWriteHelper.setWriteResultProvider((caller) ->
+        PartialWriteHelper.setWriteResultProvider(caller ->
         {
             if (caller.equals("processData"))
             {
@@ -144,8 +144,7 @@ public class ClientPartialWriteIT
     {
         PartialWriteHelper.addWriteResult(5);
         AtomicBoolean endWritten = new AtomicBoolean(false);
-        PartialWriteHelper.setWriteResultProvider((caller) -> endWritten.get() ? null : 0);
-        String expectedData = "client data";
+        PartialWriteHelper.zeroWriteUnless(endWritten::get);
 
         try (ServerSocket server = new ServerSocket())
         {
@@ -164,7 +163,7 @@ public class ClientPartialWriteIT
                 k3po.awaitBarrier("END_WRITTEN");
                 endWritten.set(true);
 
-                byte[] buf = new byte[expectedData.length() + 10];
+                byte[] buf = new byte["client data".length() + 10];
                 int offset = 0;
 
                 int read = 0;
@@ -178,8 +177,8 @@ public class ClientPartialWriteIT
                         break;
                     }
                     offset += read;
-                } while (offset < expectedData.length());
-                assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+                } while (offset < "client data".length());
+                assertEquals("client data", new String(buf, 0, offset, UTF_8));
                 if (!closed)
                 {
                     closed = (in.read() == -1);
@@ -201,9 +200,7 @@ public class ClientPartialWriteIT
     {
         PartialWriteHelper.addWriteResult(6);
         AtomicBoolean resetReceived = new AtomicBoolean(false);
-        PartialWriteHelper.setWriteResultProvider((caller) -> resetReceived.get() ? null : 0);
-
-        String expectedData = "client data";
+        PartialWriteHelper.zeroWriteUnless(resetReceived::get);
 
         try (ServerSocket server = new ServerSocket())
         {
@@ -223,7 +220,7 @@ public class ClientPartialWriteIT
 
                 final InputStream in = socket.getInputStream();
 
-                byte[] buf = new byte[expectedData.length() + 10];
+                byte[] buf = new byte["client data".length() + 10];
                 int offset = 0;
 
                 int read = 0;
@@ -237,8 +234,8 @@ public class ClientPartialWriteIT
                         break;
                     }
                     offset += read;
-                } while (offset < expectedData.length());
-                assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+                } while (offset < "client data".length());
+                assertEquals("client data", new String(buf, 0, offset, UTF_8));
 
                 if (!closed)
                 {

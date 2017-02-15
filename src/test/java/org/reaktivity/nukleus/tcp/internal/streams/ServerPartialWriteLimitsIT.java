@@ -63,7 +63,7 @@ public class ServerPartialWriteLimitsIT
             .setProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.propertyName(), "1")
             .setProperty(WINDOW_SIZE.propertyName(), "15");
 
-    private final TcpCountersRule tcpCounters = new TcpCountersRule()
+    private final TcpCountersRule counters = new TcpCountersRule()
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
@@ -71,7 +71,7 @@ public class ServerPartialWriteLimitsIT
 
     @Rule
     public final TestRule chain = outerRule(PartialWriteHelper.RULE).around(properties)
-                                  .around(nukleus).around(tcpCounters).around(k3po).around(timeout);
+                                  .around(nukleus).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -85,7 +85,7 @@ public class ServerPartialWriteLimitsIT
         PartialWriteHelper.addWriteResult(5);
         PartialWriteHelper.addWriteResult(6);
         AtomicBoolean allDataWritten = new AtomicBoolean(false);
-        PartialWriteHelper.setWriteResultProvider((caller) -> allDataWritten.get() ? null : 0);
+        PartialWriteHelper.setWriteResultProvider(caller -> allDataWritten.get() ? null : 0);
 
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
@@ -97,8 +97,7 @@ public class ServerPartialWriteLimitsIT
             k3po.awaitBarrier("SECOND_WRITE_COMPLETED");
             allDataWritten.set(true);
 
-            String expectedData = "server data 1server data 2";
-            byte[] buf = new byte[expectedData.length() + 10];
+            byte[] buf = new byte["server data 1server data 2".length() + 10];
             int offset = 0;
 
             int read = 0;
@@ -112,15 +111,15 @@ public class ServerPartialWriteLimitsIT
                     break;
                 }
                 offset += read;
-            } while (offset < expectedData.length());
+            } while (offset < "server data 1server data 2".length());
             assertFalse(closed);
-            assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+            assertEquals("server data 1server data 2", new String(buf, 0, offset, UTF_8));
 
             k3po.finish();
         }
-        assertEquals(1, tcpCounters.counters().streams().get());
-        assertEquals(1, tcpCounters.counters().routes().get());
-        assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
+        assertEquals(1, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -134,7 +133,7 @@ public class ServerPartialWriteLimitsIT
     {
         PartialWriteHelper.addWriteResult(1); // avoid spin write for first stream write
         AtomicBoolean resetReceived = new AtomicBoolean(false);
-        PartialWriteHelper.setWriteResultProvider((caller) -> resetReceived.get() ? null : 0);
+        PartialWriteHelper.zeroWriteUnless(resetReceived::get);
 
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
@@ -175,9 +174,9 @@ public class ServerPartialWriteLimitsIT
         }
 
         k3po.finish();
-        assertEquals(2, tcpCounters.counters().streams().get());
-        assertEquals(1, tcpCounters.counters().routes().get());
-        assertEquals(1, tcpCounters.counters().streamsOverflowed().get());
+        assertEquals(2, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(1, counters.overflows());
     }
 
 }

@@ -117,12 +117,12 @@ public class ServerPartialWriteIT
     @BMScript(value="PartialWriteIT.btm")
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
     {
-        // processData will be called from each of the two data frames. Make the first
+        // processData will be called for each of the two data frames. Make the first
         // do a partial write, then write nothing until handleWrite is called after the
         // second processData call, when we write everything.
         AtomicBoolean finishWrite = new AtomicBoolean(false);
         PartialWriteHelper.addWriteResult(5);
-        PartialWriteHelper.setWriteResultProvider((caller) ->
+        PartialWriteHelper.setWriteResultProvider(caller ->
         {
             if (caller.equals("processData"))
             {
@@ -148,8 +148,7 @@ public class ServerPartialWriteIT
     {
         PartialWriteHelper.addWriteResult(5);
         AtomicBoolean endWritten = new AtomicBoolean(false);
-        PartialWriteHelper.setWriteResultProvider((caller) -> endWritten.get() ? null : 0);
-        String expectedData = "server data";
+        PartialWriteHelper.zeroWriteUnless(endWritten::get);
 
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
@@ -160,7 +159,7 @@ public class ServerPartialWriteIT
             k3po.awaitBarrier("END_WRITTEN");
             endWritten.set(true);
 
-            byte[] buf = new byte[expectedData.length() + 10];
+            byte[] buf = new byte["server data".length() + 10];
             int offset = 0;
 
             int read = 0;
@@ -174,8 +173,8 @@ public class ServerPartialWriteIT
                     break;
                 }
                 offset += read;
-            } while (offset < expectedData.length());
-            assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+            } while (offset < "server data".length());
+            assertEquals("server data", new String(buf, 0, offset, UTF_8));
 
             if (!closed)
             {
@@ -197,9 +196,8 @@ public class ServerPartialWriteIT
     {
         PartialWriteHelper.addWriteResult(6);
         AtomicBoolean resetReceived = new AtomicBoolean(false);
-        PartialWriteHelper.setWriteResultProvider((caller) -> resetReceived.get() ? null : 0);
+        PartialWriteHelper.zeroWriteUnless(resetReceived::get);
 
-        String expectedData = "server data";
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
@@ -209,7 +207,7 @@ public class ServerPartialWriteIT
             resetReceived.set(true);
 
             final InputStream in = socket.getInputStream();
-            byte[] buf = new byte[expectedData.length()];
+            byte[] buf = new byte["server data".length()];
             int offset = 0;
             int read = 0;
             boolean closed = false;
@@ -222,8 +220,8 @@ public class ServerPartialWriteIT
                     break;
                 }
                 offset += read;
-            } while (offset < expectedData.length());
-            assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+            } while (offset < "server data".length());
+            assertEquals("server data", new String(buf, 0, offset, UTF_8));
 
             if (!closed)
             {

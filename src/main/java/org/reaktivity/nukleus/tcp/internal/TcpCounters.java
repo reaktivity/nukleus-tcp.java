@@ -15,45 +15,38 @@
  */
 package org.reaktivity.nukleus.tcp.internal;
 
-import static org.agrona.IoUtil.unmap;
-
-import org.agrona.concurrent.status.CountersManager;
 import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.tcp.internal.layouts.ControlLayout;
 
 public final class TcpCounters implements AutoCloseable
 {
-    private final ControlLayout controlRO;
-    private final Counters counters;
+    private final Context context;
 
     public TcpCounters(Configuration config)
     {
-        ControlLayout.Builder controlRW = new ControlLayout.Builder();
-        controlRO = controlRW.controlPath(config.directory().resolve("tcp/control"))
-            .commandBufferCapacity(config.commandBufferCapacity())
-            .responseBufferCapacity(config.responseBufferCapacity())
-            .counterLabelsBufferCapacity(config.counterLabelsBufferCapacity())
-            .counterValuesBufferCapacity(config.counterValuesBufferCapacity())
-            .readonly(true)
-            .build();
-        unmap(controlRO.commandBuffer().byteBuffer());
-        unmap(controlRO.responseBuffer().byteBuffer());
-        counters = new Counters(new CountersManager(
-                controlRO.counterLabelsBuffer(),
-                controlRO.counterValuesBuffer()));
+        context = new Context();
+        context.conclude(config);
     }
 
-    Counters counters()
+    public long routes()
     {
-        return counters;
+        return context.counters().routes().get();
     }
+
+    public long streams()
+    {
+        return context.counters().streams().get();
+    }
+
+    public long overflows()
+    {
+        return context.counters().streamsOverflowed().get();
+    }
+
 
     @Override
     public void close() throws Exception
     {
-        counters.close();
-        unmap(controlRO.counterLabelsBuffer().byteBuffer());
-        unmap(controlRO.counterValuesBuffer().byteBuffer());
+        context.close();
 
     }
 

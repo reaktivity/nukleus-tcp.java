@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.jboss.byteman.rule.helper.Helper;
 import org.junit.rules.TestRule;
@@ -38,7 +39,7 @@ public class PartialWriteHelper extends Helper
     public static final TestRule RULE = new Rule();
 
     private static Queue<Integer> writeResults;
-    private static Function<String, Integer> writeResultSupplier = (caller) -> null;
+    private static Function<String, Integer> writeResultSupplier = caller -> null;
     private static List<String> callers;
     private static Integer oldLimit;
 
@@ -96,11 +97,16 @@ public class PartialWriteHelper extends Helper
         writeResultSupplier = supplier;
     }
 
+    static void zeroWriteUnless(Supplier<Boolean> condition)
+    {
+        writeResultSupplier = caller -> condition.get() ? null : 0;
+    }
+
     private static void reset()
     {
         writeResults = new ArrayDeque<>(20);
         callers = new ArrayList<>(20);
-        writeResultSupplier = (caller) -> null;
+        writeResultSupplier = caller -> null;
     }
 
     private static class Rule implements TestRule
