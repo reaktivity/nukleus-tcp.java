@@ -36,6 +36,7 @@ public final class Counters implements AutoCloseable
     {
         routes.close();
         streams.close();
+        streamsOverflowed.close();
     }
 
     public AtomicCounter routes()

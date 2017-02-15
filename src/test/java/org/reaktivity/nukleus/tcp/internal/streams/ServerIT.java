@@ -73,10 +73,7 @@ public class ServerIT
 
         k3po.finish();
         assertEquals(1, tcpCounters.counters().streams().get());
-
-        // TODO: Do we not want to count routed input?
-        assertEquals(0, tcpCounters.counters().routes().get());
-
+        assertEquals(1, tcpCounters.counters().routes().get());
         assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
@@ -102,10 +99,7 @@ public class ServerIT
 
         k3po.finish();
         assertEquals(1, tcpCounters.counters().streams().get());
-
-        // TODO: Do we not want to count routed input?
-        assertEquals(0, tcpCounters.counters().routes().get());
-
+        assertEquals(1, tcpCounters.counters().routes().get());
         assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
@@ -171,10 +165,7 @@ public class ServerIT
 
         k3po.finish();
         assertEquals(2, tcpCounters.counters().streams().get());
-
-        // TODO: Do we not want to count routed input?
-        assertEquals(0, tcpCounters.counters().routes().get());
-
+        assertEquals(1, tcpCounters.counters().routes().get());
         assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
@@ -222,10 +213,7 @@ public class ServerIT
             k3po.finish();
         }
         assertEquals(1, tcpCounters.counters().streams().get());
-
-        // TODO: Do we not want to count routed input?
-        assertEquals(0, tcpCounters.counters().routes().get());
-
+        assertEquals(1, tcpCounters.counters().routes().get());
         assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
@@ -272,10 +260,7 @@ public class ServerIT
             k3po.finish();
         }
         assertEquals(2, tcpCounters.counters().streams().get());
-
-        // TODO: Do we not want to count routed input?
-        assertEquals(0, tcpCounters.counters().routes().get());
-
+        assertEquals(1, tcpCounters.counters().routes().get());
         assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 

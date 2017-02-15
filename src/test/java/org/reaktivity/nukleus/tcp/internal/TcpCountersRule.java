@@ -22,6 +22,7 @@ import static org.reaktivity.nukleus.Configuration.DIRECTORY_PROPERTY_NAME;
 import static org.reaktivity.nukleus.Configuration.RESPONSE_BUFFER_CAPACITY_PROPERTY_NAME;
 
 import java.util.Properties;
+import java.util.function.Consumer;
 
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
@@ -32,6 +33,8 @@ public class TcpCountersRule implements TestRule
 {
     private final Properties properties;
     private Counters counters;
+    private Consumer<Counters> assertCounters = (counters) ->
+        { };
 
     public TcpCountersRule()
     {
@@ -62,6 +65,12 @@ public class TcpCountersRule implements TestRule
         return this;
     }
 
+    public TcpCountersRule assertCounters(Consumer<Counters> assertCounters)
+    {
+        this.assertCounters = assertCounters;
+        return this;
+    }
+
     @Override
     public Statement apply(Statement base, Description description)
     {
@@ -72,9 +81,12 @@ public class TcpCountersRule implements TestRule
             public void evaluate() throws Throwable
             {
                 Configuration configuration = new Configuration(properties);
-                counters = new TcpCountersFactory().create(configuration);
-                base.evaluate();
-                counters.close();
+                try (TcpCounters counters = new TcpCounters(configuration))
+                {
+                    TcpCountersRule.this.counters = counters.counters();
+                    base.evaluate();
+                    TcpCountersRule.this.assertCounters.accept(counters.counters());
+                }
             }
 
         };

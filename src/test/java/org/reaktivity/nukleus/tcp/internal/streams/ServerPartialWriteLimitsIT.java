@@ -119,7 +119,7 @@ public class ServerPartialWriteLimitsIT
             k3po.finish();
         }
         assertEquals(1, tcpCounters.counters().streams().get());
-        assertEquals(0, tcpCounters.counters().routes().get());
+        assertEquals(1, tcpCounters.counters().routes().get());
         assertEquals(0, tcpCounters.counters().streamsOverflowed().get());
     }
 
@@ -176,7 +176,7 @@ public class ServerPartialWriteLimitsIT
 
         k3po.finish();
         assertEquals(2, tcpCounters.counters().streams().get());
-        assertEquals(0, tcpCounters.counters().routes().get());
+        assertEquals(1, tcpCounters.counters().routes().get());
         assertEquals(1, tcpCounters.counters().streamsOverflowed().get());
     }
 

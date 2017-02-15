@@ -272,6 +272,7 @@ public final class Router extends Nukleus.Composite
             Reader reader = readers.computeIfAbsent(sourceName, this::newReader);
             InetSocketAddress localAddress = new InetSocketAddress(address, (int)sourceRef);
             reader.doRouteAccept(correlationId, sourceRef, targetName, targetRef, localAddress);
+            routes.increment();
         }
         else
         {
@@ -293,6 +294,10 @@ public final class Router extends Nukleus.Composite
             if (sourceRef == 0)
             {
                 sourceRef = OUTPUT_NEW.nextRef(routes);
+            }
+            else
+            {
+                routes.increment();
             }
 
             InetSocketAddress remoteAddress = new InetSocketAddress(targetName, (int)targetRef);
@@ -328,6 +333,10 @@ public final class Router extends Nukleus.Composite
             {
                 sourceRef = OUTPUT_ESTABLISHED.nextRef(routes);
             }
+            else
+            {
+                routes.increment();
+            }
 
             Writer writer = writers.computeIfAbsent(sourceName, this::newWriter);
             writer.doRoute(correlationId, sourceRef, targetName, targetRef, null);
@@ -350,6 +359,7 @@ public final class Router extends Nukleus.Composite
         {
             Reader reader = readers.computeIfAbsent(sourceName, this::newReader);
             reader.doRoute(correlationId, sourceRef, targetName, targetRef, null);
+            routes.increment();
         }
         else
         {

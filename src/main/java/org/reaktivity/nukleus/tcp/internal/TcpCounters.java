@@ -15,31 +15,45 @@
  */
 package org.reaktivity.nukleus.tcp.internal;
 
+import static org.agrona.IoUtil.unmap;
+
 import org.agrona.concurrent.status.CountersManager;
 import org.reaktivity.nukleus.Configuration;
 import org.reaktivity.nukleus.tcp.internal.layouts.ControlLayout;
 
-public final class TcpCountersFactory
+public final class TcpCounters implements AutoCloseable
 {
-    public String name()
-    {
-        return "tcp";
-    }
+    private final ControlLayout controlRO;
+    private final Counters counters;
 
-    public Counters create(
-        Configuration config)
+    public TcpCounters(Configuration config)
     {
         ControlLayout.Builder controlRW = new ControlLayout.Builder();
-        ControlLayout controlRO = controlRW.controlPath(config.directory().resolve("tcp/control"))
+        controlRO = controlRW.controlPath(config.directory().resolve("tcp/control"))
             .commandBufferCapacity(config.commandBufferCapacity())
             .responseBufferCapacity(config.responseBufferCapacity())
             .counterLabelsBufferCapacity(config.counterLabelsBufferCapacity())
             .counterValuesBufferCapacity(config.counterValuesBufferCapacity())
             .readonly(true)
             .build();
-        return new Counters(new CountersManager(
+        unmap(controlRO.commandBuffer().byteBuffer());
+        unmap(controlRO.responseBuffer().byteBuffer());
+        counters = new Counters(new CountersManager(
                 controlRO.counterLabelsBuffer(),
                 controlRO.counterValuesBuffer()));
+    }
+
+    Counters counters()
+    {
+        return counters;
+    }
+
+    @Override
+    public void close() throws Exception
+    {
+        unmap(controlRO.counterLabelsBuffer().byteBuffer());
+        unmap(controlRO.counterValuesBuffer().byteBuffer());
+
     }
 
 }
