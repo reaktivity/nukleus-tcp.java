@@ -39,7 +39,7 @@ public class PartialWriteHelper extends Helper
     public static final TestRule RULE = new Rule();
 
     private static Queue<Integer> writeResults;
-    private static Function<String, Integer> writeResultSupplier = caller -> null;
+    private static Function<String, Integer> writeResultSupplier = (caller) -> null;
     private static List<String> callers;
     private static Integer oldLimit;
 
@@ -115,7 +115,7 @@ public class PartialWriteHelper extends Helper
     {
         writeResults = new ArrayDeque<>(20);
         callers = new ArrayList<>(20);
-        writeResultSupplier = caller -> null;
+        writeResultSupplier = (caller) -> null;
     }
 
     private static class Rule implements TestRule
