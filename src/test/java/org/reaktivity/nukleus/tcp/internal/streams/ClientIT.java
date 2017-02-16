@@ -365,7 +365,7 @@ public class ClientIT
             }
         }
         // TODO: sometime we get streams = 2 on travis
-        //assertEquals(1, counters.streams());
+        // assertEquals(1, counters.streams());
     }
 
     @Test
