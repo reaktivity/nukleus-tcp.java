@@ -99,7 +99,16 @@ public class PartialWriteHelper extends Helper
 
     static void zeroWriteUnless(Supplier<Boolean> condition)
     {
-        writeResultSupplier = caller -> condition.get() ? null : 0;
+        writeResultSupplier = new Function<String, Integer>()
+        {
+
+            @Override
+            public Integer apply(String t)
+            {
+                return condition.get() ? null : 0;
+            }
+
+        };
     }
 
     private static void reset()
