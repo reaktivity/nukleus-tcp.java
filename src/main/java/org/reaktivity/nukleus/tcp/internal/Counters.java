@@ -22,13 +22,13 @@ public final class Counters implements AutoCloseable
 {
     private final AtomicCounter routes;
     private final AtomicCounter streams;
-    private final AtomicCounter streamsOverflowed;
+    private final AtomicCounter overflows;
 
     Counters(CountersManager countersManager)
     {
         routes = countersManager.newCounter("routes");
         streams = countersManager.newCounter("streams");
-        streamsOverflowed = countersManager.newCounter("streamsOverflowed");
+        overflows = countersManager.newCounter("overflows");
     }
 
     @Override
@@ -36,7 +36,7 @@ public final class Counters implements AutoCloseable
     {
         routes.close();
         streams.close();
-        streamsOverflowed.close();
+        overflows.close();
     }
 
     public AtomicCounter routes()
@@ -49,8 +49,8 @@ public final class Counters implements AutoCloseable
         return streams;
     }
 
-    public AtomicCounter streamsOverflowed()
+    public AtomicCounter overflows()
     {
-        return streamsOverflowed;
+        return overflows;
     }
 }

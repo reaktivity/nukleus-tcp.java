@@ -182,8 +182,8 @@ public final class Router extends Nukleus.Composite
         SocketChannel channel,
         SocketAddress address)
     {
-        final AtomicCounter streamsSourced = context.counters().streams();
-        final long targetId = streamsSourced.increment();
+        final AtomicCounter streams = context.counters().streams();
+        final long targetId = streams.increment();
         final long correlationId = System.identityHashCode(channel);
         final Correlation correlation = new Correlation(sourceName, channel);
 

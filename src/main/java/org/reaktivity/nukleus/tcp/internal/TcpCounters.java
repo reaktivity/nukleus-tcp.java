@@ -40,7 +40,7 @@ public final class TcpCounters implements AutoCloseable
 
     public long overflows()
     {
-        return context.counters().streamsOverflowed().get();
+        return context.counters().overflows().get();
     }
 
     @Override
