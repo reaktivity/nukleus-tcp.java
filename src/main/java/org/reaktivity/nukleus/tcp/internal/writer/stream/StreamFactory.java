@@ -267,7 +267,9 @@ public final class StreamFactory
         {
             // If readableBytes indicates EOS has been received we must not destroy that information
             // (and in this case there is no need to write the window update)
-            if (readableBytes != EOS_REQUESTED)
+            // We can also get update < 0 if we received data GT window (protocol violation) while
+            // we have data waiting to be written (incomplete writes)
+            if (readableBytes > EOS_REQUESTED)
             {
                 readableBytes += update;
                 source.doWindow(id, update);
