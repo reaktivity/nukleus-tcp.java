@@ -39,7 +39,7 @@ public class PartialWriteHelper extends Helper
     public static final TestRule RULE = new Rule();
 
     private static Queue<Integer> writeResults;
-    private static Function<String, Integer> writeResultSupplier = (caller) -> null;
+    private static Function<String, Integer> writeResultSupplier = caller -> null;
     private static List<String> callers;
     private static Integer oldLimit;
 
@@ -48,20 +48,6 @@ public class PartialWriteHelper extends Helper
     public PartialWriteHelper(org.jboss.byteman.rule.Rule rule)
     {
         super(rule);
-    }
-
-    public void preWrite(ByteBuffer b)
-    {
-        if (callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
-                true, true)
-           ||
-            callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.handleWrite",
-                     true, true))
-        {
-            String caller = formatStackMatching("processData|handleWrite").replaceFirst("(?s).*\\$Stream.", "")
-                    .replaceFirst("(?s)\\(.*", "");
-            preWrite(caller, new Object[]{null, b});
-        }
     }
 
     public void preWrite(String caller, Object[] parameters)
@@ -82,18 +68,6 @@ public class PartialWriteHelper extends Helper
         {
             debug(format("preWrite for %s: normal write for buffer %s", caller, b));
             oldLimit = null;
-        }
-    }
-
-    public void postWrite(ByteBuffer b, int returnValue)
-    {
-        if (callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
-                true, true)
-           ||
-            callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.handleWrite",
-                     true, true))
-        {
-            postWrite(returnValue);
         }
     }
 
@@ -125,23 +99,14 @@ public class PartialWriteHelper extends Helper
 
     static void zeroWriteUnless(Supplier<Boolean> condition)
     {
-        writeResultSupplier = new Function<String, Integer>()
-        {
-
-            @Override
-            public Integer apply(String t)
-            {
-                return condition.get() ? null : 0;
-            }
-
-        };
+        writeResultSupplier = caller -> condition.get() ? null : 0;
     }
 
     private static void reset()
     {
         writeResults = new ArrayDeque<>(20);
         callers = new ArrayList<>(20);
-        writeResultSupplier = (caller) -> null;
+        writeResultSupplier = caller -> null;
     }
 
     private static class Rule implements TestRule

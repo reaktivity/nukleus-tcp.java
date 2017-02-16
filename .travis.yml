@@ -4,7 +4,7 @@ jdk:
 addons:
   apt:
     packages:
-      # Getting compile errors on javac 1.8.0_31-b13
+      # Getting core dump with java 1.8.0_31 and ByteMan
       - oracle-java8-installer
 
 install: true
