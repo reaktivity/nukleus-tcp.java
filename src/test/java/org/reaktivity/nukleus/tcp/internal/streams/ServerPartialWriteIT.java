@@ -46,6 +46,8 @@ import org.reaktivity.reaktor.test.NukleusRule;
  * incomplete writes.
  */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
+@BMUnitConfig(loadDirectory="src/test/resources")
+@BMScript(value="PartialWriteIT.btm")
 public class ServerPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -69,8 +71,6 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
-    @BMScript(value="PartialWriteIT.btm")
     public void shouldSpinWrite() throws Exception
     {
         for (int i=0; i < WRITE_SPIN_COUNT - 1; i++)
@@ -85,8 +85,6 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
-    @BMScript(value="PartialWriteIT.btm")
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
     {
         PartialWriteHelper.addWriteResult(5);
@@ -98,8 +96,6 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
-    @BMScript(value="PartialWriteIT.btm")
     public void shouldHandleMultiplePartialWrites() throws Exception
     {
         PartialWriteHelper.addWriteResult(2);
@@ -113,8 +109,6 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data.multiple.frames/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
-    @BMScript(value="PartialWriteIT.btm")
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
     {
         // processData will be called for each of the two data frames. Make the first
@@ -142,8 +136,6 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data.then.end/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
-    @BMScript(value="PartialWriteIT.btm")
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
     {
         PartialWriteHelper.addWriteResult(5);
@@ -192,8 +184,6 @@ public class ServerPartialWriteIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data.after.end/server/target"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
-    @BMScript(value="PartialWriteIT.btm")
     public void shouldResetIfDataReceivedAfterEndOfStreamWithPendingWrite() throws Exception
     {
         PartialWriteHelper.addWriteResult(6);

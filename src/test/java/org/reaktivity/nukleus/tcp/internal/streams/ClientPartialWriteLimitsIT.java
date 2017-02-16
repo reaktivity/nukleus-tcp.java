@@ -46,6 +46,8 @@ import org.reaktivity.reaktor.test.NukleusRule;
  * Tests the handling of capacity exceeded conditions in the context of incomplete writes
  */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
+@BMUnitConfig(loadDirectory="src/test/resources")
+@BMScript(value="PartialWriteIT.btm")
 public class ClientPartialWriteLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -80,8 +82,6 @@ public class ClientPartialWriteLimitsIT
         "${route}/output/new/controller",
         "${streams}/client.sent.data.multiple.frames.partial.writes/client/source"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
-    @BMScript(value="PartialWriteIT.btm")
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritableWithoutOverflowingSlot() throws Exception
     {
         PartialWriteHelper.addWriteResult(5);
@@ -138,8 +138,6 @@ public class ClientPartialWriteLimitsIT
         "${route}/output/new/controller",
         "${streams}/client.sent.data.multiple.streams.second.was.reset/client/source"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
-    @BMScript(value="PartialWriteIT.btm")
     public void shouldResetStreamsExceedingPartialWriteStreamsLimit() throws Exception
     {
         PartialWriteHelper.addWriteResult(1); // avoid spin write for first stream write
