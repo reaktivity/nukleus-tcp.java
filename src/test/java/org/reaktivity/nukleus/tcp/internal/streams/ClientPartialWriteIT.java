@@ -64,7 +64,7 @@ public class ClientPartialWriteIT
         "${route}/output/new/controller",
         "${streams}/client.sent.data/client/source"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=true)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldSpinWrite() throws Exception
     {
@@ -80,7 +80,7 @@ public class ClientPartialWriteIT
         "${route}/output/new/controller",
         "${streams}/client.sent.data/client/source"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
     {
@@ -93,7 +93,7 @@ public class ClientPartialWriteIT
         "${route}/output/new/controller",
         "${streams}/client.sent.data/client/source"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldHandleMultiplePartialWrites() throws Exception
     {
@@ -108,7 +108,7 @@ public class ClientPartialWriteIT
         "${route}/output/new/controller",
         "${streams}/client.sent.data.multiple.frames/client/source"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
     {
@@ -138,7 +138,7 @@ public class ClientPartialWriteIT
         "${route}/output/new/controller",
         "${streams}/client.sent.data.then.end/client/source"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
     {
@@ -195,7 +195,7 @@ public class ClientPartialWriteIT
         "${route}/output/new/controller",
         "${streams}/client.sent.data.after.end/client/source"
     })
-    @BMUnitConfig(loadDirectory="src/test/resources", debug=false, verbose=false)
+    @BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=false)
     @BMScript(value="PartialWriteIT.btm")
     public void shouldResetIfDataReceivedAfterEndOfStreamWithPendingWrite() throws Exception
     {

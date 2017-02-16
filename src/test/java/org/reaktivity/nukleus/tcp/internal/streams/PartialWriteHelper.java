@@ -50,6 +50,20 @@ public class PartialWriteHelper extends Helper
         super(rule);
     }
 
+    public void preWrite(ByteBuffer b)
+    {
+        if (callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
+                true, true)
+           ||
+            callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.handleWrite",
+                     true, true))
+        {
+            String caller = formatStackMatching("processData|handleWrite").replaceFirst("(?s).*\\$Stream.", "")
+                    .replaceFirst("(?s)\\(.*", "");
+            preWrite(caller, new Object[]{null, b});
+        }
+    }
+
     public void preWrite(String caller, Object[] parameters)
     {
         b = (ByteBuffer) parameters[1];
@@ -68,6 +82,18 @@ public class PartialWriteHelper extends Helper
         {
             debug(format("preWrite for %s: normal write for buffer %s", caller, b));
             oldLimit = null;
+        }
+    }
+
+    public void postWrite(ByteBuffer b, int returnValue)
+    {
+        if (callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData",
+                true, true)
+           ||
+            callerEquals("org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.handleWrite",
+                     true, true))
+        {
+            postWrite(returnValue);
         }
     }
 

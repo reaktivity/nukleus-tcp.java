@@ -1,32 +1,16 @@
-RULE  enter write from processData
-CLASS org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream
-METHOD processData
+RULE  enter write
+CLASS SocketChannelImpl
+METHOD write
 HELPER org.reaktivity.nukleus.tcp.internal.streams.PartialWriteHelper
-AT INVOKE SocketChannel.write
+AT ENTRY
 IF TRUE
-DO preWrite("processData", $@);
+DO preWrite($1);
 ENDRULE
-RULE  exit write from processData
-CLASS org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream
-METHOD processData
+RULE  exit write
+CLASS SocketChannelImpl
+METHOD write
 HELPER org.reaktivity.nukleus.tcp.internal.streams.PartialWriteHelper
-AFTER INVOKE SocketChannel.write
+AT EXIT
 IF TRUE
-DO postWrite($!);
-ENDRULE
-RULE  enter write from handleWrite
-CLASS org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream
-METHOD handleWrite
-HELPER org.reaktivity.nukleus.tcp.internal.streams.PartialWriteHelper
-AT INVOKE SocketChannel.write
-IF TRUE
-DO preWrite("handleWrite", $@);
-ENDRULE
-RULE  exit write from handleWrite
-CLASS org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream
-METHOD handleWrite
-HELPER org.reaktivity.nukleus.tcp.internal.streams.PartialWriteHelper
-AFTER INVOKE SocketChannel.write
-IF TRUE
-DO postWrite($!);
+DO postWrite($1, $!);
 ENDRULE
