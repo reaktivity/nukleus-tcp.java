@@ -122,6 +122,10 @@ public final class Connector extends TransportPoller implements Nukleus
             handleConnectFailed(request);
             LangUtil.rethrowUnchecked(ex);
         }
+        finally
+        {
+            selectionKey.cancel();
+        }
 
         return 1;
     }

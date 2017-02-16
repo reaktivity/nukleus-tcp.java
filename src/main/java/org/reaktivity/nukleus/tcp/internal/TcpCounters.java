@@ -21,11 +21,10 @@ public final class TcpCounters implements AutoCloseable
 {
     private final Context context;
 
+    @SuppressWarnings("resource")
     public TcpCounters(Configuration config)
     {
-        context = new Context();
-        context.readonly(true);
-        context.conclude(config);
+        context = new Context().readonly(true).conclude(config);
     }
 
     public long routes()

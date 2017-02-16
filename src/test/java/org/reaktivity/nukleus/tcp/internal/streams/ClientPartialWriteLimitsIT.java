@@ -190,9 +190,9 @@ public class ClientPartialWriteLimitsIT
                 k3po.finish();
             }
         }
-        assertEquals(2, counters.streams());
         assertEquals(1, counters.routes());
         assertEquals(1, counters.overflows());
+        assertEquals(2, counters.streams());
     }
 
 }
