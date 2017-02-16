@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.tcp.internal;
 
 import static java.lang.String.valueOf;
+import static org.junit.Assert.assertEquals;
 import static org.reaktivity.nukleus.Configuration.COMMAND_BUFFER_CAPACITY_PROPERTY_NAME;
 import static org.reaktivity.nukleus.Configuration.COUNTERS_BUFFER_CAPACITY_PROPERTY_NAME;
 import static org.reaktivity.nukleus.Configuration.DIRECTORY_PROPERTY_NAME;
@@ -75,6 +76,9 @@ public class TcpCountersRule implements TestRule
                 try (TcpCounters counters = new TcpCounters(configuration))
                 {
                     TcpCountersRule.this.counters = counters;
+                    assertEquals(0, counters.routes());
+                    assertEquals(0, counters.streams());
+                    assertEquals(0, counters.overflows());
                     base.evaluate();
                 }
             }
