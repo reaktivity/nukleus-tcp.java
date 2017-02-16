@@ -157,6 +157,7 @@ public class ClientPartialWriteIT
 
             try (Socket socket = server.accept())
             {
+                socket.setSoTimeout((int) SECONDS.toMillis(4));
                 k3po.notifyBarrier("ROUTED_INPUT");
 
                 final InputStream in = socket.getInputStream();
@@ -213,6 +214,7 @@ public class ClientPartialWriteIT
 
             try (Socket socket = server.accept())
             {
+                socket.setSoTimeout((int) SECONDS.toMillis(4));
                 k3po.notifyBarrier("ROUTED_INPUT");
 
                 k3po.awaitBarrier("RESET_RECEIVED");
@@ -266,6 +268,7 @@ public class ClientPartialWriteIT
 
             try (Socket socket = server.accept())
             {
+                socket.setSoTimeout((int) SECONDS.toMillis(4));
                 k3po.notifyBarrier("ROUTED_INPUT");
 
                 final InputStream in = socket.getInputStream();

@@ -174,6 +174,7 @@ public class ClientPartialWriteLimitsIT
                 }
                 assertEquals("client data 1", new String(buf, 0, offset, UTF_8));
 
+                socket2.setSoTimeout((int) SECONDS.toMillis(4));
                 in = socket2.getInputStream();
                 offset = 0;
                 int len = 0;

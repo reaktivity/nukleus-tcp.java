@@ -155,6 +155,7 @@ public class ServerPartialWriteIT
 
         try (Socket socket = new Socket("127.0.0.1", 0x1f90))
         {
+            socket.setSoTimeout((int) SECONDS.toMillis(4));
             final InputStream in = socket.getInputStream();
             k3po.awaitBarrier("END_WRITTEN");
             endWritten.set(true);
@@ -180,6 +181,7 @@ public class ServerPartialWriteIT
             {
                 closed = (in.read() == -1);
             }
+            assertTrue("Stream was not closed", closed);
         }
 
         k3po.finish();
@@ -203,6 +205,7 @@ public class ServerPartialWriteIT
 
         try (Socket socket = new Socket("127.0.0.1", 0x1f90))
         {
+            socket.setSoTimeout((int) SECONDS.toMillis(4));
             k3po.awaitBarrier("RESET_RECEIVED");
             resetReceived.set(true);
 
