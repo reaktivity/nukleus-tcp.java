@@ -51,7 +51,7 @@ public class ClientLimitsIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .streams("tcp", "source");
+        .streams("tcp", "source#partition");
 
     private final TestRule properties = new SystemPropertiesRule()
             .setProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.propertyName(), "1")
@@ -65,7 +65,6 @@ public class ClientLimitsIT
         "${route}/output/new/controller",
         "${streams}/client.sent.data.received.reset/client/source"
     })
-    @Ignore // TODO: failing on Travis
     public void shouldResetWhenWindowExceeded() throws Exception
     {
         try (ServerSocket server = new ServerSocket())

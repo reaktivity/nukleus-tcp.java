@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
 
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -50,7 +49,7 @@ public class ServerLimitsIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .streams("tcp", "target");
+        .streams("tcp", "target#partition");
 
     private final TestRule properties = new SystemPropertiesRule()
             .setProperty(WINDOW_SIZE.propertyName(), "15");
@@ -63,7 +62,6 @@ public class ServerLimitsIT
         "${route}/input/new/controller",
         "${streams}/server.sent.data.received.reset/server/target"
     })
-    @Ignore // TODO: failing on Travis
     public void shouldResetWhenWindowIsExceeded() throws Exception
     {
         k3po.start();
