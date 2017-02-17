@@ -1,5 +1,4 @@
 /**
-
  * Copyright 2016-2017 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
