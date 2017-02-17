@@ -26,8 +26,9 @@ import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ALL;
 import static org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory.WRITE_SPIN_COUNT;
 
-import java.io.InputStream;
-import java.net.Socket;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
 
@@ -140,38 +141,38 @@ public class ServerPartialWriteIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            socket.setSoTimeout((int) SECONDS.toMillis(4));
-            final InputStream in = socket.getInputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
             k3po.awaitBarrier("END_WRITTEN");
             endWritten.set(true);
 
-            byte[] buf = new byte["server data".length() + 10];
-            int offset = 0;
-
-            int read = 0;
+            ByteBuffer buf = ByteBuffer.allocate("server data".length() + 10);
             boolean closed = false;
             do
             {
-                read = in.read(buf, offset, buf.length - offset);
-                if (read == -1)
+                int len = channel.read(buf);
+                if (len == -1)
                 {
                     closed = true;
                     break;
                 }
-                offset += read;
-            } while (offset < "server data".length());
-            assertEquals("server data", new String(buf, 0, offset, UTF_8));
+            } while (buf.position() < "server data".length());
+            buf.flip();
+
+            assertEquals("server data", UTF_8.decode(buf).toString());
 
             if (!closed)
             {
-                closed = (in.read() == -1);
+                buf.rewind();
+                closed = (channel.read(buf) == -1);
             }
-            assertTrue("Stream was not closed", closed);
-        }
 
-        k3po.finish();
+            assertTrue("Stream was not closed", closed);
+
+            k3po.finish();
+        }
     }
 
     @Test
@@ -188,38 +189,38 @@ public class ServerPartialWriteIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            socket.setSoTimeout((int) SECONDS.toMillis(4));
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
             k3po.awaitBarrier("RESET_RECEIVED");
             resetReceived.set(true);
 
-            final InputStream in = socket.getInputStream();
-            byte[] buf = new byte["server data".length()];
-            int offset = 0;
-            int read = 0;
+            ByteBuffer buf = ByteBuffer.allocate("server data".length() + 10);
             boolean closed = false;
             do
             {
-                read = in.read(buf, offset, buf.length - offset);
-                if (read == -1)
+                int len = channel.read(buf);
+                if (len == -1)
                 {
                     closed = true;
                     break;
                 }
-                offset += read;
-            } while (offset < "server data".length());
-            assertEquals("server data", new String(buf, 0, offset, UTF_8));
+            } while (buf.position() < "server data".length());
+            buf.flip();
+
+            assertEquals("server data", UTF_8.decode(buf).toString());
 
             if (!closed)
             {
-                closed = (in.read() == -1);
+                buf.rewind();
+                closed = (channel.read(buf) == -1);
             }
+
             assertTrue("Stream was not closed", closed);
+
+            k3po.finish();
         }
-
-        k3po.finish();
-
     }
 
     private void shouldReceiveServerSentData(String expectedData) throws Exception
@@ -232,38 +233,38 @@ public class ServerPartialWriteIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final InputStream in = socket.getInputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            byte[] buf = new byte[expectedData.length() + 10];
-            int offset = 0;
-
-            int read = 0;
+            ByteBuffer buf = ByteBuffer.allocate(expectedData.length() + 10);
             boolean closed = false;
             do
             {
-                read = in.read(buf, offset, buf.length - offset);
-                if (read == -1)
+                int len = channel.read(buf);
+                if (len == -1)
                 {
                     closed = true;
                     break;
                 }
-                offset += read;
-            } while (offset < expectedData.length());
-            assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+            } while (buf.position() < expectedData.length());
+            buf.flip();
+
+            assertEquals(expectedData, UTF_8.decode(buf).toString());
 
             if (expectStreamClosed)
             {
                 if (!closed)
                 {
-                    closed = (in.read() == -1);
+                    buf.rewind();
+                    closed = (channel.read(buf) == -1);
                 }
+
                 assertTrue("Stream was not closed", closed);
             }
-        }
 
-        k3po.finish();
+            k3po.finish();
+        }
     }
 
 }
