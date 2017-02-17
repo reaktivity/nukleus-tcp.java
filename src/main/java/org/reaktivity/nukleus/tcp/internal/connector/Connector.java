@@ -122,6 +122,10 @@ public final class Connector extends TransportPoller implements Nukleus
             handleConnectFailed(request);
             LangUtil.rethrowUnchecked(ex);
         }
+        finally
+        {
+            selectionKey.cancel();
+        }
 
         return 1;
     }
@@ -129,13 +133,13 @@ public final class Connector extends TransportPoller implements Nukleus
     private void handleConnected(
         Request request)
     {
-        final AtomicCounter streamsSourced = context.counters().streamsSourced();
+        final AtomicCounter streams = context.counters().streams();
         final String sourceName = request.sourceName();
         final long sourceRef = request.sourceRef();
         final long sourceId = request.sourceId();
         final String targetName = request.targetName();
         final long targetRef = request.targetRef();
-        final long targetId = streamsSourced.increment();
+        final long targetId = streams.increment();
         final long correlationId = request.correlationId();
         final SocketChannel channel = request.channel();
         final InetSocketAddress address = request.address();
