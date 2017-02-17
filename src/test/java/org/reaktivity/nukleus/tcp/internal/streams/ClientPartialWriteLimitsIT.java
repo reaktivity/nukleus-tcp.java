@@ -17,17 +17,22 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.IntStream.concat;
+import static java.util.stream.IntStream.generate;
+import static java.util.stream.IntStream.of;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.MAXIMUM_STREAMS_WITH_PENDING_WRITES;
 import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
+import static org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ALL;
 
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.IntStream;
 
 import org.jboss.byteman.contrib.bmunit.BMScript;
 import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
@@ -40,6 +45,8 @@ import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
+import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.HandleWriteHelper;
+import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDataHelper;
 import org.reaktivity.reaktor.test.NukleusRule;
 
 /**
@@ -47,7 +54,7 @@ import org.reaktivity.reaktor.test.NukleusRule;
  */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 @BMUnitConfig(loadDirectory="src/test/resources")
-@BMScript(value="PartialWriteIT.btm")
+@BMScript(value="SocketChannelHelper.btm")
 public class ClientPartialWriteLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -74,7 +81,7 @@ public class ClientPartialWriteLimitsIT
             .counterValuesBufferCapacity(1024);
 
     @Rule
-    public final TestRule chain = outerRule(PartialWriteHelper.RULE).around(properties)
+    public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(properties)
                                   .around(nukleus).around(counters).around(k3po).around(timeout);
 
     @Test
@@ -84,10 +91,9 @@ public class ClientPartialWriteLimitsIT
     })
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritableWithoutOverflowingSlot() throws Exception
     {
-        PartialWriteHelper.addWriteResult(5);
-        PartialWriteHelper.addWriteResult(6);
+        ProcessDataHelper.fragmentWrites(IntStream.of(5, 6));
         AtomicBoolean allDataWritten = new AtomicBoolean(false);
-        PartialWriteHelper.zeroWriteUnless(allDataWritten::get);
+        HandleWriteHelper.fragmentWrites(generate(() -> allDataWritten.get() ? ALL : 0));
 
         try (ServerSocket server = new ServerSocket())
         {
@@ -140,9 +146,9 @@ public class ClientPartialWriteLimitsIT
     })
     public void shouldResetStreamsExceedingPartialWriteStreamsLimit() throws Exception
     {
-        PartialWriteHelper.addWriteResult(1); // avoid spin write for first stream write
+        ProcessDataHelper.fragmentWrites(concat(of(1), generate(() -> 0))); // avoid spin write for first stream write
         AtomicBoolean resetReceived = new AtomicBoolean(false);
-        PartialWriteHelper.zeroWriteUnless(resetReceived::get);
+        HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? ALL : 0));
 
         try (ServerSocket server = new ServerSocket())
         {

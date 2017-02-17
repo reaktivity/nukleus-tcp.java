@@ -23,6 +23,7 @@ import static java.util.stream.IntStream.of;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ALL;
 import static org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory.WRITE_SPIN_COUNT;
 
 import java.io.InputStream;
@@ -47,7 +48,7 @@ import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDa
 import org.reaktivity.reaktor.test.NukleusRule;
 
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-@BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=true, enforce=true)
+@BMUnitConfig(loadDirectory="src/test/resources")
 @BMScript(value="SocketChannelHelper.btm")
 public class ClientPartialWriteIT
 {
@@ -115,7 +116,7 @@ public class ClientPartialWriteIT
         AtomicBoolean finishWrite = new AtomicBoolean(false);
 
         ProcessDataHelper.fragmentWrites(concat(of(5), generate(() -> finishWrite.getAndSet(true) ? 0 : 0)));
-        HandleWriteHelper.fragmentWrites(generate(() -> finishWrite.get() ? -1 : 0));
+        HandleWriteHelper.fragmentWrites(generate(() -> finishWrite.get() ? ALL : 0));
 
         shouldReceiveClientSentData("client data 1client data 2");
     }
@@ -129,7 +130,7 @@ public class ClientPartialWriteIT
     {
         AtomicBoolean endWritten = new AtomicBoolean(false);
         ProcessDataHelper.fragmentWrites(concat(of(5), generate(() -> 0)));
-        HandleWriteHelper.fragmentWrites(generate(() -> endWritten.get() ? -1 : 0));
+        HandleWriteHelper.fragmentWrites(generate(() -> endWritten.get() ? ALL : 0));
 
         try (ServerSocket server = new ServerSocket())
         {
@@ -184,7 +185,7 @@ public class ClientPartialWriteIT
     {
         ProcessDataHelper.fragmentWrites(IntStream.of(6));
         AtomicBoolean resetReceived = new AtomicBoolean(false);
-        HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? -1 : 0));
+        HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? ALL : 0));
 
         try (ServerSocket server = new ServerSocket())
         {

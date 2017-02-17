@@ -14,6 +14,7 @@ import org.junit.runners.model.Statement;
 public final class SocketChannelHelper
 {
     public static final TestRule RULE = new Rule();
+    public static final int ALL = -1;
 
     public static class ProcessDataHelper extends Helper
     {
@@ -101,8 +102,8 @@ public final class SocketChannelHelper
 
     private static int write(SocketChannel channel, ByteBuffer b, PrimitiveIterator.OfInt iterator) throws IOException
     {
-        int bytesToWrite = iterator.hasNext() ? iterator.nextInt() : -1;
-        bytesToWrite = bytesToWrite == -1 ? b.remaining() : bytesToWrite;
+        int bytesToWrite = iterator.hasNext() ? iterator.nextInt() : ALL;
+        bytesToWrite = bytesToWrite == ALL ? b.remaining() : bytesToWrite;
         int limit = b.limit();
         b.limit(b.position() + bytesToWrite);
         int written = channel.write(b);
