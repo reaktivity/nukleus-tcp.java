@@ -54,7 +54,7 @@ public final class Router extends Nukleus.Composite
     private final Long2ObjectHashMap<Correlation> correlations;
     private final Map<String, Reader> readers;
     private final Map<String, Writer> writers;
-    private final AtomicCounter routesSourced;
+    private final AtomicCounter routes;
 
     private Conductor conductor;
     private Acceptor acceptor;
@@ -67,7 +67,7 @@ public final class Router extends Nukleus.Composite
         this.correlations = new Long2ObjectHashMap<>();
         this.readers = new HashMap<>();
         this.writers = new HashMap<>();
-        this.routesSourced = context.counters().routesSourced();
+        this.routes = context.counters().routes();
     }
 
     public void setConductor(Conductor conductor)
@@ -182,8 +182,8 @@ public final class Router extends Nukleus.Composite
         SocketChannel channel,
         SocketAddress address)
     {
-        final AtomicCounter streamsSourced = context.counters().streamsSourced();
-        final long targetId = streamsSourced.increment();
+        final AtomicCounter streams = context.counters().streams();
+        final long targetId = streams.increment();
         final long correlationId = System.identityHashCode(channel);
         final Correlation correlation = new Correlation(sourceName, channel);
 
@@ -292,7 +292,7 @@ public final class Router extends Nukleus.Composite
         {
             if (sourceRef == 0)
             {
-                sourceRef = OUTPUT_NEW.nextRef(routesSourced);
+                sourceRef = OUTPUT_NEW.nextRef(routes);
             }
 
             InetSocketAddress remoteAddress = new InetSocketAddress(targetName, (int)targetRef);
@@ -326,7 +326,7 @@ public final class Router extends Nukleus.Composite
         {
             if (sourceRef == 0)
             {
-                sourceRef = OUTPUT_ESTABLISHED.nextRef(routesSourced);
+                sourceRef = OUTPUT_ESTABLISHED.nextRef(routes);
             }
 
             Writer writer = writers.computeIfAbsent(sourceName, this::newWriter);
