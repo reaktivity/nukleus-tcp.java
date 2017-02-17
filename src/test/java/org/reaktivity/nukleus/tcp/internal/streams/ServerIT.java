@@ -299,9 +299,9 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streams}/echo.data/server/target"
+        "${streams}/client.and.server.sent.data.multiple.frames/server/target"
     })
-    public void shouldEchoData() throws Exception
+    public void shouldSendAndReceiveData() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");

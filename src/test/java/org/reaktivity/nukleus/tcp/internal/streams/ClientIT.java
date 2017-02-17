@@ -348,9 +348,9 @@ public class ClientIT
     @Test
     @Specification({
         "${route}/output/new/controller",
-        "${streams}/echo.data/client/source"
+        "${streams}/client.and.server.sent.data.multiple.frames/client/source"
     })
-    public void shouldEchoData() throws Exception
+    public void shouldSendAndReceiveData() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
