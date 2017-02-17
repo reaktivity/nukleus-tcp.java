@@ -21,9 +21,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.Socket;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -51,10 +51,10 @@ public class ServerIT
         .streams("tcp", "target#partition");
 
     private final TcpCountersRule counters = new TcpCountersRule()
-            .directory("target/nukleus-itests")
-            .commandBufferCapacity(1024)
-            .responseBufferCapacity(1024)
-            .counterValuesBufferCapacity(1024);
+        .directory("target/nukleus-itests")
+        .commandBufferCapacity(1024)
+        .responseBufferCapacity(1024)
+        .counterValuesBufferCapacity(1024);
 
     @Rule
     public final TestRule chain = outerRule(nukleus).around(counters).around(k3po).around(timeout);
@@ -69,9 +69,13 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        new Socket("127.0.0.1", 0x1f90).close();
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-        k3po.finish();
+            k3po.finish();
+        }
+
         assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
@@ -87,17 +91,19 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final InputStream in = socket.getInputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            byte[] buf = new byte[256];
-            int len = in.read(buf);
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            channel.read(buf);
+            buf.flip();
 
-            assertEquals("server data", new String(buf, 0, len, UTF_8));
+            assertEquals("server data", UTF_8.decode(buf).toString());
+
+            k3po.finish();
         }
 
-        k3po.finish();
         assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
@@ -113,28 +119,23 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final InputStream in = socket.getInputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            byte[] buf = new byte[256];
-            int offset = 0;
-
-            int read = 0;
+            ByteBuffer buf = ByteBuffer.allocate(256);
             do
             {
-                read = in.read(buf, offset, buf.length - offset);
-                if (read == -1)
+                int len = channel.read(buf);
+                if (len == -1)
                 {
                     break;
                 }
-                offset += read;
-            } while (offset < 26);
-            assertEquals("server data 1", new String(buf, 0, 13, UTF_8));
-            assertEquals("server data 2", new String(buf, 13, offset - 13, UTF_8));
-        }
-        finally
-        {
+            } while (buf.position() < 26);
+            buf.flip();
+
+            assertEquals("server data 1".concat("server data 2"), UTF_8.decode(buf).toString());
+
             k3po.finish();
         }
     }
@@ -149,21 +150,25 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90);
-             Socket socket2 = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel1 = SocketChannel.open();
+             SocketChannel channel2 = SocketChannel.open())
         {
-            InputStream in = socket.getInputStream();
+            channel1.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel2.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            byte[] buf = new byte[256];
-            int len = in.read(buf);
-            assertEquals("server data 1", new String(buf, 0, len, UTF_8));
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            channel1.read(buf);
+            buf.flip();
+            assertEquals("server data 1", UTF_8.decode(buf).toString());
 
-            in = socket2.getInputStream();
-            len = in.read(buf);
-            assertEquals("server data 2", new String(buf, 0, len, UTF_8));
+            buf.rewind();
+            channel2.read(buf);
+            buf.flip();
+            assertEquals("server data 2", UTF_8.decode(buf).toString());
+
+            k3po.finish();
         }
 
-        k3po.finish();
         assertEquals(2, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
@@ -179,19 +184,23 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final InputStream in = socket.getInputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            byte[] buf = new byte[256];
-            int len = in.read(buf);
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            channel.read(buf);
+            buf.flip();
 
-            assertEquals("server data", new String(buf, 0, len, UTF_8));
-            len = in.read(buf);
+            assertEquals("server data", UTF_8.decode(buf).toString());
+
+            buf.rewind();
+            int len = channel.read(buf);
+
             assertEquals(-1, len);
-        }
 
-        k3po.finish();
+            k3po.finish();
+        }
     }
 
     @Test
@@ -204,14 +213,14 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final OutputStream out = socket.getOutputStream();
-
-            out.write("client data".getBytes());
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.write(UTF_8.encode("client data"));
 
             k3po.finish();
         }
+
         assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
@@ -227,13 +236,14 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final OutputStream out = socket.getOutputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.write(UTF_8.encode("client data 1"));
 
-            out.write("client data 1".getBytes());
             k3po.awaitBarrier("FIRST_DATA_FRAME_RECEIVED");
-            out.write("client data 2".getBytes());
+
+            channel.write(UTF_8.encode("client data 2"));
 
             k3po.finish();
         }
@@ -249,16 +259,18 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket1 = new Socket("127.0.0.1", 0x1f90);
-             Socket socket2 = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel1 = SocketChannel.open();
+             SocketChannel channel2 = SocketChannel.open())
         {
-            final OutputStream out1 = socket1.getOutputStream();
-            final OutputStream out2 = socket2.getOutputStream();
-            out1.write("client data 1".getBytes());
-            out2.write("client data 2".getBytes());
+            channel1.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel2.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            channel1.write(UTF_8.encode("client data 1"));
+            channel2.write(UTF_8.encode("client data 2"));
 
             k3po.finish();
         }
+
         assertEquals(2, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
@@ -274,13 +286,11 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final OutputStream out = socket.getOutputStream();
-
-            out.write("client data".getBytes());
-
-            socket.shutdownOutput();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.write(UTF_8.encode("client data"));
+            channel.shutdownOutput();
 
             k3po.finish();
         }
@@ -296,26 +306,26 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final InputStream in = socket.getInputStream();
-            final OutputStream out = socket.getOutputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.write(UTF_8.encode("client data 1"));
 
-            out.write("client data 1".getBytes());
+            ByteBuffer buf1 = ByteBuffer.allocate(256);
+            channel.read(buf1);
+            buf1.flip();
 
-            byte[] buf1 = new byte[256];
-            int len1 = in.read(buf1);
+            channel.write(UTF_8.encode("client data 2"));
 
-            out.write("client data 2".getBytes());
+            ByteBuffer buf2 = ByteBuffer.allocate(256);
+            channel.read(buf2);
+            buf2.flip();
 
-            byte[] buf2 = new byte[256];
-            int len2 = in.read(buf2);
+            assertEquals("server data 1", UTF_8.decode(buf1).toString());
+            assertEquals("server data 2", UTF_8.decode(buf2).toString());
 
-            assertEquals("server data 1", new String(buf1, 0, len1, UTF_8));
-            assertEquals("server data 2", new String(buf2, 0, len2, UTF_8));
+            k3po.finish();
         }
-
-        k3po.finish();
     }
 
     @Test
@@ -328,17 +338,18 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final InputStream in = socket.getInputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            byte[] buf = new byte[256];
-            int len = in.read(buf);
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            int len = channel.read(buf);
+            buf.flip();
 
             assertEquals(-1, len);
-        }
 
-        k3po.finish();
+            k3po.finish();
+        }
     }
 
     @Test
@@ -351,9 +362,10 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            socket.shutdownOutput();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.shutdownOutput();
 
             k3po.finish();
         }
@@ -369,18 +381,21 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final InputStream in = socket.getInputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            byte[] buf = new byte[256];
-            int len = in.read(buf);
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            channel.read(buf);
+            buf.flip();
 
-            assertEquals("server data", new String(buf, 0, len, UTF_8));
+            assertEquals("server data", UTF_8.decode(buf).toString());
 
+            int len = 0;
             try
             {
-                len = in.read(buf);
+                buf.rewind();
+                len = channel.read(buf);
             }
             catch (IOException ex)
             {
@@ -388,8 +403,8 @@ public class ServerIT
             }
 
             assertEquals(-1, len);
-        }
 
-        k3po.finish();
+            k3po.finish();
+        }
     }
 }

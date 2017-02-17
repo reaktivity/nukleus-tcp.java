@@ -21,8 +21,9 @@ import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.Socket;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -52,7 +53,7 @@ public class ServerLimitsIT
         .streams("tcp", "target#partition");
 
     private final TestRule properties = new SystemPropertiesRule()
-            .setProperty(WINDOW_SIZE.propertyName(), "15");
+        .setProperty(WINDOW_SIZE.propertyName(), "15");
 
     @Rule
     public final TestRule chain = outerRule(properties).around(nukleus).around(k3po).around(timeout);
@@ -67,22 +68,24 @@ public class ServerLimitsIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            socket.setSoTimeout((int) SECONDS.toMillis(4));
-            final InputStream in = socket.getInputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             int len;
             try
             {
-                len = in.read();
+                ByteBuffer buf = ByteBuffer.allocate(256);
+                len = channel.read(buf);
             }
             catch (IOException ex)
             {
                 len = -1;
             }
+
             assertEquals(-1, len);
+
+            k3po.finish();
         }
-        k3po.finish();
     }
 }

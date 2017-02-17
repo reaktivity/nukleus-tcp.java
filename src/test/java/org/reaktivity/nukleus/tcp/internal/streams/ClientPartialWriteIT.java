@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.streams;
 
+import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.IntStream.concat;
@@ -26,10 +27,10 @@ import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ALL;
 import static org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory.WRITE_SPIN_COUNT;
 
-import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
 
@@ -132,45 +133,43 @@ public class ClientPartialWriteIT
         ProcessDataHelper.fragmentWrites(concat(of(5), generate(() -> 0)));
         HandleWriteHelper.fragmentWrites(generate(() -> endWritten.get() ? ALL : 0));
 
-        try (ServerSocket server = new ServerSocket())
+        try (ServerSocketChannel server = ServerSocketChannel.open())
         {
-            server.setReuseAddress(true);
+            server.setOption(SO_REUSEADDR, true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
-            server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
             k3po.awaitBarrier("ROUTED_OUTPUT");
 
-            try (Socket socket = server.accept())
+            try (SocketChannel channel = server.accept())
             {
-                socket.setSoTimeout((int) SECONDS.toMillis(4));
                 k3po.notifyBarrier("ROUTED_INPUT");
-
-                final InputStream in = socket.getInputStream();
                 k3po.awaitBarrier("END_WRITTEN");
                 endWritten.set(true);
 
-                byte[] buf = new byte["client data".length() + 10];
-                int offset = 0;
-
-                int read = 0;
+                ByteBuffer buf = ByteBuffer.allocate("client data".length() + 10);
                 boolean closed = false;
                 do
                 {
-                    read = in.read(buf, offset, buf.length - offset);
-                    if (read == -1)
+                    int len = channel.read(buf);
+                    if (len == -1)
                     {
                         closed = true;
                         break;
                     }
-                    offset += read;
-                } while (offset < "client data".length());
-                assertEquals("client data", new String(buf, 0, offset, UTF_8));
+                } while (buf.position() < "client data".length());
+                buf.flip();
+
+                assertEquals("client data", UTF_8.decode(buf).toString());
+
                 if (!closed)
                 {
-                    closed = (in.read() == -1);
+                    buf.rewind();
+                    closed = (channel.read(buf) == -1);
                 }
+
                 assertTrue("Stream was not closed", closed);
+
                 k3po.finish();
             }
         }
@@ -187,46 +186,42 @@ public class ClientPartialWriteIT
         AtomicBoolean resetReceived = new AtomicBoolean(false);
         HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? ALL : 0));
 
-        try (ServerSocket server = new ServerSocket())
+        try (ServerSocketChannel server = ServerSocketChannel.open())
         {
-            server.setReuseAddress(true);
+            server.setOption(SO_REUSEADDR, true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
-            server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
             k3po.awaitBarrier("ROUTED_OUTPUT");
 
-            try (Socket socket = server.accept())
+            try (SocketChannel channel = server.accept())
             {
-                socket.setSoTimeout((int) SECONDS.toMillis(4));
                 k3po.notifyBarrier("ROUTED_INPUT");
 
                 k3po.awaitBarrier("RESET_RECEIVED");
                 resetReceived.set(true);
 
-                final InputStream in = socket.getInputStream();
-
-                byte[] buf = new byte["client data".length() + 10];
-                int offset = 0;
-
-                int read = 0;
+                ByteBuffer buf = ByteBuffer.allocate("client data".length() + 10);
                 boolean closed = false;
                 do
                 {
-                    read = in.read(buf, offset, buf.length - offset);
-                    if (read == -1)
+                    int len = channel.read(buf);
+                    if (len == -1)
                     {
                         closed = true;
                         break;
                     }
-                    offset += read;
-                } while (offset < "client data".length());
-                assertEquals("client data", new String(buf, 0, offset, UTF_8));
+                } while (buf.position() < "client data".length());
+                buf.flip();
+
+                assertEquals("client data", UTF_8.decode(buf).toString());
 
                 if (!closed)
                 {
-                    closed = (in.read() == -1);
+                    buf.rewind();
+                    closed = (channel.read(buf) == -1);
                 }
+
                 assertTrue("Stream was not closed", closed);
 
                 k3po.finish();
@@ -241,44 +236,41 @@ public class ClientPartialWriteIT
 
     private void shouldReceiveClientSentData(String expectedData, boolean expectStreamClosed) throws Exception
     {
-        try (ServerSocket server = new ServerSocket())
+        try (ServerSocketChannel server = ServerSocketChannel.open())
         {
-            server.setReuseAddress(true);
+            server.setOption(SO_REUSEADDR, true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
-            server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
             k3po.awaitBarrier("ROUTED_OUTPUT");
 
-            try (Socket socket = server.accept())
+            try (SocketChannel channel = server.accept())
             {
                 k3po.notifyBarrier("ROUTED_INPUT");
 
-                final InputStream in = socket.getInputStream();
-
-                byte[] buf = new byte[expectedData.length() + 10];
-                int offset = 0;
-
-                int read = 0;
+                ByteBuffer buf = ByteBuffer.allocate(expectedData.length() + 10);
                 boolean closed = false;
                 do
                 {
-                    read = in.read(buf, offset, buf.length - offset);
-                    if (read == -1)
+                    int len = channel.read(buf);
+                    if (len == -1)
                     {
                         closed = true;
                         break;
                     }
-                    offset += read;
-                } while (offset < expectedData.length());
-                assertEquals(expectedData, new String(buf, 0, offset, UTF_8));
+                } while (buf.position() < expectedData.length());
+                buf.flip();
+
+                assertEquals(expectedData, UTF_8.decode(buf).toString());
 
                 if (expectStreamClosed)
                 {
                     if (!closed)
                     {
-                        closed = (in.read() == -1);
+                        buf.rewind();
+                        closed = (channel.read(buf) == -1);
                     }
+
                     assertTrue("Stream was not closed", closed);
                 }
 

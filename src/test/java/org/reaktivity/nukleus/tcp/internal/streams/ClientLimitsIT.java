@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.streams;
 
+import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
@@ -22,10 +23,10 @@ import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.MAXIMUM
 import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -52,8 +53,8 @@ public class ClientLimitsIT
         .streams("tcp", "source#partition");
 
     private final TestRule properties = new SystemPropertiesRule()
-            .setProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.propertyName(), "1")
-            .setProperty(WINDOW_SIZE.propertyName(), "15");
+        .setProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.propertyName(), "1")
+        .setProperty(WINDOW_SIZE.propertyName(), "15");
 
     @Rule
     public final TestRule chain = outerRule(properties).around(nukleus).around(k3po).around(timeout);
@@ -65,30 +66,31 @@ public class ClientLimitsIT
     })
     public void shouldResetWhenWindowExceeded() throws Exception
     {
-        try (ServerSocket server = new ServerSocket())
+        try (ServerSocketChannel server = ServerSocketChannel.open())
         {
-            server.setReuseAddress(true);
+            server.setOption(SO_REUSEADDR, true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
-            server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
             k3po.awaitBarrier("ROUTED_OUTPUT");
 
-            try (Socket socket = server.accept())
+            try (SocketChannel channel = server.accept())
             {
-                socket.setSoTimeout((int) SECONDS.toMillis(4));
                 k3po.notifyBarrier("ROUTED_INPUT");
-                final InputStream in = socket.getInputStream();
+
                 int len;
                 try
                 {
-                    len = in.read();
+                    ByteBuffer buf = ByteBuffer.allocate(256);
+                    len = channel.read(buf);
                 }
                 catch (IOException ex)
                 {
                     len = -1;
                 }
+
                 assertEquals(-1, len);
+
                 k3po.finish();
             }
         }

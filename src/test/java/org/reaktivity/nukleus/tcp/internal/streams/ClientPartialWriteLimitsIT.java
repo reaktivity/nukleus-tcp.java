@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.streams;
 
+import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.IntStream.concat;
@@ -27,10 +28,10 @@ import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.MAXIMUM
 import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
 import static org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ALL;
 
-import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
 
@@ -71,14 +72,14 @@ public class ClientPartialWriteLimitsIT
         .streams("tcp", "source#partition");
 
     private final TestRule properties = new SystemPropertiesRule()
-            .setProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.propertyName(), "1")
-            .setProperty(WINDOW_SIZE.propertyName(), "15");
+        .setProperty(MAXIMUM_STREAMS_WITH_PENDING_WRITES.propertyName(), "1")
+        .setProperty(WINDOW_SIZE.propertyName(), "15");
 
     private final TcpCountersRule counters = new TcpCountersRule()
-            .directory("target/nukleus-itests")
-            .commandBufferCapacity(1024)
-            .responseBufferCapacity(1024)
-            .counterValuesBufferCapacity(1024);
+        .directory("target/nukleus-itests")
+        .commandBufferCapacity(1024)
+        .responseBufferCapacity(1024)
+        .counterValuesBufferCapacity(1024);
 
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(properties)
@@ -95,45 +96,41 @@ public class ClientPartialWriteLimitsIT
         AtomicBoolean allDataWritten = new AtomicBoolean(false);
         HandleWriteHelper.fragmentWrites(generate(() -> allDataWritten.get() ? ALL : 0));
 
-        try (ServerSocket server = new ServerSocket())
+        try (ServerSocketChannel server = ServerSocketChannel.open())
         {
-            server.setReuseAddress(true);
+            server.setOption(SO_REUSEADDR, true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
-            server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
             k3po.awaitBarrier("ROUTED_OUTPUT");
 
-            try (Socket socket = server.accept())
+            try (SocketChannel channel = server.accept())
             {
                 k3po.notifyBarrier("ROUTED_INPUT");
-
-                final InputStream in = socket.getInputStream();
 
                 k3po.awaitBarrier("SECOND_WRITE_COMPLETED");
                 allDataWritten.set(true);
 
-                byte[] buf = new byte["client data 1client data 2".length() + 10];
-                int offset = 0;
-
-                int read = 0;
+                ByteBuffer buf = ByteBuffer.allocate(256);
                 boolean closed = false;
                 do
                 {
-                    read = in.read(buf, offset, buf.length - offset);
-                    if (read == -1)
+                    int len = channel.read(buf);
+                    if (len == -1)
                     {
                         closed = true;
                         break;
                     }
-                    offset += read;
-                } while (offset < "client data 1client data 2".length());
+                } while (buf.position() < "client data 1".concat("client data 2").length());
+                buf.flip();
+
                 assertFalse(closed);
-                assertEquals("client data 1client data 2", new String(buf, 0, offset, UTF_8));
+                assertEquals("client data 1".concat("client data 2"), UTF_8.decode(buf).toString());
 
                 k3po.finish();
             }
         }
+
         assertEquals(1, counters.streams());
         assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
@@ -150,55 +147,52 @@ public class ClientPartialWriteLimitsIT
         AtomicBoolean resetReceived = new AtomicBoolean(false);
         HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? ALL : 0));
 
-        try (ServerSocket server = new ServerSocket())
+        try (ServerSocketChannel server = ServerSocketChannel.open())
         {
-            server.setReuseAddress(true);
+            server.setOption(SO_REUSEADDR, true);
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
-            server.setSoTimeout((int) SECONDS.toMillis(5));
 
             k3po.start();
             k3po.awaitBarrier("ROUTED_OUTPUT");
 
-            try (Socket socket = server.accept();
-                 Socket socket2 = server.accept())
+            try (SocketChannel channel1 = server.accept();
+                 SocketChannel channel2 = server.accept())
             {
                 k3po.notifyBarrier("ROUTED_INPUT");
 
                 k3po.awaitBarrier("SECOND_STREAM_RESET_RECEIVED");
                 resetReceived.set(true);
 
-                InputStream in = socket.getInputStream();
-                byte[] buf = new byte[256];
-                int offset = 0;
-                while (offset < 13)
+                ByteBuffer buf = ByteBuffer.allocate(256);
+                while (buf.position() < 13)
                 {
-                    int len = in.read(buf, offset, buf.length - offset);
+                    int len = channel1.read(buf);
                     assert (len != -1);
-                    offset += len;
                 }
-                assertEquals("client data 1", new String(buf, 0, offset, UTF_8));
+                buf.flip();
+                assertEquals("client data 1", UTF_8.decode(buf).toString());
 
-                socket2.setSoTimeout((int) SECONDS.toMillis(4));
-                in = socket2.getInputStream();
-                offset = 0;
+                buf.rewind();
                 int len = 0;
-                while (offset < 13)
+                while (buf.position() < 13)
                 {
-                    len = in.read(buf, offset, buf.length - offset);
+                    len = channel2.read(buf);
                     if (len == -1)
                     {
                         break;
                     }
-                    offset += len;
                 }
+                buf.flip();
+
+                assertEquals(0, buf.remaining());
                 assertEquals(-1, len);
 
                 k3po.finish();
             }
         }
+
         assertEquals(1, counters.routes());
         assertEquals(1, counters.overflows());
         assertEquals(2, counters.streams());
     }
-
 }
