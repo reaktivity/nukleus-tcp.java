@@ -364,11 +364,16 @@ public class ClientIT
             {
                 k3po.notifyBarrier("ROUTED_INPUT");
 
-                ByteBuffer buf = ByteBuffer.allocate(256);
                 channel.write(UTF_8.encode("server data 1"));
+
+                ByteBuffer buf = ByteBuffer.allocate(256);
+                buf.limit("client data 1".length());
                 channel.read(buf);
+
                 channel.write(UTF_8.encode("server data 2"));
+                buf.limit(buf.capacity());
                 channel.read(buf);
+
                 buf.flip();
 
                 assertEquals(26, buf.remaining());
