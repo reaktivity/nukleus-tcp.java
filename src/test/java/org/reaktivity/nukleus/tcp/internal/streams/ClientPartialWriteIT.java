@@ -17,6 +17,9 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.IntStream.concat;
+import static java.util.stream.IntStream.generate;
+import static java.util.stream.IntStream.of;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.rules.RuleChain.outerRule;
@@ -27,8 +30,10 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.IntStream;
 
-import org.jboss.byteman.contrib.bmunit.BMScript;
+import org.jboss.byteman.contrib.bmunit.BMRule;
+import org.jboss.byteman.contrib.bmunit.BMRules;
 import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
 import org.junit.Rule;
 import org.junit.Test;
@@ -38,11 +43,30 @@ import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.HandleWriteHelper;
+import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDataHelper;
 import org.reaktivity.reaktor.test.NukleusRule;
 
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-@BMUnitConfig(loadDirectory="src/test/resources")
-@BMScript(value="PartialWriteIT.btm")
+@BMUnitConfig(enforce=true)
+@BMRules(rules = {
+    @BMRule(name = "processData",
+    targetClass = "^java.nio.channels.SocketChannel",
+    targetMethod = "write(java.nio.ByteBuffer)",
+    helper = "org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$ProcessDataHelper",
+    condition =
+      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData\", true, true)",
+      action = "return doWrite($0, $1)"
+    ),
+    @BMRule(name = "handleWrite",
+    targetClass = "^java.nio.channels.SocketChannel",
+    targetMethod = "write(java.nio.ByteBuffer)",
+    helper = "org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$HandleWriteHelper",
+    condition =
+      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.handleWrite\", true, true)",
+      action = "return doWrite($0, $1)"
+    )
+})
 public class ClientPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -59,7 +83,7 @@ public class ClientPartialWriteIT
         .streams("tcp", "source#partition");
 
     @Rule
-    public final TestRule chain = outerRule(PartialWriteHelper.RULE).around(nukleus).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(nukleus).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -68,10 +92,8 @@ public class ClientPartialWriteIT
     })
     public void shouldSpinWrite() throws Exception
     {
-        for (int i=0; i < WRITE_SPIN_COUNT - 1; i++)
-        {
-            PartialWriteHelper.addWriteResult(0);
-        }
+        ProcessDataHelper.fragmentWrites(generate(() -> 0).limit(WRITE_SPIN_COUNT - 1));
+        HandleWriteHelper.fragmentWrites(generate(() -> 0));
         shouldReceiveClientSentData("client data");
     }
 
@@ -82,7 +104,7 @@ public class ClientPartialWriteIT
     })
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
     {
-        PartialWriteHelper.addWriteResult(5);
+        ProcessDataHelper.fragmentWrites(IntStream.of(5));
         shouldReceiveClientSentData("client data");
     }
 
@@ -93,9 +115,8 @@ public class ClientPartialWriteIT
     })
     public void shouldHandleMultiplePartialWrites() throws Exception
     {
-        PartialWriteHelper.addWriteResult(2);
-        PartialWriteHelper.addWriteResult(3);
-        PartialWriteHelper.addWriteResult(1);
+        ProcessDataHelper.fragmentWrites(IntStream.of(2));
+        HandleWriteHelper.fragmentWrites(IntStream.of(3, 1));
         shouldReceiveClientSentData("client data");
     }
 
@@ -106,23 +127,13 @@ public class ClientPartialWriteIT
     })
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
     {
-        // processData will be called from each of the two data frames. Make the first
+        // processData will be called for each of the two data frames. Make the first
         // do a partial write, then write nothing until handleWrite is called after the
         // second processData call, when we write everything.
         AtomicBoolean finishWrite = new AtomicBoolean(false);
-        PartialWriteHelper.addWriteResult(5);
-        PartialWriteHelper.setWriteResultProvider(caller ->
-        {
-            if (caller.equals("processData"))
-            {
-                finishWrite.set(true);
-                return 0;
-            }
-            else
-            {
-                return finishWrite.get() ? null : 0;
-            }
-        });
+
+        ProcessDataHelper.fragmentWrites(concat(of(5), generate(() -> finishWrite.getAndSet(true) ? 0 : 0)));
+        HandleWriteHelper.fragmentWrites(generate(() -> finishWrite.get() ? -1 : 0));
 
         shouldReceiveClientSentData("client data 1client data 2");
     }
@@ -134,9 +145,9 @@ public class ClientPartialWriteIT
     })
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
     {
-        PartialWriteHelper.addWriteResult(5);
         AtomicBoolean endWritten = new AtomicBoolean(false);
-        PartialWriteHelper.zeroWriteUnless(endWritten::get);
+        ProcessDataHelper.fragmentWrites(concat(of(5), generate(() -> 0)));
+        HandleWriteHelper.fragmentWrites(generate(() -> endWritten.get() ? -1 : 0));
 
         try (ServerSocket server = new ServerSocket())
         {
@@ -189,9 +200,9 @@ public class ClientPartialWriteIT
     })
     public void shouldResetIfDataReceivedAfterEndOfStreamWithPendingWrite() throws Exception
     {
-        PartialWriteHelper.addWriteResult(6);
+        ProcessDataHelper.fragmentWrites(IntStream.of(6));
         AtomicBoolean resetReceived = new AtomicBoolean(false);
-        PartialWriteHelper.zeroWriteUnless(resetReceived::get);
+        HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? -1 : 0));
 
         try (ServerSocket server = new ServerSocket())
         {
@@ -258,7 +269,6 @@ public class ClientPartialWriteIT
 
             try (Socket socket = server.accept())
             {
-                socket.setSoTimeout((int) SECONDS.toMillis(4));
                 k3po.notifyBarrier("ROUTED_INPUT");
 
                 final InputStream in = socket.getInputStream();
@@ -293,4 +303,5 @@ public class ClientPartialWriteIT
             }
         }
     }
+
 }
