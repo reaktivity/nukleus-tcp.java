@@ -32,8 +32,7 @@ import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
 
-import org.jboss.byteman.contrib.bmunit.BMRule;
-import org.jboss.byteman.contrib.bmunit.BMRules;
+import org.jboss.byteman.contrib.bmunit.BMScript;
 import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
 import org.junit.Rule;
 import org.junit.Test;
@@ -48,25 +47,8 @@ import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDa
 import org.reaktivity.reaktor.test.NukleusRule;
 
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-@BMUnitConfig(enforce=true)
-@BMRules(rules = {
-    @BMRule(name = "processData",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "write(java.nio.ByteBuffer)",
-    helper = "org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$ProcessDataHelper",
-    condition =
-      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData\", true, true)",
-      action = "return doWrite($0, $1)"
-    ),
-    @BMRule(name = "handleWrite",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "write(java.nio.ByteBuffer)",
-    helper = "org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$HandleWriteHelper",
-    condition =
-      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.handleWrite\", true, true)",
-      action = "return doWrite($0, $1)"
-    )
-})
+@BMUnitConfig(loadDirectory="src/test/resources", debug=true, verbose=true, enforce=true)
+@BMScript(value="SocketChannelHelper.btm")
 public class ClientPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
