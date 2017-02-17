@@ -229,7 +229,7 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streams}/client.sent.data.exceeding.window/server/target"
+        "${streams}/client.sent.data.overflow/server/target"
     })
     public void shouldReceiveClientSentDataWithFlowControl() throws Exception
     {
