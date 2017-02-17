@@ -229,6 +229,29 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
+        "${streams}/client.sent.data.exceeding.window/server/target"
+    })
+    public void shouldReceiveClientSentDataWithFlowControl() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.write(UTF_8.encode("client data"));
+
+            k3po.finish();
+        }
+
+        assertEquals(1, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
         "${streams}/client.sent.data.multiple.frames/server/target"
     })
     public void shouldReceiveClientSentDataMultipleFrames() throws Exception
