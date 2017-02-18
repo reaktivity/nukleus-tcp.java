@@ -22,6 +22,7 @@ import static org.junit.rules.RuleChain.outerRule;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
@@ -107,6 +108,25 @@ public class ServerIT
         assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/server.sent.data/server/target"
+    })
+    public void shouldNotGetRepeatedIOExceptionsFromReaderStreamRead() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try(Socket socket = new Socket("127.0.0.1", 0x1f90))
+        {
+            socket.shutdownInput();
+            Thread.sleep(500);
+        }
+
+        k3po.finish();
     }
 
     @Test
