@@ -117,6 +117,36 @@ public class ClientIT
     @Test
     @Specification({
         "${route}/output/new/controller",
+        "${streams}/server.sent.data.flow.control/client/source"
+    })
+    public void shouldReceiveServerSentDataWithFlowControl() throws Exception
+    {
+        try (ServerSocketChannel server = ServerSocketChannel.open())
+        {
+            server.setOption(SO_REUSEADDR, true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_OUTPUT");
+
+            try (SocketChannel channel = server.accept())
+            {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
+                channel.write(UTF_8.encode("server data"));
+
+                k3po.finish();
+            }
+        }
+
+        assertEquals(1, counters.streams());
+        assertEquals(1, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
+    @Test
+    @Specification({
+        "${route}/output/new/controller",
         "${streams}/server.sent.data.multiple.frames/client/source"
     })
     public void shouldReceiveServerSentDataMultipleFrames() throws Exception
@@ -348,9 +378,9 @@ public class ClientIT
     @Test
     @Specification({
         "${route}/output/new/controller",
-        "${streams}/echo.data/client/source"
+        "${streams}/client.and.server.sent.data.multiple.frames/client/source"
     })
-    public void shouldEchoData() throws Exception
+    public void shouldSendAndReceiveData() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
