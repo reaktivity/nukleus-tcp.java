@@ -33,7 +33,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.IntStream;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jboss.byteman.contrib.bmunit.BMScript;
 import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
@@ -92,9 +92,10 @@ public class ClientPartialWriteLimitsIT
     })
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritableWithoutOverflowingSlot() throws Exception
     {
-        ProcessDataHelper.fragmentWrites(IntStream.of(5, 6));
-        AtomicBoolean allDataWritten = new AtomicBoolean(false);
-        HandleWriteHelper.fragmentWrites(generate(() -> allDataWritten.get() ? ALL : 0));
+        AtomicInteger dataFramesReceived = new AtomicInteger();
+        ProcessDataHelper.fragmentWrites(generate(() -> dataFramesReceived.incrementAndGet() == 1 ? 5
+                : dataFramesReceived.get() == 2 ? 6 : ALL));
+        HandleWriteHelper.fragmentWrites(generate(() -> dataFramesReceived.get() >= 2 ? ALL : 0));
 
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
@@ -107,9 +108,6 @@ public class ClientPartialWriteLimitsIT
             try (SocketChannel channel = server.accept())
             {
                 k3po.notifyBarrier("ROUTED_INPUT");
-
-                k3po.awaitBarrier("SECOND_WRITE_COMPLETED");
-                allDataWritten.set(true);
 
                 ByteBuffer buf = ByteBuffer.allocate(256);
                 boolean closed = false;
