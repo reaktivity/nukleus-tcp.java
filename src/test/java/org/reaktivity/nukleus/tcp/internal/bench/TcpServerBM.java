@@ -64,7 +64,8 @@ import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
-import org.reaktivity.reaktor.internal.Reaktor;
+import org.reaktivity.reaktor.Reaktor;
+import org.reaktivity.reaktor.matchers.NukleusMatcher;
 
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.Throughput)
@@ -82,8 +83,15 @@ public class TcpServerBM
         properties.setProperty(DIRECTORY_PROPERTY_NAME, "target/nukleus-benchmarks");
         properties.setProperty(STREAMS_BUFFER_CAPACITY_PROPERTY_NAME, Long.toString(1024L * 1024L * 16L));
 
+        final NukleusMatcher matchNukleus = n -> "tcp".equals(n);
+
         configuration = new Configuration(properties);
-        reaktor = Reaktor.launch(configuration, n -> "tcp".equals(n), TcpController.class::isAssignableFrom);
+        reaktor = Reaktor.builder()
+                    .config(configuration)
+                    .discover(matchNukleus)
+                    .discover(TcpController.class::isAssignableFrom)
+                    .errorHandler(System.err::println)
+                    .build();
     }
 
     private final BeginFW beginRO = new BeginFW();
@@ -109,6 +117,8 @@ public class TcpServerBM
         int length = configuration.streamsBufferCapacity() + RingBufferDescriptor.TRAILER_LENGTH;
         createEmptyFile(target.getAbsoluteFile(), length);
 
+        reaktor.start();
+
         TcpController controller = reaktor.controller(TcpController.class);
         controller.routeInputNew("any", 8080, "target", targetRef, getByName("127.0.0.1")).get();
 
@@ -123,6 +133,8 @@ public class TcpServerBM
 
         TcpController controller = reaktor.controller(TcpController.class);
         controller.unrouteInputNew("any", 8080, "target", targetRef, getByName("127.0.0.1")).get();
+
+        reaktor.close();
     }
 
     @Benchmark
