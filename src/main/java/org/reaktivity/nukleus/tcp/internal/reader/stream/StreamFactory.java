@@ -97,45 +97,38 @@ public final class StreamFactory
 
         private int handleRead() throws IOException
         {
-            if (readableBytes == 0)
+            assert readableBytes > 0;
+
+            final int limit = Math.min(readableBytes, bufferSize);
+
+            readBuffer.position(0);
+            readBuffer.limit(limit);
+
+            int bytesRead = channel.read(readBuffer);
+            if (bytesRead == -1)
             {
-                // over budget
-                channel.close();
-                return 0;
+                // channel closed
+                target.doTcpEnd(streamId);
+                target.removeThrottle(streamId);
+                key.cancel();
             }
             else
             {
-                final int limit = Math.min(readableBytes, bufferSize);
+                // TODO: eliminate copy
+                atomicBuffer.putBytes(0, readBuffer, 0, bytesRead);
 
-                readBuffer.position(0);
-                readBuffer.limit(limit);
+                target.doTcpData(streamId, atomicBuffer, 0, bytesRead);
 
-                int bytesRead = channel.read(readBuffer);
-                if (bytesRead == -1)
+                readableBytes -= bytesRead;
+                if (readableBytes == 0)
                 {
-                    // channel closed
-                    target.doTcpEnd(streamId);
-                    target.removeThrottle(streamId);
-                    key.cancel();
+                    final int interestOps = key.interestOps();
+                    final int newInterestOps = interestOps & ~SelectionKey.OP_READ;
+                    key.interestOps(newInterestOps);
                 }
-                else
-                {
-                    // TODO: eliminate copy
-                    atomicBuffer.putBytes(0, readBuffer, 0, bytesRead);
-
-                    target.doTcpData(streamId, atomicBuffer, 0, bytesRead);
-
-                    readableBytes -= bytesRead;
-                    if (readableBytes == 0)
-                    {
-                        final int interestOps = key.interestOps();
-                        final int newInterestOps = interestOps & ~SelectionKey.OP_READ;
-                        key.interestOps(newInterestOps);
-                    }
-                }
-
-                return 1;
             }
+
+            return 1;
         }
 
         private void handleThrottle(
