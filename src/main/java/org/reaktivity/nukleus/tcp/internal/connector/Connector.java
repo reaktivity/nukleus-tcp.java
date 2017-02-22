@@ -120,7 +120,6 @@ public final class Connector extends TransportPoller implements Nukleus
         catch (Exception ex)
         {
             handleConnectFailed(request);
-            LangUtil.rethrowUnchecked(ex);
         }
         finally
         {
