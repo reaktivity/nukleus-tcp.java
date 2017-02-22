@@ -45,7 +45,6 @@ import org.reaktivity.reaktor.test.NukleusRule;
 @BMRule(name = "handleRead",
     targetClass = "^java.nio.channels.SocketChannel",
     targetMethod = "read(java.nio.ByteBuffer)",
-    helper = "org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$ProcessDataHelper",
     condition =
       "callerEquals(\"org.reaktivity.nukleus.tcp.internal.reader.stream.StreamFactory$Stream.handleRead\", true, true)",
       action = "throw new IOException(\"Simulating An established connection was aborted by the software in your host machine\")"
@@ -63,7 +62,7 @@ public class ClientIOExceptionFromReadIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .streams("tcp", "target#partition");
+        .streams("tcp", "source#partition");
 
     private final TcpCountersRule counters = new TcpCountersRule()
         .directory("target/nukleus-itests")
@@ -106,6 +105,13 @@ public class ClientIOExceptionFromReadIT
         "${route}/output/new/controller",
         "${streams}/client.sent.data.received.reset/client/source"
     })
+    @BMRule(name = "processData",
+    targetClass = "^java.nio.channels.SocketChannel",
+    targetMethod = "write(java.nio.ByteBuffer)",
+    condition =
+      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData\", true, true)",
+      action = "throw new IOException(\"Simulating an IOException expected after IOException on read\")"
+    )
     public void writeAfterIOExceptionFromReadShouldResultInReset() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
