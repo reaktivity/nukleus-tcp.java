@@ -20,6 +20,7 @@ import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.function.IntSupplier;
+import java.util.function.LongFunction;
 
 import org.agrona.CloseHelper;
 import org.agrona.LangUtil;
@@ -27,6 +28,7 @@ import org.agrona.nio.TransportPoller;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.tcp.internal.reader.stream.StreamFactory;
+import org.reaktivity.nukleus.tcp.internal.router.Correlation;
 
 @Reaktive
 public final class Source extends TransportPoller implements Nukleus
@@ -36,10 +38,11 @@ public final class Source extends TransportPoller implements Nukleus
 
     public Source(
         String sourceName,
-        int bufferSize)
+        int bufferSize,
+        LongFunction<Correlation> resolveCorrelation)
     {
         this.sourceName = sourceName;
-        this.streamFactory = new StreamFactory(bufferSize);
+        this.streamFactory = new StreamFactory(bufferSize, resolveCorrelation);
     }
 
     @Override
@@ -87,7 +90,7 @@ public final class Source extends TransportPoller implements Nukleus
             target.doTcpBegin(targetId, targetRef, correlationId, localAddress, remoteAddress);
 
             final SelectionKey key = channel.register(selector, 0);
-            final IntSupplier attachment = streamFactory.newStream(target, targetId, key, channel);
+            final IntSupplier attachment = streamFactory.newStream(target, targetId, key, channel, correlationId);
 
             key.attach(attachment);
         }
