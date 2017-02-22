@@ -15,15 +15,13 @@
  */
 package org.reaktivity.nukleus.tcp.internal.streams;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 
 import java.net.InetSocketAddress;
+import java.net.StandardSocketOptions;
 import java.nio.channels.SocketChannel;
 
-import org.jboss.byteman.contrib.bmunit.BMRule;
-import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -39,15 +37,6 @@ import org.reaktivity.reaktor.test.NukleusRule;
  * Tests the handling of IOException thrown from SocketChannel.read (see issue #9).
  */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-@BMUnitConfig()
-@BMRule(name = "handleRead",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "read(java.nio.ByteBuffer)",
-    helper = "org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$ProcessDataHelper",
-    condition =
-      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.reader.stream.StreamFactory$Stream.handleRead\", true, true)",
-      action = "throw new IOException(\"Simulating An established connection was aborted by the software in your host machine\")"
-    )
 public class ServerIOExceptionFromReadIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -86,7 +75,9 @@ public class ServerIOExceptionFromReadIT
         try (SocketChannel channel = SocketChannel.open())
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-            channel.write(UTF_8.encode("client data"));
+
+            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+            channel.close();
 
             k3po.finish();
         }
@@ -105,7 +96,9 @@ public class ServerIOExceptionFromReadIT
         try (SocketChannel channel = SocketChannel.open())
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-            channel.write(UTF_8.encode("client data"));
+
+            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+            channel.close();
 
             k3po.finish();
         }
@@ -114,7 +107,7 @@ public class ServerIOExceptionFromReadIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streams}/server.close/server/target"
+        "${streams}/client.then.server.sent.end/server/target"
     })
     public void endAfterIOExceptionFromReadShouldNotCauseReset() throws Exception
     {
@@ -124,7 +117,9 @@ public class ServerIOExceptionFromReadIT
         try (SocketChannel channel = SocketChannel.open())
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-            channel.write(UTF_8.encode("client data"));
+
+            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+            channel.close();
 
             k3po.finish();
         }

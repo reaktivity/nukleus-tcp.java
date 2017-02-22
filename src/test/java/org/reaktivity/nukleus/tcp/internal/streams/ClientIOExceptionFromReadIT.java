@@ -16,39 +16,31 @@
 package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 
 import java.net.InetSocketAddress;
+import java.net.StandardSocketOptions;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
-import org.jboss.byteman.contrib.bmunit.BMRule;
-import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.NukleusRule;
 
 /**
- * Tests the handling of IOException thrown from SocketChannel.read (see issue #9).
+ * Tests the handling of IOException thrown from SocketChannel.read (see issue #9). This condition  is forced
+ * in this test by causing the remote end to send a TCP reset (RST) by setting SO_LINGER to 0 then closing the socket,
+ * as documented in <a href="https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html">
+ * Orderly Versus Abortive Connection Release in Java</a>
+
  */
-@RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-@BMUnitConfig()
-@BMRule(name = "handleRead",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "read(java.nio.ByteBuffer)",
-    condition =
-      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.reader.stream.StreamFactory$Stream.handleRead\", true, true)",
-      action = "throw new IOException(\"Simulating An established connection was aborted by the software in your host machine\")"
-    )
 public class ClientIOExceptionFromReadIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -93,7 +85,8 @@ public class ClientIOExceptionFromReadIT
             {
                 k3po.notifyBarrier("ROUTED_INPUT");
 
-                channel.write(UTF_8.encode("server data"));
+                channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+                channel.close();
 
                 k3po.finish();
             }
@@ -105,13 +98,6 @@ public class ClientIOExceptionFromReadIT
         "${route}/output/new/controller",
         "${streams}/client.sent.data.received.reset/client/source"
     })
-    @BMRule(name = "processData",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "write(java.nio.ByteBuffer)",
-    condition =
-      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData\", true, true)",
-      action = "throw new IOException(\"Simulating an IOException expected after IOException on read\")"
-    )
     public void writeAfterIOExceptionFromReadShouldResultInReset() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
@@ -126,7 +112,8 @@ public class ClientIOExceptionFromReadIT
             {
                 k3po.notifyBarrier("ROUTED_INPUT");
 
-                channel.write(UTF_8.encode("server data"));
+                channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+                channel.close();
 
                 k3po.finish();
             }
@@ -136,19 +123,27 @@ public class ClientIOExceptionFromReadIT
     @Test
     @Specification({
         "${route}/output/new/controller",
-        "${streams}/client.close/client/source"
+        "${streams}/server.then.client.sent.end/client/source"
     })
     public void endAfterIOExceptionFromReadShouldNotCauseReset() throws Exception
     {
-        k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
-
-        try (SocketChannel channel = SocketChannel.open())
+        try (ServerSocketChannel server = ServerSocketChannel.open())
         {
-            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-            channel.write(UTF_8.encode("client data"));
+            server.setOption(SO_REUSEADDR, true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            k3po.finish();
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_OUTPUT");
+
+            try (SocketChannel channel = server.accept())
+            {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
+                channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+                channel.close();
+
+                k3po.finish();
+            }
         }
     }
 

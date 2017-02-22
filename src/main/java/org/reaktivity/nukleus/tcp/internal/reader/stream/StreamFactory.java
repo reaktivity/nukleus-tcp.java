@@ -84,18 +84,10 @@ public final class StreamFactory
 
         private int handleStream()
         {
-            try
-            {
-                return handleRead();
-            }
-            catch (IOException ex)
-            {
-                LangUtil.rethrowUnchecked(ex);
-                return 0;
-            }
+            return handleRead();
         }
 
-        private int handleRead() throws IOException
+        private int handleRead()
         {
             assert readableBytes > 0;
 
@@ -104,7 +96,16 @@ public final class StreamFactory
             readBuffer.position(0);
             readBuffer.limit(limit);
 
-            int bytesRead = channel.read(readBuffer);
+            int bytesRead;
+            try
+            {
+                bytesRead = channel.read(readBuffer);
+            }
+            catch(IOException ex)
+            {
+                // RST from client. We treat this as end of stream (see issue #9).
+                bytesRead = -1;
+            }
             if (bytesRead == -1)
             {
                 // channel closed

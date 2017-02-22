@@ -118,7 +118,6 @@ public final class StreamFactory
             catch (IOException ex)
             {
                 doFail();
-                LangUtil.rethrowUnchecked(ex);
             }
         }
 
