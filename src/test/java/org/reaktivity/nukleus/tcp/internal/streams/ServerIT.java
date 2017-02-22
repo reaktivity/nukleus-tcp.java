@@ -428,6 +428,30 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
+        "${streams}/server.close.and.reset/server/target"
+    })
+    public void shouldInitiateServerCloseWithInputReset() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            int len = channel.read(buf);
+            buf.flip();
+
+            assertEquals(-1, len);
+
+            k3po.finish();
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
         "${streams}/client.close/server/target"
     })
     public void shouldInitiateClientClose() throws Exception
