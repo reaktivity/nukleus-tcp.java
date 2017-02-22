@@ -22,6 +22,7 @@ import static org.junit.rules.RuleChain.outerRule;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
@@ -94,9 +95,10 @@ public class ServerIT
         try (SocketChannel channel = SocketChannel.open())
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.setOption(StandardSocketOptions.TCP_NODELAY, true);
 
             // Write should result in reset (RST) from other end, so IOException from read
-            channel.write(UTF_8.encode("client data"));
+            channel.write(UTF_8.encode("client data which should cause a reset at the other end"));
 
             ByteBuffer buf = ByteBuffer.allocate(256);
             try
