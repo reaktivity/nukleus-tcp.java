@@ -18,16 +18,19 @@ package org.reaktivity.nukleus.tcp.internal.reader.stream;
 import static java.nio.ByteOrder.nativeOrder;
 
 import java.io.IOException;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.function.IntSupplier;
+import java.util.function.LongFunction;
 
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.tcp.internal.reader.Target;
+import org.reaktivity.nukleus.tcp.internal.router.Correlation;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
 
@@ -37,13 +40,16 @@ public final class StreamFactory
     private final ResetFW resetRO = new ResetFW();
 
     private final int bufferSize;
+    private final LongFunction<Correlation> resolveCorrelation;
     private final ByteBuffer readBuffer;
     private final AtomicBuffer atomicBuffer;
 
     public StreamFactory(
-        int bufferSize)
+        int bufferSize,
+        LongFunction<Correlation> resolveCorrelation)
     {
         this.bufferSize = bufferSize;
+        this.resolveCorrelation = resolveCorrelation;
         this.readBuffer = ByteBuffer.allocate(bufferSize).order(nativeOrder());
         this.atomicBuffer = new UnsafeBuffer(new byte[bufferSize]);
     }
@@ -52,9 +58,10 @@ public final class StreamFactory
         Target target,
         long targetId,
         SelectionKey key,
-        SocketChannel channel)
+        SocketChannel channel,
+        long correlationId)
     {
-        final Stream stream = new Stream(target, targetId, key, channel);
+        final Stream stream = new Stream(target, targetId, key, channel, correlationId);
 
         target.addThrottle(targetId, stream::handleThrottle);
 
@@ -67,6 +74,7 @@ public final class StreamFactory
         private final long streamId;
         private final SelectionKey key;
         private final SocketChannel channel;
+        private final long correlationId;
 
         private int readableBytes;
 
@@ -74,12 +82,14 @@ public final class StreamFactory
             Target target,
             long streamId,
             SelectionKey key,
-            SocketChannel channel)
+            SocketChannel channel,
+            long correlationId)
         {
             this.target = target;
             this.streamId = streamId;
             this.key = key;
             this.channel = channel;
+            this.correlationId = correlationId;
         }
 
         private int handleStream()
@@ -178,12 +188,26 @@ public final class StreamFactory
 
             try
             {
-                channel.shutdownInput();
-                target.removeThrottle(streamId);
+                if (resolveCorrelation.apply(correlationId) == null)
+                {
+                    // Begin on correlated output stream was already processed
+                    channel.shutdownInput();
+                }
+                else
+                {
+                    // Force a hard reset (TCP RST), as documented in "Orderly Versus Abortive Connection Release in Java"
+                    // (https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html)
+                    channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+                    channel.close();
+                }
             }
             catch (IOException ex)
             {
                 LangUtil.rethrowUnchecked(ex);
+            }
+            finally
+            {
+                target.removeThrottle(streamId);
             }
         }
     }

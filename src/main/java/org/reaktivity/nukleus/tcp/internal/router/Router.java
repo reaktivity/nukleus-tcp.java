@@ -442,7 +442,7 @@ public final class Router extends Nukleus.Composite
     private Reader newReader(
         String sourceName)
     {
-        return include(new Reader(context, conductor, acceptor, sourceName));
+        return include(new Reader(context, conductor, acceptor, sourceName, correlations::remove));
     }
 
     private Writer newWriter(

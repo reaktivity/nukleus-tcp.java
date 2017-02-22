@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.function.LongFunction;
 import java.util.function.Predicate;
 
 import org.agrona.CloseHelper;
@@ -44,6 +45,7 @@ import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
+import org.reaktivity.nukleus.tcp.internal.router.Correlation;
 import org.reaktivity.nukleus.tcp.internal.router.RouteKind;
 
 /**
@@ -64,17 +66,19 @@ public final class Reader extends Nukleus.Composite
     private final AtomicBuffer writeBuffer;
     private final Long2ObjectHashMap<List<Route>> routesByRef;
 
+
     public Reader(
         Context context,
         Conductor conductor,
         Acceptor acceptor,
-        String sourceName)
+        String sourceName,
+        LongFunction<Correlation> resolveCorrelation)
     {
         this.context = context;
         this.conductor = conductor;
         this.acceptor = acceptor;
         this.sourceName = sourceName;
-        this.source = include(new Source(sourceName, context.maxMessageLength()));
+        this.source = include(new Source(sourceName, context.maxMessageLength(), resolveCorrelation));
         this.writeBuffer = new UnsafeBuffer(new byte[context.maxMessageLength()]);
         this.targetsByName = new TreeMap<>();
         this.routesByRef = new Long2ObjectHashMap<>();

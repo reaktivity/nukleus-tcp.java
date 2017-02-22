@@ -81,6 +81,36 @@ public class ServerIT
         assertEquals(0, counters.overflows());
     }
 
+    @Test(expected = IOException.class)
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/connection.failed/server/target"
+    })
+    public void connectionFailed() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            try
+            {
+                channel.read(buf);
+            }
+            finally
+            {
+                k3po.finish();
+            }
+        }
+
+        assertEquals(0, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
     @Test
     @Specification({
         "${route}/input/new/controller",
