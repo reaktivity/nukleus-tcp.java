@@ -69,7 +69,7 @@ public class ServerIOExceptionFromWriteIT
       "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData\", true, true)",
       action = "throw new IOException(\"Simulating an IOException from write\")"
     )
-    public void ioExceptionFromImmediateWriteShouldResultInReset() throws Exception
+    public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
@@ -104,7 +104,7 @@ public class ServerIOExceptionFromWriteIT
           action = "throw new IOException(\"Simulating an IOException from write\")"
         )
     })
-    public void ioExceptionFromDelayedWriteShouldResultInReset() throws Exception
+    public void shouldResetWhenDeferredWriteThrowsIOException() throws Exception
     {
         ProcessDataHelper.fragmentWrites(generate(() -> 0));
         k3po.start();

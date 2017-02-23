@@ -71,7 +71,7 @@ public class ClientIOExceptionFromWriteIT
       "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData\", true, true)",
       action = "throw new IOException(\"Simulating an IOException from write\")"
     )
-    public void ioExceptionFromImmediateWriteShouldResultInReset() throws Exception
+    public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
@@ -112,7 +112,7 @@ public class ClientIOExceptionFromWriteIT
           action = "throw new IOException(\"Simulating an IOException from write\")"
         )
     })
-    public void ioExceptionFromDelayedWriteShouldResultInReset() throws Exception
+    public void shouldResetWhenDeferredWriteThrowsIOException() throws Exception
     {
         ProcessDataHelper.fragmentWrites(generate(() -> 0));
         try (ServerSocketChannel server = ServerSocketChannel.open())
