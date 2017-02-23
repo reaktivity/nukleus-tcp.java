@@ -27,7 +27,6 @@ import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
@@ -36,7 +35,6 @@ import org.reaktivity.reaktor.test.NukleusRule;
 /**
  * Tests the handling of IOException thrown from SocketChannel.read (see issue #9).
  */
-@RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 public class ServerIOExceptionFromReadIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -59,8 +57,7 @@ public class ServerIOExceptionFromReadIT
         .counterValuesBufferCapacity(1024);
 
     @Rule
-    public final TestRule chain = outerRule(SocketChannelHelper.RULE)
-                                  .around(nukleus).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(nukleus).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({

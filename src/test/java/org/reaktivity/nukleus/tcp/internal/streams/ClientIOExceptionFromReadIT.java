@@ -39,7 +39,6 @@ import org.reaktivity.reaktor.test.NukleusRule;
  * in this test by causing the remote end to send a TCP reset (RST) by setting SO_LINGER to 0 then closing the socket,
  * as documented in <a href="https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html">
  * Orderly Versus Abortive Connection Release in Java</a>
-
  */
 public class ClientIOExceptionFromReadIT
 {
@@ -63,8 +62,7 @@ public class ClientIOExceptionFromReadIT
         .counterValuesBufferCapacity(1024);
 
     @Rule
-    public final TestRule chain = outerRule(SocketChannelHelper.RULE)
-                                  .around(nukleus).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(nukleus).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
