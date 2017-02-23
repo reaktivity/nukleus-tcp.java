@@ -96,7 +96,7 @@ public class ClientIOExceptionFromReadIT
         "${route}/output/new/controller",
         "${streams}/server.then.client.sent.end/client/source"
     })
-    public void endAfterIOExceptionFromReadShouldNotCauseReset() throws Exception
+    public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
