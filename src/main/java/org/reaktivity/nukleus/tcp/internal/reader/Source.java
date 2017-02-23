@@ -38,11 +38,11 @@ public final class Source extends TransportPoller implements Nukleus
 
     public Source(
         String sourceName,
-        int bufferSize,
+        int maxMessageLength,
         LongFunction<Correlation> resolveCorrelation)
     {
         this.sourceName = sourceName;
-        this.streamFactory = new StreamFactory(bufferSize, resolveCorrelation);
+        this.streamFactory = new StreamFactory(maxMessageLength, resolveCorrelation);
     }
 
     @Override

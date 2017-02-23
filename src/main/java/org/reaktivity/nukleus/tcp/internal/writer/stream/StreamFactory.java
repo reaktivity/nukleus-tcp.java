@@ -141,11 +141,11 @@ public final class StreamFactory
             dataRO.wrap(buffer, offset, limit);
 
             final OctetsFW payload = dataRO.payload();
-            final int writableBytes = Math.max(payload.length() - 1, 0);
+            final int writableBytes = dataRO.length();
 
             if (reduceWindow(writableBytes))
             {
-                ByteBuffer writeBuffer = writeSlab.get(slot, buffer, payload.offset() + 1, writableBytes);
+                ByteBuffer writeBuffer = writeSlab.get(slot, buffer, payload.offset(), writableBytes);
 
                 int bytesWritten = 0;
 

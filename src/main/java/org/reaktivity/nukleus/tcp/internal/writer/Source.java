@@ -300,7 +300,7 @@ public final class Source implements Nukleus
             .correlationId(correlationId)
             .build();
 
-        newStream.onMessage(BeginFW.TYPE_ID, writeBuffer, begin.offset(), begin.length());
+        newStream.onMessage(begin.typeId(), writeBuffer, begin.offset(), begin.sizeof());
     }
 
     public void doWindow(
@@ -312,7 +312,7 @@ public final class Source implements Nukleus
                 .update(update)
                 .build();
 
-        throttleBuffer.write(window.typeId(), window.buffer(), window.offset(), window.length());
+        throttleBuffer.write(window.typeId(), window.buffer(), window.offset(), window.sizeof());
     }
 
     public void doReset(
@@ -322,7 +322,7 @@ public final class Source implements Nukleus
                 .streamId(streamId)
                 .build();
 
-        throttleBuffer.write(reset.typeId(), reset.buffer(), reset.offset(), reset.length());
+        throttleBuffer.write(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
     }
 
     public void replaceStream(

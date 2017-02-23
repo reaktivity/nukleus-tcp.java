@@ -232,14 +232,14 @@ public final class TcpController implements Controller
     {
         if (address == null)
         {
-            return (buffer, offset, limit) -> routeExRW.wrap(buffer, offset, limit).build().length();
+            return (buffer, offset, limit) -> routeExRW.wrap(buffer, offset, limit).build().sizeof();
         }
 
         return (buffer, offset, limit) ->
             routeExRW.wrap(buffer, offset, limit)
                      .address(a -> inetAddress(address, a::ipv4Address, a::ipv6Address))
                      .build()
-                     .length();
+                     .sizeof();
     }
 
     private int handleResponse(
@@ -370,7 +370,7 @@ public final class TcpController implements Controller
                                  .extension(b -> b.set(visitRouteEx(address)))
                                  .build();
 
-        if (!conductorCommands.write(routeRO.typeId(), routeRO.buffer(), routeRO.offset(), routeRO.length()))
+        if (!conductorCommands.write(routeRO.typeId(), routeRO.buffer(), routeRO.offset(), routeRO.sizeof()))
         {
             commandSendFailed(promise);
         }
@@ -406,7 +406,7 @@ public final class TcpController implements Controller
                                  .extension(b -> b.set(visitRouteEx(address)))
                                  .build();
 
-        if (!conductorCommands.write(unrouteRO.typeId(), unrouteRO.buffer(), unrouteRO.offset(), unrouteRO.length()))
+        if (!conductorCommands.write(unrouteRO.typeId(), unrouteRO.buffer(), unrouteRO.offset(), unrouteRO.sizeof()))
         {
             commandSendFailed(promise);
         }

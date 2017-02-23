@@ -31,6 +31,7 @@ import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.tcp.internal.reader.Target;
 import org.reaktivity.nukleus.tcp.internal.router.Correlation;
+import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
 
@@ -45,10 +46,10 @@ public final class StreamFactory
     private final AtomicBuffer atomicBuffer;
 
     public StreamFactory(
-        int bufferSize,
+        int maxMessageLength,
         LongFunction<Correlation> resolveCorrelation)
     {
-        this.bufferSize = bufferSize;
+        this.bufferSize = maxMessageLength - DataFW.FIELD_OFFSET_PAYLOAD;
         this.resolveCorrelation = resolveCorrelation;
         this.readBuffer = ByteBuffer.allocate(bufferSize).order(nativeOrder());
         this.atomicBuffer = new UnsafeBuffer(new byte[bufferSize]);
