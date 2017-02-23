@@ -73,6 +73,8 @@ public class ServerIOExceptionFromReadIT
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
+            k3po.awaitBarrier("WINDOW_UPDATED");
+
             channel.setOption(StandardSocketOptions.SO_LINGER, 0);
             channel.close();
 
@@ -85,7 +87,7 @@ public class ServerIOExceptionFromReadIT
         "${route}/input/new/controller",
         "${streams}/client.then.server.sent.end/server/target"
     })
-    public void endAfterIOExceptionFromReadShouldNotCauseReset() throws Exception
+    public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
@@ -93,6 +95,8 @@ public class ServerIOExceptionFromReadIT
         try (SocketChannel channel = SocketChannel.open())
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            k3po.awaitBarrier("WINDOW_UPDATED");
 
             channel.setOption(StandardSocketOptions.SO_LINGER, 0);
             channel.close();
