@@ -16,26 +16,30 @@
 package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.IntStream.generate;
 import static org.junit.rules.RuleChain.outerRule;
 
 import java.net.InetSocketAddress;
-import java.net.StandardSocketOptions;
 import java.nio.channels.SocketChannel;
 
+import org.jboss.byteman.contrib.bmunit.BMRule;
+import org.jboss.byteman.contrib.bmunit.BMRules;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
+import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDataHelper;
 import org.reaktivity.reaktor.test.NukleusRule;
 
 /**
  * Tests the handling of IOException thrown from SocketChannel.read (see issue #9).
  */
-public class ServerIOExceptionFromReadIT
+@RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
+public class ServerIOExceptionFromWriteIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
@@ -50,21 +54,22 @@ public class ServerIOExceptionFromReadIT
         .counterValuesBufferCapacity(1024)
         .streams("tcp", "target#partition");
 
-    private final TcpCountersRule counters = new TcpCountersRule()
-        .directory("target/nukleus-itests")
-        .commandBufferCapacity(1024)
-        .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024);
-
     @Rule
-    public final TestRule chain = outerRule(nukleus).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(nukleus).around(k3po).around(timeout);
 
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streams}/client.close/server/target"
+        "${streams}/server.sent.data.received.reset/server/target"
     })
-    public void shouldReportIOExceptionFromReadAsEndOfStream() throws Exception
+    @BMRule(name = "processData",
+    targetClass = "^java.nio.channels.SocketChannel",
+    targetMethod = "write(java.nio.ByteBuffer)",
+    condition =
+      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData\", true, true)",
+      action = "throw new IOException(\"Simulating an IOException from write\")"
+    )
+    public void ioExceptionFromImmediateWriteShouldResultInReset() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
@@ -72,9 +77,6 @@ public class ServerIOExceptionFromReadIT
         try (SocketChannel channel = SocketChannel.open())
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-
-            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-            channel.close();
 
             k3po.finish();
         }
@@ -83,19 +85,34 @@ public class ServerIOExceptionFromReadIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streams}/client.then.server.sent.end/server/target"
+        "${streams}/server.sent.data.received.reset/server/target"
     })
-    public void endAfterIOExceptionFromReadShouldNotCauseReset() throws Exception
+    @BMRules(rules = {
+        @BMRule(name = "processData",
+        helper = "org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$ProcessDataHelper",
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "write(java.nio.ByteBuffer)",
+        condition =
+          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData\", true, true)",
+        action = "return doWrite($0, $1);"
+        ),
+        @BMRule(name = "handleWrite",
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "write(java.nio.ByteBuffer)",
+        condition =
+          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.handleWrite\", true, true)",
+          action = "throw new IOException(\"Simulating an IOException from write\")"
+        )
+    })
+    public void ioExceptionFromDelayedWriteShouldResultInReset() throws Exception
     {
+        ProcessDataHelper.fragmentWrites(generate(() -> 0));
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
         try (SocketChannel channel = SocketChannel.open())
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-
-            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-            channel.close();
 
             k3po.finish();
         }

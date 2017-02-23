@@ -206,6 +206,10 @@ public final class StreamFactory
         private void doFail()
         {
             source.doReset(id);
+            if (slot >= 0)
+            {
+                writeSlab.release(slot);
+            }
             doCleanup();
         }
 
@@ -235,7 +239,8 @@ public final class StreamFactory
             }
             catch (IOException ex)
             {
-                LangUtil.rethrowUnchecked(ex);
+                doFail();
+                return 0;
             }
 
             slot = writeSlab.written(id, slot, writeBuffer, bytesWritten, this::offerWindow);
