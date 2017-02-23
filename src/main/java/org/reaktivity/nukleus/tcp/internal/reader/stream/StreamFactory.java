@@ -94,11 +94,6 @@ public final class StreamFactory
 
         private int handleStream()
         {
-            return handleRead();
-        }
-
-        private int handleRead()
-        {
             assert readableBytes > 0;
 
             final int limit = Math.min(readableBytes, bufferSize);
@@ -113,7 +108,7 @@ public final class StreamFactory
             }
             catch(IOException ex)
             {
-                // RST from client. We treat this as end of stream (see issue #9).
+                // treat TCP reset as end-of-stream
                 bytesRead = -1;
             }
             if (bytesRead == -1)
