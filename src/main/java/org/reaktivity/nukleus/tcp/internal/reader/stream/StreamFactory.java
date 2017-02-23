@@ -94,19 +94,6 @@ public final class StreamFactory
 
         private int handleStream()
         {
-            try
-            {
-                return handleRead();
-            }
-            catch (IOException ex)
-            {
-                LangUtil.rethrowUnchecked(ex);
-                return 0;
-            }
-        }
-
-        private int handleRead() throws IOException
-        {
             assert readableBytes > 0;
 
             final int limit = Math.min(readableBytes, bufferSize);
@@ -114,7 +101,16 @@ public final class StreamFactory
             readBuffer.position(0);
             readBuffer.limit(limit);
 
-            int bytesRead = channel.read(readBuffer);
+            int bytesRead;
+            try
+            {
+                bytesRead = channel.read(readBuffer);
+            }
+            catch(IOException ex)
+            {
+                // treat TCP reset as end-of-stream
+                bytesRead = -1;
+            }
             if (bytesRead == -1)
             {
                 // channel closed

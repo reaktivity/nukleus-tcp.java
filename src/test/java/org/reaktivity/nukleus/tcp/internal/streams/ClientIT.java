@@ -485,6 +485,69 @@ public class ClientIT
     @Test
     @Specification({
         "${route}/output/new/controller",
+        "${streams}/server.sent.end.then.received.data/client/source"
+    })
+    public void shouldWriteDataAfterReceiveEnd() throws Exception
+    {
+        try (ServerSocketChannel server = ServerSocketChannel.open())
+        {
+            server.setOption(SO_REUSEADDR, true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_OUTPUT");
+
+            try (SocketChannel channel = server.accept())
+            {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
+                channel.shutdownOutput();
+
+                ByteBuffer buf = ByteBuffer.allocate(256);
+                channel.read(buf);
+                buf.flip();
+
+                assertEquals("client data", UTF_8.decode(buf).toString());
+
+                k3po.finish();
+            }
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/output/new/controller",
+        "${streams}/client.sent.end.then.received.data/client/source"
+    })
+    public void shouldReceiveDataAfterSendingEnd() throws Exception
+    {
+        try (ServerSocketChannel server = ServerSocketChannel.open())
+        {
+            server.setOption(SO_REUSEADDR, true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_OUTPUT");
+
+            try (SocketChannel channel = server.accept())
+            {
+                k3po.notifyBarrier("ROUTED_INPUT");
+
+                ByteBuffer buf = ByteBuffer.allocate(256);
+                int len = channel.read(buf);
+
+                assertEquals(-1, len);
+
+                channel.write(UTF_8.encode("server data"));
+
+                k3po.finish();
+            }
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/output/new/controller",
         "${streams}/client.sent.data.after.end/client/source"
     })
     public void shouldResetIfDataReceivedAfterEndOfStream() throws Exception
