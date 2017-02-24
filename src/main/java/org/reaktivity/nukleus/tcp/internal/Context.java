@@ -226,7 +226,7 @@ public final class Context implements Closeable
 
     public Logger logger()
     {
-        return Logger.getLogger("nuklei.ws");
+        return Logger.getLogger(Context.class.getPackage().getName());
     }
 
     public Context countersManager(
