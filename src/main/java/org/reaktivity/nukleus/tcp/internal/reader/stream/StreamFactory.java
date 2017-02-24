@@ -18,16 +18,20 @@ package org.reaktivity.nukleus.tcp.internal.reader.stream;
 import static java.nio.ByteOrder.nativeOrder;
 
 import java.io.IOException;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.function.IntSupplier;
+import java.util.function.LongFunction;
 
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.tcp.internal.reader.Target;
+import org.reaktivity.nukleus.tcp.internal.router.Correlation;
+import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
 
@@ -37,13 +41,16 @@ public final class StreamFactory
     private final ResetFW resetRO = new ResetFW();
 
     private final int bufferSize;
+    private final LongFunction<Correlation> resolveCorrelation;
     private final ByteBuffer readBuffer;
     private final AtomicBuffer atomicBuffer;
 
     public StreamFactory(
-        int bufferSize)
+        int maxMessageLength,
+        LongFunction<Correlation> resolveCorrelation)
     {
-        this.bufferSize = bufferSize;
+        this.bufferSize = maxMessageLength - DataFW.FIELD_OFFSET_PAYLOAD;
+        this.resolveCorrelation = resolveCorrelation;
         this.readBuffer = ByteBuffer.allocate(bufferSize).order(nativeOrder());
         this.atomicBuffer = new UnsafeBuffer(new byte[bufferSize]);
     }
@@ -52,9 +59,10 @@ public final class StreamFactory
         Target target,
         long targetId,
         SelectionKey key,
-        SocketChannel channel)
+        SocketChannel channel,
+        long correlationId)
     {
-        final Stream stream = new Stream(target, targetId, key, channel);
+        final Stream stream = new Stream(target, targetId, key, channel, correlationId);
 
         target.addThrottle(targetId, stream::handleThrottle);
 
@@ -67,6 +75,7 @@ public final class StreamFactory
         private final long streamId;
         private final SelectionKey key;
         private final SocketChannel channel;
+        private final long correlationId;
 
         private int readableBytes;
 
@@ -74,68 +83,59 @@ public final class StreamFactory
             Target target,
             long streamId,
             SelectionKey key,
-            SocketChannel channel)
+            SocketChannel channel,
+            long correlationId)
         {
             this.target = target;
             this.streamId = streamId;
             this.key = key;
             this.channel = channel;
+            this.correlationId = correlationId;
         }
 
         private int handleStream()
         {
+            assert readableBytes > 0;
+
+            final int limit = Math.min(readableBytes, bufferSize);
+
+            readBuffer.position(0);
+            readBuffer.limit(limit);
+
+            int bytesRead;
             try
             {
-                return handleRead();
+                bytesRead = channel.read(readBuffer);
             }
-            catch (IOException ex)
+            catch(IOException ex)
             {
-                LangUtil.rethrowUnchecked(ex);
-                return 0;
+                // treat TCP reset as end-of-stream
+                bytesRead = -1;
             }
-        }
-
-        private int handleRead() throws IOException
-        {
-            if (readableBytes == 0)
+            if (bytesRead == -1)
             {
-                // over budget
-                channel.close();
-                return 0;
+                // channel closed
+                target.doTcpEnd(streamId);
+                target.removeThrottle(streamId);
+                key.cancel();
             }
             else
             {
-                final int limit = Math.min(readableBytes, bufferSize);
+                // TODO: eliminate copy
+                atomicBuffer.putBytes(0, readBuffer, 0, bytesRead);
 
-                readBuffer.position(0);
-                readBuffer.limit(limit);
+                target.doTcpData(streamId, atomicBuffer, 0, bytesRead);
 
-                int bytesRead = channel.read(readBuffer);
-                if (bytesRead == -1)
+                readableBytes -= bytesRead;
+                if (readableBytes == 0)
                 {
-                    // channel closed
-                    target.doTcpEnd(streamId);
-                    target.removeThrottle(streamId);
-                    key.cancel();
+                    final int interestOps = key.interestOps();
+                    final int newInterestOps = interestOps & ~SelectionKey.OP_READ;
+                    key.interestOps(newInterestOps);
                 }
-                else
-                {
-                    // TODO: eliminate copy
-                    atomicBuffer.putBytes(0, readBuffer, 0, bytesRead);
-
-                    target.doTcpData(streamId, atomicBuffer, 0, bytesRead);
-
-                    readableBytes -= bytesRead;
-                    if (readableBytes == 0)
-                    {
-                        final int interestOps = key.interestOps();
-                        final int newInterestOps = interestOps & ~SelectionKey.OP_READ;
-                        key.interestOps(newInterestOps);
-                    }
-                }
-
-                return 1;
             }
+
+            return 1;
         }
 
         private void handleThrottle(
@@ -185,12 +185,26 @@ public final class StreamFactory
 
             try
             {
-                channel.shutdownInput();
-                target.removeThrottle(streamId);
+                if (resolveCorrelation.apply(correlationId) == null)
+                {
+                    // Begin on correlated output stream was already processed
+                    channel.shutdownInput();
+                }
+                else
+                {
+                    // Force a hard reset (TCP RST), as documented in "Orderly Versus Abortive Connection Release in Java"
+                    // (https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html)
+                    channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+                    channel.close();
+                }
             }
             catch (IOException ex)
             {
                 LangUtil.rethrowUnchecked(ex);
+            }
+            finally
+            {
+                target.removeThrottle(streamId);
             }
         }
     }

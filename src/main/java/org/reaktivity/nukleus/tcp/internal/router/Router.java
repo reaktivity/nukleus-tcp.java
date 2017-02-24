@@ -54,7 +54,7 @@ public final class Router extends Nukleus.Composite
     private final Long2ObjectHashMap<Correlation> correlations;
     private final Map<String, Reader> readers;
     private final Map<String, Writer> writers;
-    private final AtomicCounter routesSourced;
+    private final AtomicCounter routes;
 
     private Conductor conductor;
     private Acceptor acceptor;
@@ -67,7 +67,7 @@ public final class Router extends Nukleus.Composite
         this.correlations = new Long2ObjectHashMap<>();
         this.readers = new HashMap<>();
         this.writers = new HashMap<>();
-        routesSourced = context.counters().routesSourced();
+        this.routes = context.counters().routes();
     }
 
     public void setConductor(Conductor conductor)
@@ -178,22 +178,23 @@ public final class Router extends Nukleus.Composite
 
     public void onAccepted(
         String sourceName,
+        long sourceRef,
         SocketChannel channel,
         SocketAddress address)
     {
-        final AtomicCounter streamsSourced = context.counters().streamsSourced();
-        final long targetId = streamsSourced.increment();
+        final AtomicCounter streams = context.counters().streams();
+        final long targetId = streams.increment();
         final long correlationId = System.identityHashCode(channel);
         final Correlation correlation = new Correlation(sourceName, channel);
 
         correlations.put(correlationId, correlation);
 
         Reader reader = readers.computeIfAbsent(sourceName, this::newReader);
-        reader.onAccepted(targetId, correlationId, channel, address);
+        reader.onAccepted(sourceRef, targetId, correlationId, channel, address);
     }
 
     public void onConnected(
-        String sourceName,
+        String partitionName,
         long sourceRef,
         long sourceId,
         String targetName,
@@ -206,19 +207,21 @@ public final class Router extends Nukleus.Composite
         // TODO: support network device for channel local address
         targetName = "any";
 
+        String sourceName = source(partitionName);
         Writer writer = writers.get(sourceName);
-        writer.onConnected(sourceName, sourceId, sourceRef, targetName, correlationId, channel);
+        writer.onConnected(partitionName, sourceId, sourceRef, targetName, correlationId, channel);
 
         Reader reader = readers.computeIfAbsent(targetName, this::newReader);
         reader.onConnected(sourceRef, sourceName, targetId, correlationId, channel, address);
     }
 
     public void onConnectFailed(
-        String sourceName,
+        String partitionName,
         long sourceId)
     {
+        String sourceName = source(partitionName);
         Writer writer = writers.get(sourceName);
-        writer.onConnectFailed(sourceName, sourceId);
+        writer.onConnectFailed(partitionName, sourceId);
     }
 
     public void onReadable(
@@ -239,7 +242,12 @@ public final class Router extends Nukleus.Composite
     private static String source(
         Path path)
     {
-        Matcher matcher = SOURCE_NAME.matcher(path.getName(path.getNameCount() - 1).toString());
+        return source(path.getName(path.getNameCount() - 1).toString());
+    }
+
+    private static String source(String partitionName)
+    {
+        Matcher matcher = SOURCE_NAME.matcher(partitionName);
         if (matcher.matches())
         {
             return matcher.group(1);
@@ -284,11 +292,18 @@ public final class Router extends Nukleus.Composite
         {
             if (sourceRef == 0)
             {
-                sourceRef = OUTPUT_NEW.nextRef(routesSourced);
+                sourceRef = OUTPUT_NEW.nextRef(routes);
             }
 
-            Writer writer = writers.computeIfAbsent(sourceName, this::newWriter);
             InetSocketAddress remoteAddress = new InetSocketAddress(targetName, (int)targetRef);
+
+            // TODO: support network device for remote address gateway route
+            targetName = "any";
+
+            Reader reader = readers.computeIfAbsent(targetName, this::newReader);
+            reader.doRouteDefault(correlationId, sourceName);
+
+            Writer writer = writers.computeIfAbsent(sourceName, this::newWriter);
             writer.doRoute(correlationId, sourceRef, targetName, targetRef, remoteAddress);
         }
         else
@@ -311,7 +326,7 @@ public final class Router extends Nukleus.Composite
         {
             if (sourceRef == 0)
             {
-                sourceRef = OUTPUT_ESTABLISHED.nextRef(routesSourced);
+                sourceRef = OUTPUT_ESTABLISHED.nextRef(routes);
             }
 
             Writer writer = writers.computeIfAbsent(sourceName, this::newWriter);
@@ -374,6 +389,10 @@ public final class Router extends Nukleus.Composite
         if (writer != null && address == null)
         {
             InetSocketAddress remoteAddress = new InetSocketAddress(targetName, (int)targetRef);
+
+            // TODO: support network device for remote address gateway route
+            targetName = "any";
+
             writer.doUnroute(correlationId, sourceRef, targetName, targetRef, remoteAddress);
         }
         else
@@ -423,7 +442,7 @@ public final class Router extends Nukleus.Composite
     private Reader newReader(
         String sourceName)
     {
-        return include(new Reader(context, conductor, acceptor, sourceName));
+        return include(new Reader(context, conductor, acceptor, sourceName, correlations::remove));
     }
 
     private Writer newWriter(

@@ -17,10 +17,6 @@ package org.reaktivity.nukleus.tcp.internal.control;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.nukleus.tcp.internal.types.control.Role.INPUT;
-import static org.reaktivity.nukleus.tcp.internal.types.control.Role.OUTPUT;
-import static org.reaktivity.nukleus.tcp.internal.types.control.State.ESTABLISHED;
-import static org.reaktivity.nukleus.tcp.internal.types.control.State.NEW;
 
 import java.net.InetAddress;
 import java.util.Random;
@@ -64,7 +60,7 @@ public class ControllerIT
         k3po.start();
 
         controller.controller(TcpController.class)
-                  .route(INPUT, NEW, "any", 8080, "target", targetRef, address)
+                  .routeInputNew("any", 8080, "target", targetRef, address)
                   .get();
 
         k3po.finish();
@@ -79,7 +75,7 @@ public class ControllerIT
         k3po.start();
 
         controller.controller(TcpController.class)
-                  .route(OUTPUT, NEW, "source", 0L, "localhost", 8080, null)
+                  .routeOutputNew("source", 0L, "localhost", 8080, null)
                   .get();
 
         k3po.finish();
@@ -94,7 +90,7 @@ public class ControllerIT
         k3po.start();
 
         controller.controller(TcpController.class)
-                  .route(OUTPUT, ESTABLISHED, "target", 0L, "any", 0L, null)
+                  .routeOutputEstablished("target", 0L, "any", 0L, null)
                   .get();
 
         k3po.finish();
@@ -111,7 +107,7 @@ public class ControllerIT
         k3po.start();
 
         controller.controller(TcpController.class)
-                  .route(INPUT, ESTABLISHED, "any", 8080, "source", sourceRef, null)
+                  .routeInputEstablished("any", 8080, "source", sourceRef, null)
                   .get();
 
         k3po.finish();
@@ -130,7 +126,7 @@ public class ControllerIT
         k3po.notifyBarrier("ROUTED_INPUT");
 
         controller.controller(TcpController.class)
-                  .unroute(INPUT, NEW, "any", 8080, "target", targetRef, address)
+                  .unrouteInputNew("any", 8080, "target", targetRef, address)
                   .get();
 
         k3po.finish();
@@ -148,7 +144,7 @@ public class ControllerIT
         long sourceRef = new Random().nextLong();
 
         controller.controller(TcpController.class)
-                  .unroute(OUTPUT, NEW, "source", sourceRef, "localhost", 8080, null)
+                  .unrouteOutputNew("source", sourceRef, "localhost", 8080, null)
                   .get();
 
         k3po.finish();
@@ -166,7 +162,7 @@ public class ControllerIT
         k3po.notifyBarrier("ROUTED_OUTPUT");
 
         controller.controller(TcpController.class)
-                  .unroute(OUTPUT, ESTABLISHED, "target", targetRef, "any", 0L, null)
+                  .unrouteOutputEstablished("target", targetRef, "any", 0L, null)
                   .get();
 
         k3po.finish();
@@ -184,7 +180,7 @@ public class ControllerIT
         k3po.notifyBarrier("ROUTED_INPUT");
 
         controller.controller(TcpController.class)
-                  .unroute(INPUT, ESTABLISHED, "any", 8080, "source", sourceRef, null)
+                  .unrouteInputEstablished("any", 8080, "source", sourceRef, null)
                   .get();
 
         k3po.finish();

@@ -25,12 +25,10 @@ public enum RouteKind
     {
         @Override
         protected final long nextRef(
-            LongSupplier getAndIncrement,
-            LongSupplier get)
+            LongSupplier getAndIncrement)
         {
             // positive, even, non-zero
-            getAndIncrement.getAsLong();
-            return get.getAsLong() << 1L;
+            return getAndIncrement.getAsLong() << 1L;
         }
     },
 
@@ -38,12 +36,10 @@ public enum RouteKind
     {
         @Override
         protected final long nextRef(
-            LongSupplier getAndIncrement,
-            LongSupplier get)
+            LongSupplier getAndIncrement)
         {
             // negative, even, non-zero
-            getAndIncrement.getAsLong();
-            return get.getAsLong() << 1L | 0x8000000000000000L;
+            return getAndIncrement.getAsLong() << 1L | 0x8000000000000000L;
         }
     },
 
@@ -51,8 +47,7 @@ public enum RouteKind
     {
         @Override
         protected final long nextRef(
-            LongSupplier getAndIncrement,
-            LongSupplier get)
+            LongSupplier getAndIncrement)
         {
             // positive, odd
             return (getAndIncrement.getAsLong() << 1L) | 1L;
@@ -63,8 +58,7 @@ public enum RouteKind
     {
         @Override
         protected final long nextRef(
-            LongSupplier getAndIncrement,
-            LongSupplier get)
+            LongSupplier getAndIncrement)
         {
             // negative, odd
             return (getAndIncrement.getAsLong() << 1L) | 0x8000000000000001L;
@@ -74,12 +68,11 @@ public enum RouteKind
     public final long nextRef(
         AtomicCounter counter)
     {
-        return nextRef(counter::increment, counter::get);
+        return nextRef(counter::increment);
     }
 
     protected abstract long nextRef(
-        LongSupplier getAndIncrement,
-        LongSupplier get);
+        LongSupplier getAndIncrement);
 
     public static RouteKind match(
         long referenceId)

@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.tcp.internal.writer;
 
 import static java.util.Collections.emptyList;
+import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.MAXIMUM_STREAMS_WITH_PENDING_WRITES;
 import static org.reaktivity.nukleus.tcp.internal.writer.Route.addressMatches;
 import static org.reaktivity.nukleus.tcp.internal.writer.Route.sourceMatches;
 import static org.reaktivity.nukleus.tcp.internal.writer.Route.sourceRefMatches;
@@ -94,14 +95,14 @@ public final class Writer extends Nukleus.Composite
     }
 
     public void onConnected(
-        String sourceName,
+        String partitionName,
         long sourceId,
         long sourceRef,
         String targetName,
         long correlationId,
         SocketChannel channel)
     {
-        final Source source = sourcesByPartitionName.get(sourceName);
+        final Source source = sourcesByPartitionName.get(partitionName);
         final Target target = targetsByName.computeIfAbsent(targetName, this::newTarget);
 
         source.onConnected(sourceId, sourceRef, target, channel, correlationId);
@@ -202,7 +203,14 @@ public final class Writer extends Nukleus.Composite
 
         Function<String, Target> supplyTarget = n -> targetsByName.computeIfAbsent(n, this::newTarget);
 
+        int maximumPendingWriteStreams = MAXIMUM_STREAMS_WITH_PENDING_WRITES.intValue(() ->
+        {
+            return (context.maximumStreamsCount() < 1001 ? context.maximumStreamsCount()
+                    : context.maximumStreamsCount() / 10);
+        });
+
         return include(new Source(partitionName, connector, this::lookupRoutes, resolveCorrelation,
-                        supplyTarget, layout, writeBuffer));
+                       supplyTarget, layout, writeBuffer, maximumPendingWriteStreams,
+                       context.counters().overflows()::increment));
     }
 }

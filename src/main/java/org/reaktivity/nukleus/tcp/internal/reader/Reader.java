@@ -31,8 +31,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.function.LongFunction;
 import java.util.function.Predicate;
 
+import org.agrona.CloseHelper;
 import org.agrona.LangUtil;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
@@ -43,6 +45,7 @@ import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
+import org.reaktivity.nukleus.tcp.internal.router.Correlation;
 import org.reaktivity.nukleus.tcp.internal.router.RouteKind;
 
 /**
@@ -63,17 +66,19 @@ public final class Reader extends Nukleus.Composite
     private final AtomicBuffer writeBuffer;
     private final Long2ObjectHashMap<List<Route>> routesByRef;
 
+
     public Reader(
         Context context,
         Conductor conductor,
         Acceptor acceptor,
-        String sourceName)
+        String sourceName,
+        LongFunction<Correlation> resolveCorrelation)
     {
         this.context = context;
         this.conductor = conductor;
         this.acceptor = acceptor;
         this.sourceName = sourceName;
-        this.source = include(new Source(sourceName, context.maxMessageLength()));
+        this.source = include(new Source(sourceName, context.maxMessageLength(), resolveCorrelation));
         this.writeBuffer = new UnsafeBuffer(new byte[context.maxMessageLength()]);
         this.targetsByName = new TreeMap<>();
         this.routesByRef = new Long2ObjectHashMap<>();
@@ -86,6 +91,7 @@ public final class Reader extends Nukleus.Composite
     }
 
     public void onAccepted(
+        long sourceRef,
         long targetId,
         long correlationId,
         SocketChannel channel,
@@ -95,8 +101,9 @@ public final class Reader extends Nukleus.Composite
                 sourceMatches(sourceName)
                  .and(addressMatches(address));
 
-        final Optional<Route> optional = routesByRef.values().stream()
-            .flatMap(rs -> rs.stream())
+        final List<Route> routes = routesByRef.getOrDefault(sourceRef, EMPTY_ROUTES);
+
+        final Optional<Route> optional = routes.stream()
             .filter(filter)
             .findFirst();
 
@@ -107,6 +114,10 @@ public final class Reader extends Nukleus.Composite
             final long targetRef = route.targetRef();
 
             source.onBegin(target, targetRef, targetId, correlationId, channel);
+        }
+        else
+        {
+            CloseHelper.close(channel);
         }
     }
 
@@ -140,6 +151,21 @@ public final class Reader extends Nukleus.Composite
             final Target target = targetsByName.computeIfAbsent(targetName, this::newTarget);
 
             source.onBegin(target, 0L, targetId, correlationId, channel);
+        }
+    }
+
+    public void doRouteDefault(
+        long correlationId,
+        String targetName)
+    {
+        try
+        {
+            targetsByName.computeIfAbsent(targetName, this::newTarget);
+        }
+        catch (Exception ex)
+        {
+            conductor.onErrorResponse(correlationId);
+            LangUtil.rethrowUnchecked(ex);
         }
     }
 

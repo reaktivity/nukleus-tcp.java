@@ -116,10 +116,10 @@ public final class Target implements Nukleus
                 .extension(b -> b.set(visitBeginEx(localAddress, remoteAddress)))
                 .build();
 
-        streamsBuffer.write(begin.typeId(), begin.buffer(), begin.offset(), begin.length());
+        streamsBuffer.write(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
-    public int doTcpData(
+    public void doTcpData(
         long streamId,
         DirectBuffer payload,
         int offset,
@@ -128,12 +128,9 @@ public final class Target implements Nukleus
         DataFW tcpData = tcpDataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
                 .payload(p -> p.set(payload, offset, length))
-                .extension(b -> b.set((buf, off, len) -> 0))
                 .build();
 
-        streamsBuffer.write(tcpData.typeId(), tcpData.buffer(), tcpData.offset(), tcpData.length());
-
-        return tcpData.length();
+        streamsBuffer.write(tcpData.typeId(), tcpData.buffer(), tcpData.offset(), tcpData.sizeof());
     }
 
     public void doTcpEnd(
@@ -144,7 +141,7 @@ public final class Target implements Nukleus
                 .extension(b -> b.set((buf, off, len) -> 0))
                 .build();
 
-        streamsBuffer.write(tcpEnd.typeId(), tcpEnd.buffer(), tcpEnd.offset(), tcpEnd.length());
+        streamsBuffer.write(tcpEnd.typeId(), tcpEnd.buffer(), tcpEnd.offset(), tcpEnd.sizeof());
     }
 
     private Flyweight.Builder.Visitor visitBeginEx(
@@ -158,7 +155,7 @@ public final class Target implements Nukleus
                      .remoteAddress(a -> socketAddress(remoteAddress, a::ipv4Address, a::ipv6Address))
                      .remotePort(remoteAddress.getPort())
                      .build()
-                     .length();
+                     .sizeof();
     }
 
     private void handleRead(

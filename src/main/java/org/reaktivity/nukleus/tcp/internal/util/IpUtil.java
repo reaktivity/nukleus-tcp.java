@@ -46,7 +46,7 @@ public final class IpUtil
     public static InetAddress inetAddress(
         TcpAddressFW address)
     {
-        if (address.length() == 0)
+        if (address.sizeof() == 0)
         {
             return null;
         }

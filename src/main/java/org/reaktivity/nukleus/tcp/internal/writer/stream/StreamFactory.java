@@ -15,10 +15,14 @@
  */
 package org.reaktivity.nukleus.tcp.internal.writer.stream;
 
+import static org.reaktivity.nukleus.tcp.internal.writer.stream.Slab.NO_SLOT;
+import static org.reaktivity.nukleus.tcp.internal.writer.stream.Slab.OUT_OF_MEMORY;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
@@ -32,22 +36,30 @@ import org.reaktivity.nukleus.tcp.internal.writer.Target;
 
 public final class StreamFactory
 {
+    // Mina uses a value of 256 (see AbstractPollingIoProcessor.writeBuffer).
+    // Netty uses a configurable value, defaulting to 16
+    // (see https://netty.io/4.0/api/io/netty/channel/ChannelConfig.html#setWriteSpinCount(int))
+    public static final int WRITE_SPIN_COUNT = 16;
+
     private final BeginFW beginRO = new BeginFW();
     private final DataFW dataRO = new DataFW();
     private final EndFW endRO = new EndFW();
 
     private final Source source;
     private final int windowSize;
-    private final ByteBuffer writeBuffer;
+    private final Slab writeSlab;
+    private final LongSupplier incrementOverflow;
 
     public StreamFactory(
         Source source,
         int windowSize,
-        int maxMessageSize)
+        int maxPartiallyWrittenStreams,
+        LongSupplier incrementOverflow)
     {
         this.source = source;
         this.windowSize = windowSize;
-        this.writeBuffer = ByteBuffer.allocateDirect(maxMessageSize);
+        writeSlab = new Slab(maxPartiallyWrittenStreams, windowSize);
+        this.incrementOverflow = incrementOverflow;
     }
 
     public MessageHandler newStream(
@@ -60,12 +72,13 @@ public final class StreamFactory
 
     private final class Stream
     {
+        private static final int EOS_REQUESTED = -1;
         private final long id;
         private final Target target;
         private final SocketChannel channel;
+        private int slot = NO_SLOT;
 
         private SelectionKey key;
-
         private int readableBytes;
 
         private Stream(
@@ -105,7 +118,6 @@ public final class StreamFactory
             catch (IOException ex)
             {
                 doFail();
-                LangUtil.rethrowUnchecked(ex);
             }
         }
 
@@ -129,28 +141,48 @@ public final class StreamFactory
             dataRO.wrap(buffer, offset, limit);
 
             final OctetsFW payload = dataRO.payload();
-            final int writableBytes = Math.max(payload.length() - 1, 0);
+            final int writableBytes = dataRO.length();
 
             if (reduceWindow(writableBytes))
             {
-                writeBuffer.position(0);
-                writeBuffer.limit(writeBuffer.capacity());
-                buffer.getBytes(payload.offset() + 1, writeBuffer, writableBytes);
-                writeBuffer.flip();
+                ByteBuffer writeBuffer = writeSlab.get(slot, buffer, payload.offset(), writableBytes);
 
-                final int bytesWritten = channel.write(writeBuffer);
+                int bytesWritten = 0;
 
+                for (int i = WRITE_SPIN_COUNT; bytesWritten == 0 && i > 0; i--)
+                {
+                    bytesWritten = channel.write(writeBuffer);
+                }
+
+                int originalSlot = slot;
+                slot = writeSlab.written(id, slot, writeBuffer, bytesWritten, this::offerWindow);
+                if (slot == OUT_OF_MEMORY)
+                {
+                    incrementOverflow.getAsLong();
+                    doFail();
+                    return;
+                }
                 if (bytesWritten < writableBytes)
                 {
                     key.interestOps(SelectionKey.OP_WRITE);
-                    throw new IOException("partial write, defer unwritten bytes");
                 }
-
-                offerWindow(bytesWritten);
+                else if (originalSlot != NO_SLOT)
+                {
+                    // we just flushed out a pending write
+                    key.interestOps(0);
+                }
             }
             else
             {
-                doFail();
+                if (slot == NO_SLOT)
+                {
+                    doFail();
+                }
+                else
+                {
+                    // send reset but defer cleanup until pending writes are completed
+                    source.doReset(id);
+                }
             }
         }
 
@@ -159,20 +191,31 @@ public final class StreamFactory
             int offset,
             int limit)
         {
-            endRO.wrap(buffer, offset, limit);
-
-            // TODO: flush partial writes first (if necessary)
-            doCleanup();
+            if (slot == NO_SLOT) // no partial writes pending
+            {
+                endRO.wrap(buffer, offset, limit);
+                doCleanup();
+            }
+            else
+            {
+                // Signal end of stream requested and ensure further data streams will result in reset
+                readableBytes = EOS_REQUESTED;
+            }
         }
 
         private void doFail()
         {
             source.doReset(id);
+            if (slot >= 0)
+            {
+                writeSlab.release(slot);
+            }
             doCleanup();
         }
 
         private void doCleanup()
         {
+            key.interestOps(0); // clear OP_WRITE
             try
             {
                 source.removeStream(id);
@@ -186,10 +229,35 @@ public final class StreamFactory
 
         private int handleWrite()
         {
-            // TODO: partial write completed
+            key.interestOps(0); // clear OP_WRITE
+            ByteBuffer writeBuffer = writeSlab.get(slot);
 
-            // TODO: end stream (if necessary) after all partial writes completed
-            return 0;
+            int bytesWritten = 0;
+            try
+            {
+                bytesWritten = channel.write(writeBuffer);
+            }
+            catch (IOException ex)
+            {
+                doFail();
+                return 0;
+            }
+
+            slot = writeSlab.written(id, slot, writeBuffer, bytesWritten, this::offerWindow);
+
+            if (slot == NO_SLOT)
+            {
+                if (readableBytes < 0) // deferred EOS and/or window was exceeded
+                {
+                    doCleanup();
+                }
+            }
+            else
+            {
+                // Incomplete write
+                key.interestOps(SelectionKey.OP_WRITE);
+            }
+            return bytesWritten;
         }
 
         private boolean reduceWindow(
@@ -199,11 +267,17 @@ public final class StreamFactory
             return readableBytes >= 0;
         }
 
-        private void offerWindow(
-            final int update)
+        private void offerWindow(final int update)
         {
-            readableBytes += update;
-            source.doWindow(id, update);
+            // If readableBytes indicates EOS has been received we must not destroy that information
+            // (and in this case there is no need to write the window update)
+            // We can also get update < 0 if we received data GT window (protocol violation) while
+            // we have data waiting to be written (incomplete writes)
+            if (readableBytes > EOS_REQUESTED)
+            {
+                readableBytes += update;
+                source.doWindow(id, update);
+            }
         }
     }
 }

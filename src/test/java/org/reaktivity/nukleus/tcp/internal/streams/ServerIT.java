@@ -20,9 +20,11 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -31,6 +33,7 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.NukleusRule;
 
 public class ServerIT
@@ -46,10 +49,16 @@ public class ServerIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .streams("tcp", "target");
+        .streams("tcp", "target#partition");
+
+    private final TcpCountersRule counters = new TcpCountersRule()
+        .directory("target/nukleus-itests")
+        .commandBufferCapacity(1024)
+        .responseBufferCapacity(1024)
+        .counterValuesBufferCapacity(1024);
 
     @Rule
-    public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(nukleus).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -61,9 +70,46 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        new Socket("127.0.0.1", 0x1f90).close();
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-        k3po.finish();
+            k3po.finish();
+        }
+
+        assertEquals(1, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
+    @Test(expected = IOException.class)
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/connection.failed/server/target"
+    })
+    public void connectionFailed() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            try
+            {
+                channel.read(buf);
+            }
+            finally
+            {
+                k3po.finish();
+            }
+        }
+
+        assertEquals(0, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -76,17 +122,135 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final InputStream in = socket.getInputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            byte[] buf = new byte[256];
-            int len = in.read(buf);
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            channel.read(buf);
+            buf.flip();
 
-            assertEquals("server data", new String(buf, 0, len, UTF_8));
+            assertEquals("server data", UTF_8.decode(buf).toString());
+
+            k3po.finish();
+        }
+
+        assertEquals(1, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/server.sent.data/server/target"
+    })
+    public void shouldNotGetRepeatedIOExceptionsFromReaderStreamRead() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try(Socket socket = new Socket("127.0.0.1", 0x1f90))
+        {
+            socket.shutdownInput();
+            Thread.sleep(500);
         }
 
         k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/server.sent.data.multiple.frames/server/target"
+    })
+    public void shouldReceiveServerSentDataMultipleFrames() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            do
+            {
+                int len = channel.read(buf);
+                if (len == -1)
+                {
+                    break;
+                }
+            } while (buf.position() < 26);
+            buf.flip();
+
+            assertEquals("server data 1".concat("server data 2"), UTF_8.decode(buf).toString());
+
+            k3po.finish();
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/server.sent.data.multiple.streams/server/target"
+    })
+    public void shouldReceiveServerSentDataMultipleStreams() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel1 = SocketChannel.open();
+             SocketChannel channel2 = SocketChannel.open())
+        {
+            channel1.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel2.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            channel1.read(buf);
+            buf.flip();
+            assertEquals("server data 1", UTF_8.decode(buf).toString());
+
+            buf.rewind();
+            channel2.read(buf);
+            buf.flip();
+            assertEquals("server data 2", UTF_8.decode(buf).toString());
+
+            k3po.finish();
+        }
+
+        assertEquals(2, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/server.sent.data.then.end/server/target"
+    })
+    public void shouldReceiveServerSentDataAndEnd() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            channel.read(buf);
+            buf.flip();
+
+            assertEquals("server data", UTF_8.decode(buf).toString());
+
+            buf.rewind();
+            int len = channel.read(buf);
+
+            assertEquals(-1, len);
+
+            k3po.finish();
+        }
     }
 
     @Test
@@ -99,11 +263,60 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final OutputStream out = socket.getOutputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.write(UTF_8.encode("client data"));
 
-            out.write("client data".getBytes());
+            k3po.finish();
+        }
+
+        assertEquals(1, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/client.sent.data.flow.control/server/target"
+    })
+    public void shouldReceiveClientSentDataWithFlowControl() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.write(UTF_8.encode("client data"));
+
+            k3po.finish();
+        }
+
+        assertEquals(1, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/client.sent.data.multiple.frames/server/target"
+    })
+    public void shouldReceiveClientSentDataMultipleFrames() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.write(UTF_8.encode("client data 1"));
+
+            k3po.awaitBarrier("FIRST_DATA_FRAME_RECEIVED");
+
+            channel.write(UTF_8.encode("client data 2"));
 
             k3po.finish();
         }
@@ -112,33 +325,80 @@ public class ServerIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streams}/echo.data/server/target"
+        "${streams}/client.sent.data.multiple.streams/server/target"
     })
-    public void shouldEchoData() throws Exception
+    public void shouldReceiveClientSentDataMultipleStreams() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel1 = SocketChannel.open();
+             SocketChannel channel2 = SocketChannel.open())
         {
-            final InputStream in = socket.getInputStream();
-            final OutputStream out = socket.getOutputStream();
+            channel1.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel2.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            out.write("client data 1".getBytes());
+            channel1.write(UTF_8.encode("client data 1"));
+            channel2.write(UTF_8.encode("client data 2"));
 
-            byte[] buf1 = new byte[256];
-            int len1 = in.read(buf1);
-
-            out.write("client data 2".getBytes());
-
-            byte[] buf2 = new byte[256];
-            int len2 = in.read(buf2);
-
-            assertEquals("server data 1", new String(buf1, 0, len1, UTF_8));
-            assertEquals("server data 2", new String(buf2, 0, len2, UTF_8));
+            k3po.finish();
         }
 
-        k3po.finish();
+        assertEquals(2, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/client.sent.data.then.end/server/target"
+    })
+    public void shouldReceiveClientSentDataAndEnd() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.write(UTF_8.encode("client data"));
+            channel.shutdownOutput();
+
+            k3po.finish();
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/client.and.server.sent.data.multiple.frames/server/target"
+    })
+    public void shouldSendAndReceiveData() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.write(UTF_8.encode("client data 1"));
+
+            ByteBuffer buf1 = ByteBuffer.allocate(256);
+            channel.read(buf1);
+            buf1.flip();
+
+            channel.write(UTF_8.encode("client data 2"));
+
+            ByteBuffer buf2 = ByteBuffer.allocate(256);
+            channel.read(buf2);
+            buf2.flip();
+
+            assertEquals("server data 1", UTF_8.decode(buf1).toString());
+            assertEquals("server data 2", UTF_8.decode(buf2).toString());
+
+            k3po.finish();
+        }
     }
 
     @Test
@@ -151,17 +411,42 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            final InputStream in = socket.getInputStream();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            byte[] buf = new byte[256];
-            int len = in.read(buf);
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            int len = channel.read(buf);
+            buf.flip();
 
             assertEquals(-1, len);
-        }
 
-        k3po.finish();
+            k3po.finish();
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/server.close.and.reset/server/target"
+    })
+    public void shouldInitiateServerCloseWithInputReset() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            int len = channel.read(buf);
+            buf.flip();
+
+            assertEquals(-1, len);
+
+            k3po.finish();
+        }
     }
 
     @Test
@@ -174,9 +459,98 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_INPUT");
 
-        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (SocketChannel channel = SocketChannel.open())
         {
-            socket.shutdownOutput();
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.shutdownOutput();
+
+            k3po.finish();
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/server.sent.end.then.received.data/server/target"
+    })
+    public void shouldReceiveDataAfterSendingEnd() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            int len = channel.read(buf);
+            buf.flip();
+
+            assertEquals(-1, len);
+
+            channel.write(UTF_8.encode("client data"));
+
+            k3po.finish();
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/client.sent.end.then.received.data/server/target"
+    })
+    public void shouldWriteDataAfterReceiveEnd() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.shutdownOutput();
+
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            channel.read(buf);
+            buf.flip();
+
+            assertEquals("server data", UTF_8.decode(buf).toString());
+
+            k3po.finish();
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/input/new/controller",
+        "${streams}/server.sent.data.after.end/server/target"
+    })
+    public void shouldResetIfDataReceivedAfterEndOfStream() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_INPUT");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            ByteBuffer buf = ByteBuffer.allocate(256);
+            channel.read(buf);
+            buf.flip();
+
+            assertEquals("server data", UTF_8.decode(buf).toString());
+
+            int len = 0;
+            try
+            {
+                buf.rewind();
+                len = channel.read(buf);
+            }
+            catch (IOException ex)
+            {
+                len = -1;
+            }
+
+            assertEquals(-1, len);
 
             k3po.finish();
         }

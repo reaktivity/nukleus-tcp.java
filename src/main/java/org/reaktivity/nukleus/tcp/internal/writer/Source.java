@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.writer;
 
+import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
 import static org.reaktivity.nukleus.tcp.internal.writer.Route.sourceRefMatches;
 
 import java.io.IOException;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.LongFunction;
+import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 
 import org.agrona.LangUtil;
@@ -71,7 +73,9 @@ public final class Source implements Nukleus
         LongFunction<Correlation> resolveCorrelation,
         Function<String, Target> supplyTarget,
         StreamsLayout layout,
-        AtomicBuffer writeBuffer)
+        AtomicBuffer writeBuffer,
+        int maximumStreamsCount,
+        LongSupplier incrementOverflow)
     {
         this.partitionName = partitionName;
         this.connector = connector;
@@ -82,7 +86,7 @@ public final class Source implements Nukleus
         this.writeBuffer = writeBuffer;
         this.streamsBuffer = layout.streamsBuffer();
         this.throttleBuffer = layout.throttleBuffer();
-        this.streamFactory = new StreamFactory(this, 8192, 8192); // TODO: configure 8192
+        this.streamFactory = new StreamFactory(this, WINDOW_SIZE.intValue(), maximumStreamsCount, incrementOverflow);
         this.streams = new Long2ObjectHashMap<>();
     }
 
@@ -296,7 +300,7 @@ public final class Source implements Nukleus
             .correlationId(correlationId)
             .build();
 
-        newStream.onMessage(BeginFW.TYPE_ID, writeBuffer, begin.offset(), begin.length());
+        newStream.onMessage(begin.typeId(), writeBuffer, begin.offset(), begin.sizeof());
     }
 
     public void doWindow(
@@ -308,7 +312,7 @@ public final class Source implements Nukleus
                 .update(update)
                 .build();
 
-        throttleBuffer.write(window.typeId(), window.buffer(), window.offset(), window.length());
+        throttleBuffer.write(window.typeId(), window.buffer(), window.offset(), window.sizeof());
     }
 
     public void doReset(
@@ -318,7 +322,7 @@ public final class Source implements Nukleus
                 .streamId(streamId)
                 .build();
 
-        throttleBuffer.write(reset.typeId(), reset.buffer(), reset.offset(), reset.length());
+        throttleBuffer.write(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
     }
 
     public void replaceStream(
