@@ -22,6 +22,7 @@ import java.net.InetAddress;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.AtomicBuffer;
+import org.agrona.concurrent.MessageHandler;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.agrona.concurrent.broadcast.BroadcastTransmitter;
 import org.agrona.concurrent.ringbuffer.RingBuffer;
@@ -54,9 +55,9 @@ public final class Conductor implements Nukleus
     private final UnroutedFW.Builder unroutedRW = new UnroutedFW.Builder();
 
     private final RingBuffer conductorCommands;
-
     private final BroadcastTransmitter conductorResponses;
     private final AtomicBuffer sendBuffer;
+    private final MessageHandler commandHandler;
 
     private Router router;
 
@@ -64,8 +65,8 @@ public final class Conductor implements Nukleus
     {
         this.conductorCommands = context.conductorCommands();
         this.conductorResponses = context.conductorResponses();
-
         this.sendBuffer = new UnsafeBuffer(new byte[SEND_BUFFER_CAPACITY]);
+        this.commandHandler = this::handleCommand;
     }
 
     public void setRouter(
@@ -77,7 +78,7 @@ public final class Conductor implements Nukleus
     @Override
     public int process()
     {
-        return conductorCommands.read(this::handleCommand);
+        return conductorCommands.read(commandHandler);
     }
 
     @Override

@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.tcp.internal.writer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.function.IntSupplier;
+import java.util.function.ToIntFunction;
 
 import org.agrona.LangUtil;
 import org.agrona.nio.TransportPoller;
@@ -28,11 +29,13 @@ import org.reaktivity.nukleus.Reaktive;
 public final class Target extends TransportPoller implements Nukleus
 {
     private final String targetName;
+    private final ToIntFunction<SelectionKey> writeHandler;
 
     public Target(
         String targetName)
     {
         this.targetName = targetName;
+        this.writeHandler = this::handleWrite;
     }
 
     @Override
@@ -55,7 +58,7 @@ public final class Target extends TransportPoller implements Nukleus
         try
         {
             selector.selectNow();
-            weight += selectedKeySet.forEach(this::processKey);
+            weight += selectedKeySet.forEach(writeHandler);
         }
         catch (Exception ex)
         {
@@ -83,7 +86,7 @@ public final class Target extends TransportPoller implements Nukleus
         return null;
     }
 
-    private int processKey(
+    private int handleWrite(
         SelectionKey key)
     {
         IntSupplier supplier = (IntSupplier) key.attachment();

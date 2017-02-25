@@ -65,6 +65,7 @@ public final class Source implements Nukleus
     private final RingBuffer throttleBuffer;
     private final StreamFactory streamFactory;
     private final Long2ObjectHashMap<MessageHandler> streams;
+    private final MessageHandler readHandler;
 
     Source(
         String partitionName,
@@ -88,12 +89,13 @@ public final class Source implements Nukleus
         this.throttleBuffer = layout.throttleBuffer();
         this.streamFactory = new StreamFactory(this, WINDOW_SIZE.intValue(), maximumStreamsCount, incrementOverflow);
         this.streams = new Long2ObjectHashMap<>();
+        this.readHandler = this::handleRead;
     }
 
     @Override
     public int process()
     {
-        return streamsBuffer.read(this::handleRead);
+        return streamsBuffer.read(readHandler);
     }
 
     @Override

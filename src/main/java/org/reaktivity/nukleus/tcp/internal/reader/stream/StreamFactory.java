@@ -112,6 +112,7 @@ public final class StreamFactory
                 // treat TCP reset as end-of-stream
                 bytesRead = -1;
             }
+
             if (bytesRead == -1)
             {
                 // channel closed
@@ -127,6 +128,7 @@ public final class StreamFactory
                 target.doTcpData(streamId, atomicBuffer, 0, bytesRead);
 
                 readableBytes -= bytesRead;
+
                 if (readableBytes == 0)
                 {
                     final int interestOps = key.interestOps();

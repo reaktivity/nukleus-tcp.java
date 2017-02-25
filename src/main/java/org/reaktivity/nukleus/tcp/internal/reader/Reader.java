@@ -101,7 +101,11 @@ public final class Reader extends Nukleus.Composite
                 sourceMatches(sourceName)
                  .and(addressMatches(address));
 
-        final List<Route> routes = routesByRef.getOrDefault(sourceRef, EMPTY_ROUTES);
+        List<Route> routes = routesByRef.get(sourceRef);
+        if (routes == null)
+        {
+            routes = EMPTY_ROUTES;
+        }
 
         final Optional<Route> optional = routes.stream()
             .filter(filter)

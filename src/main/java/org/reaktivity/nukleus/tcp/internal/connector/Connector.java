@@ -19,9 +19,10 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.function.LongSupplier;
+import java.util.function.ToIntFunction;
 
 import org.agrona.LangUtil;
-import org.agrona.concurrent.status.AtomicCounter;
 import org.agrona.nio.TransportPoller;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.Reaktive;
@@ -34,14 +35,17 @@ import org.reaktivity.nukleus.tcp.internal.router.Router;
 @Reaktive
 public final class Connector extends TransportPoller implements Nukleus
 {
-    private final Context context;
+    private final ToIntFunction<SelectionKey> connectHandler;
+    private final LongSupplier supplyTargetId;
 
     private Router router;
+
 
     public Connector(
         Context context)
     {
-        this.context = context;
+        this.supplyTargetId = context.counters().streams()::increment;
+        this.connectHandler = this::handleConnect;
     }
 
     public void setRouter(
@@ -54,7 +58,7 @@ public final class Connector extends TransportPoller implements Nukleus
     public int process()
     {
         selectNow();
-        return selectedKeySet.forEach(this::processConnect);
+        return selectedKeySet.forEach(connectHandler);
     }
 
     @Override
@@ -106,7 +110,7 @@ public final class Connector extends TransportPoller implements Nukleus
         }
     }
 
-    private int processConnect(
+    private int handleConnect(
         SelectionKey selectionKey)
     {
         final Request request = (Request) selectionKey.attachment();
@@ -132,13 +136,12 @@ public final class Connector extends TransportPoller implements Nukleus
     private void handleConnected(
         Request request)
     {
-        final AtomicCounter streams = context.counters().streams();
         final String sourceName = request.sourceName();
         final long sourceRef = request.sourceRef();
         final long sourceId = request.sourceId();
         final String targetName = request.targetName();
         final long targetRef = request.targetRef();
-        final long targetId = streams.increment();
+        final long targetId = supplyTargetId.getAsLong();
         final long correlationId = request.correlationId();
         final SocketChannel channel = request.channel();
         final InetSocketAddress address = request.address();

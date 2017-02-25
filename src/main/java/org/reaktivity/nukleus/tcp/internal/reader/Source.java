@@ -21,6 +21,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.function.IntSupplier;
 import java.util.function.LongFunction;
+import java.util.function.ToIntFunction;
 
 import org.agrona.CloseHelper;
 import org.agrona.LangUtil;
@@ -35,6 +36,7 @@ public final class Source extends TransportPoller implements Nukleus
 {
     private final String sourceName;
     private final StreamFactory streamFactory;
+    private final ToIntFunction<SelectionKey> readHandler;
 
     public Source(
         String sourceName,
@@ -43,6 +45,7 @@ public final class Source extends TransportPoller implements Nukleus
     {
         this.sourceName = sourceName;
         this.streamFactory = new StreamFactory(maxMessageLength, resolveCorrelation);
+        this.readHandler = this::handleRead;
     }
 
     @Override
@@ -65,7 +68,7 @@ public final class Source extends TransportPoller implements Nukleus
         try
         {
             selector.selectNow();
-            weight += selectedKeySet.forEach(this::processKey);
+            weight += selectedKeySet.forEach(readHandler);
         }
         catch (Exception ex)
         {
@@ -101,7 +104,7 @@ public final class Source extends TransportPoller implements Nukleus
         }
     }
 
-    private int processKey(
+    private int handleRead(
         SelectionKey selectionKey)
     {
         final IntSupplier attachment = (IntSupplier) selectionKey.attachment();

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.function.IntConsumer;
 import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
@@ -58,8 +59,8 @@ public final class StreamFactory
     {
         this.source = source;
         this.windowSize = windowSize;
-        writeSlab = new Slab(maxPartiallyWrittenStreams, windowSize);
         this.incrementOverflow = incrementOverflow;
+        this.writeSlab = new Slab(maxPartiallyWrittenStreams, windowSize);
     }
 
     public MessageHandler newStream(
@@ -73,9 +74,12 @@ public final class StreamFactory
     private final class Stream
     {
         private static final int EOS_REQUESTED = -1;
+
         private final long id;
         private final Target target;
         private final SocketChannel channel;
+        private final IntConsumer offerWindow;
+
         private int slot = NO_SLOT;
 
         private SelectionKey key;
@@ -89,6 +93,7 @@ public final class StreamFactory
             this.id = id;
             this.target = target;
             this.channel = channel;
+            this.offerWindow = this::offerWindow;
         }
 
         private void handleStream(
@@ -155,7 +160,7 @@ public final class StreamFactory
                 }
 
                 int originalSlot = slot;
-                slot = writeSlab.written(id, slot, writeBuffer, bytesWritten, this::offerWindow);
+                slot = writeSlab.written(id, slot, writeBuffer, bytesWritten, offerWindow);
                 if (slot == OUT_OF_MEMORY)
                 {
                     incrementOverflow.getAsLong();

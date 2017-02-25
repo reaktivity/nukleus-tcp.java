@@ -51,6 +51,7 @@ public final class Target implements Nukleus
     private final RingBuffer streamsBuffer;
     private final RingBuffer throttleBuffer;
     private final Long2ObjectHashMap<MessageHandler> throttles;
+    private final MessageHandler readHandler;
 
     public Target(
         String name,
@@ -63,12 +64,13 @@ public final class Target implements Nukleus
         this.streamsBuffer = layout.streamsBuffer();
         this.throttleBuffer = layout.throttleBuffer();
         this.throttles = new Long2ObjectHashMap<>();
+        this.readHandler = this::handleRead;
     }
 
     @Override
     public int process()
     {
-        return throttleBuffer.read(this::handleRead);
+        return throttleBuffer.read(readHandler);
     }
 
     @Override

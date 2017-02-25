@@ -29,6 +29,7 @@ import java.nio.channels.SocketChannel;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.ToIntFunction;
 
 import org.agrona.CloseHelper;
 import org.agrona.LangUtil;
@@ -44,8 +45,15 @@ import org.reaktivity.nukleus.tcp.internal.router.Router;
 @Reaktive
 public final class Acceptor extends TransportPoller implements Nukleus
 {
+    private final ToIntFunction<SelectionKey> handleAccept;
+
     private Conductor conductor;
     private Router router;
+
+    public Acceptor()
+    {
+        this.handleAccept = this::handleAccept;
+    }
 
     public void setConductor(
         Conductor conductor)
@@ -63,7 +71,7 @@ public final class Acceptor extends TransportPoller implements Nukleus
     public int process()
     {
         selectNow();
-        return selectedKeySet.forEach(this::processAccept);
+        return selectedKeySet.forEach(handleAccept);
     }
 
     @Override
@@ -138,7 +146,7 @@ public final class Acceptor extends TransportPoller implements Nukleus
         }
     }
 
-    private int processAccept(
+    private int handleAccept(
         SelectionKey selectionKey)
     {
         try
