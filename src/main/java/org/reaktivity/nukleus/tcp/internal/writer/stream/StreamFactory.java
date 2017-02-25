@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
@@ -79,6 +80,7 @@ public final class StreamFactory
         private final Target target;
         private final SocketChannel channel;
         private final IntConsumer offerWindow;
+        private final IntSupplier writeHandler;
 
         private int slot = NO_SLOT;
 
@@ -94,6 +96,7 @@ public final class StreamFactory
             this.target = target;
             this.channel = channel;
             this.offerWindow = this::offerWindow;
+            this.writeHandler = this::handleWrite;
         }
 
         private void handleStream(
@@ -133,7 +136,7 @@ public final class StreamFactory
         {
             beginRO.wrap(buffer, offset, limit);
 
-            this.key = target.doRegister(channel, 0, this::handleWrite);
+            this.key = target.doRegister(channel, 0, writeHandler);
 
             offerWindow(windowSize);
         }
