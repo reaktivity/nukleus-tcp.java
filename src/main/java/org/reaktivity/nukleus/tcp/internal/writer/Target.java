@@ -15,27 +15,29 @@
  */
 package org.reaktivity.nukleus.tcp.internal.writer;
 
-import java.nio.channels.SelectionKey;
+import static java.nio.channels.SelectionKey.OP_WRITE;
+
 import java.nio.channels.SocketChannel;
-import java.util.function.IntSupplier;
 import java.util.function.ToIntFunction;
 
 import org.agrona.LangUtil;
-import org.agrona.nio.TransportPoller;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.Reaktive;
+import org.reaktivity.nukleus.tcp.internal.poller.Poller;
+import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 
 @Reaktive
-public final class Target extends TransportPoller implements Nukleus
+public final class Target implements Nukleus
 {
+    private final Poller poller;
     private final String targetName;
-    private final ToIntFunction<SelectionKey> writeHandler;
 
     public Target(
+        Poller poller,
         String targetName)
     {
+        this.poller = poller;
         this.targetName = targetName;
-        this.writeHandler = this::handleWrite;
     }
 
     @Override
@@ -53,29 +55,16 @@ public final class Target extends TransportPoller implements Nukleus
     @Override
     public int process()
     {
-        int weight = 0;
-
-        try
-        {
-            selector.selectNow();
-            weight += selectedKeySet.forEach(writeHandler);
-        }
-        catch (Exception ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
-        }
-
-        return weight;
+        return 0;
     }
 
-    public SelectionKey doRegister(
+    public PollerKey doRegister(
         SocketChannel channel,
-        int ops,
-        IntSupplier attachment)
+        ToIntFunction<PollerKey> writeHandler)
     {
         try
         {
-            return channel.register(selector, ops, attachment);
+            return poller.doRegister(channel, OP_WRITE, writeHandler);
         }
         catch (Exception ex)
         {
@@ -84,12 +73,5 @@ public final class Target extends TransportPoller implements Nukleus
 
         // unreachable
         return null;
-    }
-
-    private int handleWrite(
-        SelectionKey key)
-    {
-        IntSupplier supplier = (IntSupplier) key.attachment();
-        return supplier.getAsInt();
     }
 }

@@ -15,20 +15,21 @@
  */
 package org.reaktivity.nukleus.tcp.internal.writer.stream;
 
+import static java.nio.channels.SelectionKey.OP_WRITE;
 import static org.reaktivity.nukleus.tcp.internal.writer.stream.Slab.NO_SLOT;
 import static org.reaktivity.nukleus.tcp.internal.writer.stream.Slab.OUT_OF_MEMORY;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.function.IntConsumer;
-import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
+import java.util.function.ToIntFunction;
 
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.concurrent.MessageHandler;
+import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
@@ -80,11 +81,11 @@ public final class StreamFactory
         private final Target target;
         private final SocketChannel channel;
         private final IntConsumer offerWindow;
-        private final IntSupplier writeHandler;
+        private final ToIntFunction<PollerKey> writeHandler;
 
         private int slot = NO_SLOT;
 
-        private SelectionKey key;
+        private PollerKey key;
         private int readableBytes;
 
         private Stream(
@@ -136,7 +137,7 @@ public final class StreamFactory
         {
             beginRO.wrap(buffer, offset, limit);
 
-            this.key = target.doRegister(channel, 0, writeHandler);
+            this.key = target.doRegister(channel, writeHandler);
 
             offerWindow(windowSize);
         }
@@ -172,12 +173,12 @@ public final class StreamFactory
                 }
                 if (bytesWritten < writableBytes)
                 {
-                    key.interestOps(SelectionKey.OP_WRITE);
+                    key.register(OP_WRITE);
                 }
                 else if (originalSlot != NO_SLOT)
                 {
                     // we just flushed out a pending write
-                    key.interestOps(0);
+                    key.clear(OP_WRITE);
                 }
             }
             else
@@ -223,7 +224,7 @@ public final class StreamFactory
 
         private void doCleanup()
         {
-            key.interestOps(0); // clear OP_WRITE
+            key.clear(OP_WRITE);
             try
             {
                 source.removeStream(id);
@@ -235,9 +236,10 @@ public final class StreamFactory
             }
         }
 
-        private int handleWrite()
+        private int handleWrite(
+            PollerKey key)
         {
-            key.interestOps(0); // clear OP_WRITE
+            key.clear(OP_WRITE);
             ByteBuffer writeBuffer = writeSlab.get(slot);
 
             int bytesWritten = 0;
@@ -262,8 +264,8 @@ public final class StreamFactory
             }
             else
             {
-                // Incomplete write
-                key.interestOps(SelectionKey.OP_WRITE);
+                // incomplete write
+                key.register(OP_WRITE);
             }
             return bytesWritten;
         }

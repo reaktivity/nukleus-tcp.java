@@ -42,6 +42,7 @@ import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.connector.Connector;
 import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
+import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.router.Correlation;
 
 /**
@@ -55,6 +56,7 @@ public final class Writer extends Nukleus.Composite
     private final Context context;
     private final Conductor conductor;
     private final Connector connector;
+    private final Poller poller;
     private final String name;
     private final String sourceName;
     private final AtomicBuffer writeBuffer;
@@ -67,12 +69,14 @@ public final class Writer extends Nukleus.Composite
         Context context,
         Conductor conductor,
         Connector connector,
+        Poller poller,
         String sourceName,
         LongFunction<Correlation> resolveCorrelation)
     {
         this.context = context;
         this.conductor = conductor;
         this.connector = connector;
+        this.poller = poller;
         this.sourceName = sourceName;
         this.resolveCorrelation = resolveCorrelation;
         this.name = sourceName;
@@ -176,7 +180,7 @@ public final class Writer extends Nukleus.Composite
     private Target newTarget(
         String targetName)
     {
-        return include(new Target(targetName));
+        return include(new Target(poller, targetName));
     }
 
     private List<Route> newRoutes(

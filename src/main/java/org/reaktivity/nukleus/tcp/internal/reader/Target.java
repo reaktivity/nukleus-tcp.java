@@ -129,7 +129,7 @@ public final class Target implements Nukleus
     {
         DataFW tcpData = tcpDataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
-                .payload(p -> p.set(payload, offset, length))
+                .payload(payload, offset, length)
                 .build();
 
         streamsBuffer.write(tcpData.typeId(), tcpData.buffer(), tcpData.offset(), tcpData.sizeof());

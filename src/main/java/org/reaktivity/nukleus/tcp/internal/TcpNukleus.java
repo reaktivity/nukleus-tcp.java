@@ -21,6 +21,7 @@ import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.connector.Connector;
+import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.router.Router;
 import org.reaktivity.nukleus.tcp.internal.watcher.Watcher;
 
@@ -36,9 +37,10 @@ public final class TcpNukleus extends Nukleus.Composite
         Watcher watcher,
         Acceptor acceptor,
         Connector connector,
+        Poller poller,
         Closeable cleanup)
     {
-        super(conductor, watcher, router, acceptor, connector);
+        super(conductor, watcher, router, acceptor, connector, poller);
         this.cleaner = cleanup;
     }
 

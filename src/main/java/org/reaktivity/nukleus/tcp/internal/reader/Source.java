@@ -15,67 +15,42 @@
  */
 package org.reaktivity.nukleus.tcp.internal.reader;
 
+import static java.nio.channels.SelectionKey.OP_READ;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.util.function.IntSupplier;
 import java.util.function.LongFunction;
 import java.util.function.ToIntFunction;
 
 import org.agrona.CloseHelper;
 import org.agrona.LangUtil;
-import org.agrona.nio.TransportPoller;
-import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.Reaktive;
+import org.reaktivity.nukleus.tcp.internal.poller.Poller;
+import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.reader.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.router.Correlation;
 
-@Reaktive
-public final class Source extends TransportPoller implements Nukleus
+public final class Source
 {
+    private final Poller poller;
     private final String sourceName;
     private final StreamFactory streamFactory;
-    private final ToIntFunction<SelectionKey> readHandler;
 
     public Source(
+        Poller poller,
         String sourceName,
         int maxMessageLength,
         LongFunction<Correlation> resolveCorrelation)
     {
+        this.poller = poller;
         this.sourceName = sourceName;
         this.streamFactory = new StreamFactory(maxMessageLength, resolveCorrelation);
-        this.readHandler = this::handleRead;
-    }
-
-    @Override
-    public String name()
-    {
-        return sourceName;
     }
 
     @Override
     public String toString()
     {
         return String.format("%s[name=%s]", getClass().getSimpleName(), sourceName);
-    }
-
-    @Override
-    public int process()
-    {
-        int weight = 0;
-
-        try
-        {
-            selector.selectNow();
-            weight += selectedKeySet.forEach(readHandler);
-        }
-        catch (Exception ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
-        }
-
-        return weight;
     }
 
     public void onBegin(
@@ -92,22 +67,15 @@ public final class Source extends TransportPoller implements Nukleus
 
             target.doTcpBegin(targetId, targetRef, correlationId, localAddress, remoteAddress);
 
-            final SelectionKey key = channel.register(selector, 0);
-            final IntSupplier attachment = streamFactory.newStream(target, targetId, key, channel, correlationId);
+            final PollerKey key = poller.doRegister(channel, 0, null);
+            final ToIntFunction<PollerKey> handler = streamFactory.newStream(target, targetId, key, channel, correlationId);
 
-            key.attach(attachment);
+            key.handler(OP_READ, handler);
         }
         catch (IOException ex)
         {
             CloseHelper.quietClose(channel);
             LangUtil.rethrowUnchecked(ex);
         }
-    }
-
-    private int handleRead(
-        SelectionKey selectionKey)
-    {
-        final IntSupplier attachment = (IntSupplier) selectionKey.attachment();
-        return attachment.getAsInt();
     }
 }

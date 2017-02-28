@@ -20,6 +20,7 @@ import org.reaktivity.nukleus.NukleusFactorySpi;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.connector.Connector;
+import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.router.Router;
 import org.reaktivity.nukleus.tcp.internal.watcher.Watcher;
 
@@ -42,9 +43,14 @@ public final class TcpNukleusFactorySpi implements NukleusFactorySpi
         Watcher watcher = new Watcher(context);
         Acceptor acceptor = new Acceptor();
         Connector connector = new Connector(context);
+        Poller poller = new Poller();
 
         router.setConductor(conductor);
         acceptor.setConductor(conductor);
+
+        acceptor.setPoller(poller);
+        connector.setPoller(poller);
+        router.setPoller(poller);
 
         router.setAcceptor(acceptor);
         router.setConnector(connector);
@@ -54,6 +60,6 @@ public final class TcpNukleusFactorySpi implements NukleusFactorySpi
         acceptor.setRouter(router);
         connector.setRouter(router);
 
-        return new TcpNukleus(conductor, router, watcher, acceptor, connector, context);
+        return new TcpNukleus(conductor, router, watcher, acceptor, connector, poller, context);
     }
 }

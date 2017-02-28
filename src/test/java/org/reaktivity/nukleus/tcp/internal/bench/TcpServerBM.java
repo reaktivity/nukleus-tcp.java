@@ -74,7 +74,7 @@ public class TcpServerBM
                     .config(configuration)
                     .discover(matchNukleus)
                     .discover(TcpController.class::isAssignableFrom)
-                    .errorHandler(System.err::println)
+                    .errorHandler(ex -> ex.printStackTrace(System.err))
                     .build();
 
         this.controller = reaktor.controller(TcpController.class);

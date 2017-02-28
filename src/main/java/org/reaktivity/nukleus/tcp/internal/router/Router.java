@@ -36,6 +36,7 @@ import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.connector.Connector;
+import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.reader.Reader;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.State;
@@ -59,6 +60,7 @@ public final class Router extends Nukleus.Composite
     private Conductor conductor;
     private Acceptor acceptor;
     private Connector connector;
+    private Poller poller;
 
     public Router(
         Context context)
@@ -83,6 +85,11 @@ public final class Router extends Nukleus.Composite
     public void setConnector(Connector connector)
     {
         this.connector = connector;
+    }
+
+    public void setPoller(Poller poller)
+    {
+        this.poller = poller;
     }
 
     @Override
@@ -442,12 +449,12 @@ public final class Router extends Nukleus.Composite
     private Reader newReader(
         String sourceName)
     {
-        return include(new Reader(context, conductor, acceptor, sourceName, correlations::remove));
+        return include(new Reader(context, conductor, acceptor, poller, sourceName, correlations::remove));
     }
 
     private Writer newWriter(
         String sourceName)
     {
-        return include(new Writer(context, conductor, connector, sourceName, correlations::remove));
+        return include(new Writer(context, conductor, connector, poller, sourceName, correlations::remove));
     }
 }
