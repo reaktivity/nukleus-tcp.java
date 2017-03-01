@@ -118,12 +118,13 @@ public final class StreamFactory
             if (bytesRead == -1)
             {
                 // channel input closed
+                readableBytes = -1;
                 target.doTcpEnd(streamId);
                 target.removeThrottle(streamId);
 
                 key.cancel(OP_READ);
             }
-            else
+            else if (bytesRead != 0)
             {
                 // atomic buffer is zero copy with read buffer
                 target.doTcpData(streamId, atomicBuffer, 0, bytesRead);
@@ -166,13 +167,19 @@ public final class StreamFactory
         {
             windowRO.wrap(buffer, index, index + length);
 
-            final int update = windowRO.update();
-            if (readableBytes == 0 && update > 0)
+            if (readableBytes != -1)
             {
-                key.register(OP_READ);
-            }
+                final int update = windowRO.update();
 
-            readableBytes += update;
+                readableBytes += update;
+
+                handleStream(key);
+
+                if (readableBytes > 0)
+                {
+                    key.register(OP_READ);
+                }
+            }
         }
 
         private void processReset(

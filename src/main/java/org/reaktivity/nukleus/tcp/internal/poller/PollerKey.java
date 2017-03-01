@@ -32,11 +32,13 @@ public final class PollerKey
     private ToIntFunction<PollerKey> writeHandler = PollerKey::nop;
 
     private final SelectionKey key;
+    private int interestOps;
 
     PollerKey(
         SelectionKey key)
     {
         this.key = key;
+        this.interestOps = key.interestOps();
     }
 
     public SelectableChannel channel()
@@ -47,13 +49,23 @@ public final class PollerKey
     public void register(
         int registerOps)
     {
-        key.interestOps(key.interestOps() | registerOps);
+        final int newInterestOps = interestOps | registerOps;
+        if (newInterestOps != interestOps)
+        {
+            key.interestOps(newInterestOps);
+            interestOps = newInterestOps;
+        }
     }
 
     public void clear(
         int clearOps)
     {
-        key.interestOps(key.interestOps() & ~clearOps);
+        final int newInterestOps = interestOps & ~clearOps;
+        if (newInterestOps != interestOps)
+        {
+            key.interestOps(newInterestOps);
+            interestOps = newInterestOps;
+        }
     }
 
     public void handler(

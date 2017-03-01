@@ -44,8 +44,10 @@ public final class Poller extends TransportPoller implements Nukleus
 
         try
         {
-            selector.selectNow();
-            workDone = selectedKeySet.forEach(selectHandler);
+            if (selector.selectNow() != 0)
+            {
+                workDone = selectedKeySet.forEach(selectHandler);
+            }
         }
         catch (IOException ex)
         {
