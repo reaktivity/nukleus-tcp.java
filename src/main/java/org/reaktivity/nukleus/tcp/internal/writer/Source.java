@@ -73,6 +73,7 @@ public final class Source implements Nukleus
         LongFunction<List<Route>> lookupRoutes,
         LongFunction<Correlation> resolveCorrelation,
         Function<String, Target> supplyTarget,
+        Long2ObjectHashMap<MessageHandler> streams,
         StreamsLayout layout,
         AtomicBuffer writeBuffer,
         int maximumStreamsCount,
@@ -88,7 +89,7 @@ public final class Source implements Nukleus
         this.streamsBuffer = layout.streamsBuffer();
         this.throttleBuffer = layout.throttleBuffer();
         this.streamFactory = new StreamFactory(this, WINDOW_SIZE.intValue(), maximumStreamsCount, incrementOverflow);
-        this.streams = new Long2ObjectHashMap<>();
+        this.streams = streams;
         this.readHandler = this::handleRead;
     }
 
