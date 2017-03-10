@@ -36,6 +36,7 @@ import java.util.function.Predicate;
 import org.agrona.LangUtil;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
+import org.agrona.concurrent.MessageHandler;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.tcp.internal.Context;
@@ -64,6 +65,7 @@ public final class Writer extends Nukleus.Composite
     private final Map<String, Target> targetsByName;
     private final Long2ObjectHashMap<List<Route>> routesByRef;
     private final LongFunction<Correlation> resolveCorrelation;
+    private final Long2ObjectHashMap<MessageHandler> streams;
 
     public Writer(
         Context context,
@@ -84,6 +86,7 @@ public final class Writer extends Nukleus.Composite
         this.sourcesByPartitionName = new HashMap<>();
         this.targetsByName = new HashMap<>();
         this.routesByRef = new Long2ObjectHashMap<>();
+        this.streams = new Long2ObjectHashMap<>();
     }
 
     @Override
@@ -214,7 +217,7 @@ public final class Writer extends Nukleus.Composite
         });
 
         return include(new Source(partitionName, connector, this::lookupRoutes, resolveCorrelation,
-                       supplyTarget, layout, writeBuffer, maximumPendingWriteStreams,
+                       supplyTarget, streams, layout, writeBuffer, maximumPendingWriteStreams,
                        context.counters().overflows()::increment));
     }
 }
