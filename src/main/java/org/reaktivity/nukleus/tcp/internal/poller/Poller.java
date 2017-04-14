@@ -70,6 +70,9 @@ public final class Poller extends TransportPoller implements Nukleus
         {
             quietClose(key.channel());
         }
+
+        // Allow proper cleanup on platforms like Windows
+        selectNowWithoutProcessing();
     }
 
     public PollerKey doRegister(
