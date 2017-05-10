@@ -272,7 +272,7 @@
                   implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <mainClass>org.openjdk.jmh.Main</mainClass>
                   <manifestEntries>
-                    <Class-Path>${project.build.directory}/${project.artifactId}-shaded.jar</Class-Path>
+                    <Class-Path>${project.artifactId}-shaded.jar</Class-Path>
                   </manifestEntries>
                 </transformer>
               </transformers>
