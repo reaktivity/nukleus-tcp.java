@@ -60,13 +60,13 @@ public class ServerLimitsIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.received.reset/server/target"
     })
     public void shouldResetWhenWindowIsExceeded() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {

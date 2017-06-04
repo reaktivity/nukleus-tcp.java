@@ -62,13 +62,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/connection.established/server/target"
     })
     public void shouldEstablishConnection() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -84,13 +84,13 @@ public class ServerIT
 
     @Test(expected = IOException.class)
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/connection.failed/server/target"
     })
     public void connectionFailed() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -114,13 +114,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data/server/target"
     })
     public void shouldReceiveServerSentData() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -142,13 +142,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data/server/target"
     })
     public void shouldNotGetRepeatedIOExceptionsFromReaderStreamRead() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try(Socket socket = new Socket("127.0.0.1", 0x1f90))
         {
@@ -161,13 +161,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.multiple.frames/server/target"
     })
     public void shouldReceiveServerSentDataMultipleFrames() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -192,13 +192,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.multiple.streams/server/target"
     })
     public void shouldReceiveServerSentDataMultipleStreams() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel1 = SocketChannel.open();
              SocketChannel channel2 = SocketChannel.open())
@@ -226,13 +226,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.then.end/server/target"
     })
     public void shouldReceiveServerSentDataAndEnd() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -255,13 +255,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/client.sent.data/server/target"
     })
     public void shouldReceiveClientSentData() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -278,13 +278,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/client.sent.data.flow.control/server/target"
     })
     public void shouldReceiveClientSentDataWithFlowControl() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -301,13 +301,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/client.sent.data.multiple.frames/server/target"
     })
     public void shouldReceiveClientSentDataMultipleFrames() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -324,13 +324,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/client.sent.data.multiple.streams/server/target"
     })
     public void shouldReceiveClientSentDataMultipleStreams() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel1 = SocketChannel.open();
              SocketChannel channel2 = SocketChannel.open())
@@ -351,13 +351,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/client.sent.data.then.end/server/target"
     })
     public void shouldReceiveClientSentDataAndEnd() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -371,13 +371,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/client.and.server.sent.data.multiple.frames/server/target"
     })
     public void shouldSendAndReceiveData() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -403,13 +403,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.close/server/target"
     })
     public void shouldInitiateServerClose() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -427,13 +427,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.close.and.reset/server/target"
     })
     public void shouldInitiateServerCloseWithInputReset() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -451,13 +451,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/client.close/server/target"
     })
     public void shouldInitiateClientClose() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -470,13 +470,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.end.then.received.data/server/target"
     })
     public void shouldReceiveDataAfterSendingEnd() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -496,13 +496,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/client.sent.end.then.received.data/server/target"
     })
     public void shouldWriteDataAfterReceiveEnd() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -521,13 +521,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.after.end/server/target"
     })
     public void shouldResetIfDataReceivedAfterEndOfStream() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {

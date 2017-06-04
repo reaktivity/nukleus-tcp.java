@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.reader;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.socketAddress;
 
 import java.net.InetSocketAddress;
@@ -24,8 +25,10 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.MessageHandler;
+import org.agrona.concurrent.UnsafeBuffer;
 import org.agrona.concurrent.ringbuffer.RingBuffer;
 import org.reaktivity.nukleus.Nukleus;
+import org.reaktivity.nukleus.tcp.internal.TcpNukleus;
 import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
@@ -36,6 +39,8 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.TcpBeginExFW;
 
 public final class Target implements Nukleus
 {
+    private static final DirectBuffer SOURCE_NAME_BUFFER = new UnsafeBuffer(TcpNukleus.NAME.getBytes(UTF_8));
+
     private final FrameFW frameRO = new FrameFW();
 
     private final BeginFW.Builder beginRW = new BeginFW.Builder();
@@ -51,6 +56,7 @@ public final class Target implements Nukleus
     private final RingBuffer streamsBuffer;
     private final RingBuffer throttleBuffer;
     private final Long2ObjectHashMap<MessageHandler> throttles;
+    private final MessageHandler readHandler;
 
     public Target(
         String name,
@@ -63,12 +69,13 @@ public final class Target implements Nukleus
         this.streamsBuffer = layout.streamsBuffer();
         this.throttleBuffer = layout.throttleBuffer();
         this.throttles = new Long2ObjectHashMap<>();
+        this.readHandler = this::handleRead;
     }
 
     @Override
     public int process()
     {
-        return throttleBuffer.read(this::handleRead);
+        return throttleBuffer.read(readHandler);
     }
 
     @Override
@@ -110,7 +117,8 @@ public final class Target implements Nukleus
         InetSocketAddress remoteAddress)
     {
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .referenceId(referenceId)
+                .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
+                .sourceRef(referenceId)
                 .streamId(streamId)
                 .correlationId(correlationId)
                 .extension(b -> b.set(visitBeginEx(localAddress, remoteAddress)))
@@ -127,7 +135,7 @@ public final class Target implements Nukleus
     {
         DataFW tcpData = tcpDataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
-                .payload(p -> p.set(payload, offset, length))
+                .payload(payload, offset, length)
                 .build();
 
         streamsBuffer.write(tcpData.typeId(), tcpData.buffer(), tcpData.offset(), tcpData.sizeof());

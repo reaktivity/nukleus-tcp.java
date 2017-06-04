@@ -76,7 +76,7 @@ public class ServerPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data/server/target"
     })
     public void shouldSpinWrite() throws Exception
@@ -88,7 +88,7 @@ public class ServerPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data/server/target"
     })
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
@@ -99,7 +99,7 @@ public class ServerPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data/server/target"
     })
     public void shouldHandleMultiplePartialWrites() throws Exception
@@ -111,7 +111,7 @@ public class ServerPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.multiple.frames/server/target"
     })
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
@@ -129,7 +129,7 @@ public class ServerPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.then.end/server/target"
     })
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
@@ -139,7 +139,7 @@ public class ServerPartialWriteIT
         HandleWriteHelper.fragmentWrites(generate(() -> endWritten.get() ? ALL : 0));
 
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -177,7 +177,7 @@ public class ServerPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.after.end/server/target"
     })
     public void shouldResetIfDataReceivedAfterEndOfStreamWithPendingWrite() throws Exception
@@ -187,7 +187,7 @@ public class ServerPartialWriteIT
         HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? ALL : 0));
 
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -231,7 +231,7 @@ public class ServerPartialWriteIT
     private void shouldReceiveServerSentData(String expectedData, boolean expectStreamClosed) throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {

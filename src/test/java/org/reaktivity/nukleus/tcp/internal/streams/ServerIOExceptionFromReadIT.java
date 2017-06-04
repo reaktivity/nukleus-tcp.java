@@ -61,13 +61,13 @@ public class ServerIOExceptionFromReadIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/client.close/server/target"
     })
     public void shouldReportIOExceptionFromReadAsEndOfStream() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -84,13 +84,13 @@ public class ServerIOExceptionFromReadIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/client.then.server.sent.end/server/target"
     })
     public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {

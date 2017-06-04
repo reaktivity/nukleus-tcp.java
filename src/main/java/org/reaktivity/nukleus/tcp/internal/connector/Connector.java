@@ -15,33 +15,37 @@
  */
 package org.reaktivity.nukleus.tcp.internal.connector;
 
+import static java.nio.channels.SelectionKey.OP_CONNECT;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.function.LongSupplier;
+import java.util.function.ToIntFunction;
 
 import org.agrona.LangUtil;
-import org.agrona.concurrent.status.AtomicCounter;
-import org.agrona.nio.TransportPoller;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.tcp.internal.Context;
+import org.reaktivity.nukleus.tcp.internal.poller.Poller;
+import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.router.Router;
 
 /**
  * The {@code Connector} nukleus accepts new socket connections and informs the {@code Router} nukleus.
  */
 @Reaktive
-public final class Connector extends TransportPoller implements Nukleus
+public final class Connector implements Nukleus
 {
-    private final Context context;
+    private final LongSupplier supplyTargetId;
 
     private Router router;
+    private Poller poller;
 
     public Connector(
         Context context)
     {
-        this.context = context;
+        this.supplyTargetId = context.counters().streams()::increment;
     }
 
     public void setRouter(
@@ -50,11 +54,16 @@ public final class Connector extends TransportPoller implements Nukleus
         this.router = router;
     }
 
+    public void setPoller(
+        Poller poller)
+    {
+        this.poller = poller;
+    }
+
     @Override
     public int process()
     {
-        selectNow();
-        return selectedKeySet.forEach(this::processConnect);
+        return 0;
     }
 
     @Override
@@ -84,7 +93,7 @@ public final class Connector extends TransportPoller implements Nukleus
             }
             else
             {
-                channel.register(selector, SelectionKey.OP_CONNECT, request);
+                poller.doRegister(channel, OP_CONNECT, request);
             }
         }
         catch (IOException ex)
@@ -94,51 +103,15 @@ public final class Connector extends TransportPoller implements Nukleus
         }
     }
 
-    private void selectNow()
-    {
-        try
-        {
-            selector.selectNow();
-        }
-        catch (IOException ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
-        }
-    }
-
-    private int processConnect(
-        SelectionKey selectionKey)
-    {
-        final Request request = (Request) selectionKey.attachment();
-        final SocketChannel channel = request.channel();
-
-        try
-        {
-            channel.finishConnect();
-            handleConnected(request);
-        }
-        catch (Exception ex)
-        {
-            handleConnectFailed(request);
-        }
-        finally
-        {
-            selectionKey.cancel();
-        }
-
-        return 1;
-    }
-
     private void handleConnected(
         Request request)
     {
-        final AtomicCounter streams = context.counters().streams();
         final String sourceName = request.sourceName();
         final long sourceRef = request.sourceRef();
         final long sourceId = request.sourceId();
         final String targetName = request.targetName();
         final long targetRef = request.targetRef();
-        final long targetId = streams.increment();
+        final long targetId = supplyTargetId.getAsLong();
         final long correlationId = request.correlationId();
         final SocketChannel channel = request.channel();
         final InetSocketAddress address = request.address();
@@ -153,5 +126,107 @@ public final class Connector extends TransportPoller implements Nukleus
         final long sourceId = request.sourceId();
 
         router.onConnectFailed(sourceName, sourceId);
+    }
+
+    private final class Request implements ToIntFunction<PollerKey>
+    {
+        private final String sourceName;
+        private final long sourceRef;
+        private final long sourceId;
+        private final String targetName;
+        private final long targetRef;
+        private final long correlationId;
+        private final SocketChannel channel;
+        private final InetSocketAddress address;
+
+        private Request(
+            String sourceName,
+            long sourceRef,
+            long sourceId,
+            String targetName,
+            long targetRef,
+            long correlationId,
+            SocketChannel channel,
+            InetSocketAddress address)
+        {
+            this.sourceName = sourceName;
+            this.sourceRef = sourceRef;
+            this.sourceId = sourceId;
+            this.targetName = targetName;
+            this.targetRef = targetRef;
+            this.correlationId = correlationId;
+            this.channel = channel;
+            this.address = address;
+        }
+
+        public String sourceName()
+        {
+            return sourceName;
+        }
+
+        public long sourceRef()
+        {
+            return sourceRef;
+        }
+
+        public long sourceId()
+        {
+            return sourceId;
+        }
+
+        public String targetName()
+        {
+            return targetName;
+        }
+
+        public long targetRef()
+        {
+            return targetRef;
+        }
+
+        public long correlationId()
+        {
+            return correlationId;
+        }
+
+        public SocketChannel channel()
+        {
+            return channel;
+        }
+
+        public InetSocketAddress address()
+        {
+            return address;
+        }
+
+        @Override
+        public String toString()
+        {
+            return String.format(
+                    "[sourceName=%s, sourceRef=%d, sourceId=%d, targetName=%s, targetRef=%d" +
+                            ", correlationId=%d, channel=%s, address=%s]",
+                    sourceName, sourceRef, sourceId, targetName, targetRef, correlationId, channel, address);
+        }
+
+        @Override
+        public int applyAsInt(
+            PollerKey key)
+        {
+            try
+            {
+                channel.finishConnect();
+                handleConnected(this);
+            }
+            catch (Exception ex)
+            {
+                handleConnectFailed(this);
+            }
+            finally
+            {
+                key.cancel(OP_CONNECT);
+            }
+
+            return 1;
+        }
     }
 }

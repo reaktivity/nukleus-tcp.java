@@ -32,7 +32,7 @@ public class TcpNukleusFactorySpiTest
     {
         NukleusFactory factory = NukleusFactory.instantiate();
         Properties properties = new Properties();
-        properties.setProperty(Configuration.DIRECTORY_PROPERTY_NAME, "target/nuklei-tests");
+        properties.setProperty(Configuration.DIRECTORY_PROPERTY_NAME, "target/nukleus-tests");
         Configuration config = new Configuration(properties);
         Nukleus nukleus = factory.create("tcp", config);
         assertThat(nukleus, instanceOf(TcpNukleus.class));

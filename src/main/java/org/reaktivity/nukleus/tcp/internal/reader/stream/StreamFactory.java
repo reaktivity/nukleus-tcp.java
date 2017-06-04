@@ -16,19 +16,20 @@
 package org.reaktivity.nukleus.tcp.internal.reader.stream;
 
 import static java.nio.ByteOrder.nativeOrder;
+import static java.nio.channels.SelectionKey.OP_READ;
 
 import java.io.IOException;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.util.function.IntSupplier;
 import java.util.function.LongFunction;
+import java.util.function.ToIntFunction;
 
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
+import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.reader.Target;
 import org.reaktivity.nukleus.tcp.internal.router.Correlation;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
@@ -51,14 +52,14 @@ public final class StreamFactory
     {
         this.bufferSize = maxMessageLength - DataFW.FIELD_OFFSET_PAYLOAD;
         this.resolveCorrelation = resolveCorrelation;
-        this.readBuffer = ByteBuffer.allocate(bufferSize).order(nativeOrder());
-        this.atomicBuffer = new UnsafeBuffer(new byte[bufferSize]);
+        this.readBuffer = ByteBuffer.allocateDirect(bufferSize).order(nativeOrder());
+        this.atomicBuffer = new UnsafeBuffer(readBuffer);
     }
 
-    public IntSupplier newStream(
+    public ToIntFunction<PollerKey> newStream(
         Target target,
         long targetId,
-        SelectionKey key,
+        PollerKey key,
         SocketChannel channel,
         long correlationId)
     {
@@ -73,7 +74,7 @@ public final class StreamFactory
     {
         private final Target target;
         private final long streamId;
-        private final SelectionKey key;
+        private final PollerKey key;
         private final SocketChannel channel;
         private final long correlationId;
 
@@ -82,7 +83,7 @@ public final class StreamFactory
         private Stream(
             Target target,
             long streamId,
-            SelectionKey key,
+            PollerKey key,
             SocketChannel channel,
             long correlationId)
         {
@@ -93,7 +94,8 @@ public final class StreamFactory
             this.correlationId = correlationId;
         }
 
-        private int handleStream()
+        private int handleStream(
+            PollerKey key)
         {
             assert readableBytes > 0;
 
@@ -112,26 +114,26 @@ public final class StreamFactory
                 // treat TCP reset as end-of-stream
                 bytesRead = -1;
             }
+
             if (bytesRead == -1)
             {
-                // channel closed
+                // channel input closed
+                readableBytes = -1;
                 target.doTcpEnd(streamId);
                 target.removeThrottle(streamId);
-                key.cancel();
-            }
-            else
-            {
-                // TODO: eliminate copy
-                atomicBuffer.putBytes(0, readBuffer, 0, bytesRead);
 
+                key.cancel(OP_READ);
+            }
+            else if (bytesRead != 0)
+            {
+                // atomic buffer is zero copy with read buffer
                 target.doTcpData(streamId, atomicBuffer, 0, bytesRead);
 
                 readableBytes -= bytesRead;
+
                 if (readableBytes == 0)
                 {
-                    final int interestOps = key.interestOps();
-                    final int newInterestOps = interestOps & ~SelectionKey.OP_READ;
-                    key.interestOps(newInterestOps);
+                    key.clear(OP_READ);
                 }
             }
 
@@ -165,15 +167,19 @@ public final class StreamFactory
         {
             windowRO.wrap(buffer, index, index + length);
 
-            final int update = windowRO.update();
-            if (readableBytes == 0 && update > 0)
+            if (readableBytes != -1)
             {
-                final int interestOps = key.interestOps();
-                final int newInterestOps = interestOps | SelectionKey.OP_READ;
-                key.interestOps(newInterestOps);
-            }
+                final int update = windowRO.update();
 
-            readableBytes += update;
+                readableBytes += update;
+
+                handleStream(key);
+
+                if (readableBytes > 0)
+                {
+                    key.register(OP_READ);
+                }
+            }
         }
 
         private void processReset(

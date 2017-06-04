@@ -59,7 +59,7 @@ public class ServerIOExceptionFromWriteIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.received.reset/server/target"
     })
     @BMRule(name = "processData",
@@ -72,7 +72,7 @@ public class ServerIOExceptionFromWriteIT
     public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -84,7 +84,7 @@ public class ServerIOExceptionFromWriteIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.received.reset/server/target"
     })
     @BMRules(rules = {
@@ -108,7 +108,7 @@ public class ServerIOExceptionFromWriteIT
     {
         ProcessDataHelper.fragmentWrites(generate(() -> 0));
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {

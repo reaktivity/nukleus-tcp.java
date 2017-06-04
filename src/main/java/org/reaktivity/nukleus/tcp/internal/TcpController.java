@@ -35,7 +35,6 @@ import org.reaktivity.nukleus.tcp.internal.types.control.ErrorFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.RoutedFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.State;
 import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnroutedFW;
@@ -98,126 +97,44 @@ public final class TcpController implements Controller
         return "tcp";
     }
 
-    public CompletableFuture<Long> routeInputNone(
+    public CompletableFuture<Long> routeServer(
         String source,
         long sourceRef,
         String target,
         long targetRef,
         InetAddress address)
     {
-        return route(Role.INPUT, State.NONE, source, sourceRef, target, targetRef, address);
+        return route(Role.SERVER, source, sourceRef, target, targetRef, address);
     }
 
-    public CompletableFuture<Long> routeInputNew(
+    public CompletableFuture<Long> routeClient(
         String source,
         long sourceRef,
         String target,
         long targetRef,
         InetAddress address)
     {
-        return route(Role.INPUT, State.NEW, source, sourceRef, target, targetRef, address);
+        return route(Role.CLIENT, source, sourceRef, target, targetRef, address);
     }
 
-    public CompletableFuture<Long> routeInputEstablished(
+    public CompletableFuture<Void> unrouteServer(
         String source,
         long sourceRef,
         String target,
         long targetRef,
         InetAddress address)
     {
-        return route(Role.INPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
+        return unroute(Role.SERVER, source, sourceRef, target, targetRef, address);
     }
 
-    public CompletableFuture<Long> routeOutputNone(
+    public CompletableFuture<Void> unrouteClient(
         String source,
         long sourceRef,
         String target,
         long targetRef,
         InetAddress address)
     {
-        return route(Role.OUTPUT, State.NONE, source, sourceRef, target, targetRef, address);
-    }
-
-    public CompletableFuture<Long> routeOutputNew(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef,
-        InetAddress address)
-    {
-        return route(Role.OUTPUT, State.NEW, source, sourceRef, target, targetRef, address);
-    }
-
-    public CompletableFuture<Long> routeOutputEstablished(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef,
-        InetAddress address)
-    {
-        return route(Role.OUTPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
-    }
-
-
-    public CompletableFuture<Void> unrouteInputEstablished(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef,
-        InetAddress address)
-    {
-        return unroute(Role.INPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
-    }
-
-    public CompletableFuture<Void> unrouteInputNew(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef,
-        InetAddress address)
-    {
-        return unroute(Role.INPUT, State.NEW, source, sourceRef, target, targetRef, address);
-    }
-
-    public CompletableFuture<Void> unrouteInputNone(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef,
-        InetAddress address)
-    {
-        return unroute(Role.INPUT, State.NONE, source, sourceRef, target, targetRef, address);
-    }
-
-
-    public CompletableFuture<Void> unrouteOutputEstablished(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef,
-        InetAddress address)
-    {
-        return unroute(Role.OUTPUT, State.ESTABLISHED, source, sourceRef, target, targetRef, address);
-    }
-
-    public CompletableFuture<Void> unrouteOutputNew(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef,
-        InetAddress address)
-    {
-        return unroute(Role.OUTPUT, State.NEW, source, sourceRef, target, targetRef, address);
-    }
-
-    public CompletableFuture<Void> unrouteOutputNone(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef,
-        InetAddress address)
-    {
-        return unroute(Role.OUTPUT, State.NONE, source, sourceRef, target, targetRef, address);
+        return unroute(Role.CLIENT, source, sourceRef, target, targetRef, address);
     }
 
     public TcpStreams streams(
@@ -348,7 +265,6 @@ public final class TcpController implements Controller
 
     private CompletableFuture<Long> route(
         Role role,
-        State state,
         String source,
         long sourceRef,
         String target,
@@ -362,7 +278,6 @@ public final class TcpController implements Controller
         RouteFW routeRO = routeRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
                                  .correlationId(correlationId)
                                  .role(b -> b.set(role))
-                                 .state(b -> b.set(state))
                                  .source(source)
                                  .sourceRef(sourceRef)
                                  .target(target)
@@ -384,7 +299,6 @@ public final class TcpController implements Controller
 
     private CompletableFuture<Void> unroute(
         Role role,
-        State state,
         String source,
         long sourceRef,
         String target,
@@ -398,7 +312,6 @@ public final class TcpController implements Controller
         UnrouteFW unrouteRO = unrouteRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
                                  .correlationId(correlationId)
                                  .role(b -> b.set(role))
-                                 .state(b -> b.set(state))
                                  .source(source)
                                  .sourceRef(sourceRef)
                                  .target(target)

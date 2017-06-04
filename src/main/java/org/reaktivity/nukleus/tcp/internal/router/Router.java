@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.tcp.internal.router;
 
-import static org.reaktivity.nukleus.tcp.internal.router.RouteKind.OUTPUT_ESTABLISHED;
 import static org.reaktivity.nukleus.tcp.internal.router.RouteKind.OUTPUT_NEW;
 
 import java.net.InetAddress;
@@ -36,9 +35,9 @@ import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.connector.Connector;
+import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.reader.Reader;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
-import org.reaktivity.nukleus.tcp.internal.types.control.State;
 import org.reaktivity.nukleus.tcp.internal.writer.Writer;
 
 /**
@@ -59,6 +58,7 @@ public final class Router extends Nukleus.Composite
     private Conductor conductor;
     private Acceptor acceptor;
     private Connector connector;
+    private Poller poller;
 
     public Router(
         Context context)
@@ -85,6 +85,11 @@ public final class Router extends Nukleus.Composite
         this.connector = connector;
     }
 
+    public void setPoller(Poller poller)
+    {
+        this.poller = poller;
+    }
+
     @Override
     public String name()
     {
@@ -101,7 +106,6 @@ public final class Router extends Nukleus.Composite
     public void doRoute(
         long correlationId,
         Role role,
-        State state,
         String sourceName,
         long sourceRef,
         String targetName,
@@ -110,29 +114,14 @@ public final class Router extends Nukleus.Composite
     {
         switch (role)
         {
-        case INPUT:
-            switch (state)
-            {
-            case NONE:
-            case NEW:
-                doRouteInput(correlationId, sourceName, sourceRef, targetName, targetRef, address);
-                break;
-            case ESTABLISHED:
-                doRouteInputEstablished(correlationId, sourceName, sourceRef, targetName, targetRef, address);
-                break;
-            }
+        case SERVER:
+            doRouteServer(correlationId, sourceName, sourceRef, targetName, targetRef, address);
             break;
-        case OUTPUT:
-            switch (state)
-            {
-            case NONE:
-            case NEW:
-                doRouteOutput(correlationId, sourceName, sourceRef, targetName, targetRef, address);
-                break;
-            case ESTABLISHED:
-                doRouteOutputEstablished(correlationId, sourceName, sourceRef, targetName, targetRef, address);
-                break;
-            }
+        case CLIENT:
+            doRouteClient(correlationId, sourceName, sourceRef, targetName, targetRef, address);
+            break;
+        default:
+            conductor.onErrorResponse(correlationId);
             break;
         }
     }
@@ -140,7 +129,6 @@ public final class Router extends Nukleus.Composite
     public void doUnroute(
         long correlationId,
         Role role,
-        State state,
         String sourceName,
         long sourceRef,
         String targetName,
@@ -149,29 +137,14 @@ public final class Router extends Nukleus.Composite
     {
         switch (role)
         {
-        case INPUT:
-            switch (state)
-            {
-            case NONE:
-            case NEW:
-                doUnrouteInput(correlationId, sourceName, sourceRef, targetName, targetRef, address);
-                break;
-            case ESTABLISHED:
-                doUnrouteInputEstablished(correlationId, sourceName, sourceRef, targetName, targetRef, address);
-                break;
-            }
+        case SERVER:
+            doUnrouteServer(correlationId, sourceName, sourceRef, targetName, targetRef, address);
             break;
-        case OUTPUT:
-            switch (state)
-            {
-            case NONE:
-            case NEW:
-                doUnrouteOutput(correlationId, sourceName, sourceRef, targetName, targetRef, address);
-                break;
-            case ESTABLISHED:
-                doUnrouteOutputEstablished(correlationId, sourceName, sourceRef, targetName, targetRef, address);
-                break;
-            }
+        case CLIENT:
+            doUnrouteClient(correlationId, sourceName, sourceRef, targetName, targetRef, address);
+            break;
+        default:
+            conductor.onErrorResponse(correlationId);
             break;
         }
     }
@@ -258,7 +231,7 @@ public final class Router extends Nukleus.Composite
         }
     }
 
-    private void doRouteInput(
+    private void doRouteServer(
         long correlationId,
         String sourceName,
         long sourceRef,
@@ -279,7 +252,7 @@ public final class Router extends Nukleus.Composite
         }
     }
 
-    private void doRouteOutput(
+    private void doRouteClient(
         long correlationId,
         String sourceName,
         long sourceRef,
@@ -312,52 +285,7 @@ public final class Router extends Nukleus.Composite
         }
     }
 
-    private void doRouteOutputEstablished(
-        long correlationId,
-        String sourceName,
-        long sourceRef,
-        String targetName,
-        long targetRef,
-        InetAddress address)
-    {
-        // TODO: scope DNS-resolved targetName by address (mask?)
-        if (targetRef == 0L && address == null &&
-                (sourceRef == 0 || RouteKind.match(sourceRef) == OUTPUT_ESTABLISHED))
-        {
-            if (sourceRef == 0)
-            {
-                sourceRef = OUTPUT_ESTABLISHED.nextRef(routes);
-            }
-
-            Writer writer = writers.computeIfAbsent(sourceName, this::newWriter);
-            writer.doRoute(correlationId, sourceRef, targetName, targetRef, null);
-        }
-        else
-        {
-            conductor.onErrorResponse(correlationId);
-        }
-    }
-
-    private void doRouteInputEstablished(
-        long correlationId,
-        String sourceName,
-        long sourceRef,
-        String targetName,
-        long targetRef,
-        InetAddress address)
-    {
-        if (address == null && sourceRef >= 0L && sourceRef <= 65535L)
-        {
-            Reader reader = readers.computeIfAbsent(sourceName, this::newReader);
-            reader.doRoute(correlationId, sourceRef, targetName, targetRef, null);
-        }
-        else
-        {
-            conductor.onErrorResponse(correlationId);
-        }
-    }
-
-    private void doUnrouteInput(
+    private void doUnrouteServer(
         long correlationId,
         String sourceName,
         long sourceRef,
@@ -377,7 +305,7 @@ public final class Router extends Nukleus.Composite
         }
     }
 
-    private void doUnrouteOutput(
+    private void doUnrouteClient(
         long correlationId,
         String sourceName,
         long sourceRef,
@@ -401,53 +329,15 @@ public final class Router extends Nukleus.Composite
         }
     }
 
-    private void doUnrouteOutputEstablished(
-        long correlationId,
-        String sourceName,
-        long sourceRef,
-        String targetName,
-        long targetRef,
-        InetAddress address)
-    {
-        Writer writer = writers.get(sourceName);
-        if (targetRef == 0L && address == null && writer != null)
-        {
-            writer.doUnroute(correlationId, sourceRef, targetName, targetRef, null);
-        }
-        else
-        {
-            conductor.onErrorResponse(correlationId);
-        }
-    }
-
-    private void doUnrouteInputEstablished(
-        long correlationId,
-        String sourceName,
-        long sourceRef,
-        String targetName,
-        long targetRef,
-        InetAddress address)
-    {
-        Reader reader = readers.get(sourceName);
-        if (address == null && sourceRef >= 0L && sourceRef <= 65535L && reader != null)
-        {
-            reader.doUnroute(correlationId, sourceRef, targetName, targetRef, null);
-        }
-        else
-        {
-            conductor.onErrorResponse(correlationId);
-        }
-    }
-
     private Reader newReader(
         String sourceName)
     {
-        return include(new Reader(context, conductor, acceptor, sourceName, correlations::remove));
+        return include(new Reader(context, conductor, acceptor, poller, sourceName, correlations::remove));
     }
 
     private Writer newWriter(
         String sourceName)
     {
-        return include(new Writer(context, conductor, connector, sourceName, correlations::remove));
+        return include(new Writer(context, conductor, connector, poller, sourceName, correlations::remove));
     }
 }

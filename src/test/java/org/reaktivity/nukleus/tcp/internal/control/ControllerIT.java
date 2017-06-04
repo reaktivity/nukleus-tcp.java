@@ -50,9 +50,9 @@ public class ControllerIT
 
     @Test
     @Specification({
-        "${route}/input/new/nukleus"
+        "${route}/server/nukleus"
     })
-    public void shouldRouteInputNew() throws Exception
+    public void shouldRouteServer() throws Exception
     {
         long targetRef = new Random().nextLong();
         InetAddress address = InetAddress.getByName("127.0.0.1");
@@ -60,7 +60,7 @@ public class ControllerIT
         k3po.start();
 
         controller.controller(TcpController.class)
-                  .routeInputNew("any", 8080, "target", targetRef, address)
+                  .routeServer("any", 8080, "target", targetRef, address)
                   .get();
 
         k3po.finish();
@@ -68,14 +68,14 @@ public class ControllerIT
 
     @Test
     @Specification({
-        "${route}/output/new/nukleus"
+        "${route}/client/nukleus"
     })
-    public void shouldRouteOutputNew() throws Exception
+    public void shouldRouteClient() throws Exception
     {
         k3po.start();
 
         controller.controller(TcpController.class)
-                  .routeOutputNew("source", 0L, "localhost", 8080, null)
+                  .routeClient("source", 0L, "localhost", 8080, null)
                   .get();
 
         k3po.finish();
@@ -83,50 +83,17 @@ public class ControllerIT
 
     @Test
     @Specification({
-        "${route}/output/established/nukleus"
+        "${unroute}/server/nukleus"
     })
-    public void shouldRouteOutputEstablished() throws Exception
-    {
-        k3po.start();
-
-        controller.controller(TcpController.class)
-                  .routeOutputEstablished("target", 0L, "any", 0L, null)
-                  .get();
-
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
-        "${route}/input/established/nukleus"
-    })
-    public void shouldRouteInputEstablished() throws Exception
-    {
-        long sourceRef = new Random().nextLong();
-
-        k3po.start();
-
-        controller.controller(TcpController.class)
-                  .routeInputEstablished("any", 8080, "source", sourceRef, null)
-                  .get();
-
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
-        "${unroute}/input/new/nukleus"
-    })
-    public void shouldUnrouteInputNew() throws Exception
+    public void shouldUnrouteServer() throws Exception
     {
         long targetRef = new Random().nextLong();
         InetAddress address = InetAddress.getByName("127.0.0.1");
 
         k3po.start();
-        k3po.notifyBarrier("ROUTED_INPUT");
 
         controller.controller(TcpController.class)
-                  .unrouteInputNew("any", 8080, "target", targetRef, address)
+                  .unrouteServer("any", 8080, "target", targetRef, address)
                   .get();
 
         k3po.finish();
@@ -134,53 +101,16 @@ public class ControllerIT
 
     @Test
     @Specification({
-        "${unroute}/output/new/nukleus"
+        "${unroute}/client/nukleus"
     })
-    public void shouldUnrouteOutputNew() throws Exception
-    {
-        k3po.start();
-        k3po.notifyBarrier("ROUTED_OUTPUT");
-
-        long sourceRef = new Random().nextLong();
-
-        controller.controller(TcpController.class)
-                  .unrouteOutputNew("source", sourceRef, "localhost", 8080, null)
-                  .get();
-
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
-        "${unroute}/output/established/nukleus"
-    })
-    public void shouldUnrouteOutputEstablished() throws Exception
-    {
-        long targetRef = new Random().nextLong();
-
-        k3po.start();
-        k3po.notifyBarrier("ROUTED_OUTPUT");
-
-        controller.controller(TcpController.class)
-                  .unrouteOutputEstablished("target", targetRef, "any", 0L, null)
-                  .get();
-
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
-        "${unroute}/input/established/nukleus"
-    })
-    public void shouldUnrouteInputEstablished() throws Exception
+    public void shouldUnrouteClient() throws Exception
     {
         long sourceRef = new Random().nextLong();
 
         k3po.start();
-        k3po.notifyBarrier("ROUTED_INPUT");
 
         controller.controller(TcpController.class)
-                  .unrouteInputEstablished("any", 8080, "source", sourceRef, null)
+                  .unrouteClient("source", sourceRef, "localhost", 8080, null)
                   .get();
 
         k3po.finish();

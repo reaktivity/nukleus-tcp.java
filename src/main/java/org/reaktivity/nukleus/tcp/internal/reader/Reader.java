@@ -45,6 +45,7 @@ import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
+import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.router.Correlation;
 import org.reaktivity.nukleus.tcp.internal.router.RouteKind;
 
@@ -71,6 +72,7 @@ public final class Reader extends Nukleus.Composite
         Context context,
         Conductor conductor,
         Acceptor acceptor,
+        Poller poller,
         String sourceName,
         LongFunction<Correlation> resolveCorrelation)
     {
@@ -78,7 +80,7 @@ public final class Reader extends Nukleus.Composite
         this.conductor = conductor;
         this.acceptor = acceptor;
         this.sourceName = sourceName;
-        this.source = include(new Source(sourceName, context.maxMessageLength(), resolveCorrelation));
+        this.source = new Source(poller, sourceName, context.maxMessageLength(), resolveCorrelation);
         this.writeBuffer = new UnsafeBuffer(new byte[context.maxMessageLength()]);
         this.targetsByName = new TreeMap<>();
         this.routesByRef = new Long2ObjectHashMap<>();
@@ -101,7 +103,11 @@ public final class Reader extends Nukleus.Composite
                 sourceMatches(sourceName)
                  .and(addressMatches(address));
 
-        final List<Route> routes = routesByRef.getOrDefault(sourceRef, EMPTY_ROUTES);
+        List<Route> routes = routesByRef.get(sourceRef);
+        if (routes == null)
+        {
+            routes = EMPTY_ROUTES;
+        }
 
         final Optional<Route> optional = routes.stream()
             .filter(filter)
@@ -298,6 +304,7 @@ public final class Reader extends Nukleus.Composite
                 .readonly(false)
                 .build();
 
-        return include(new Target(targetName, layout, writeBuffer));
+        Target target = new Target(targetName, layout, writeBuffer);
+        return include(target);
     }
 }

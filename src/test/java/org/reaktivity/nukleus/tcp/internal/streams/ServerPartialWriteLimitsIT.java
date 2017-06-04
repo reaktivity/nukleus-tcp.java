@@ -85,7 +85,7 @@ public class ServerPartialWriteLimitsIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.multiple.frames.partial.writes/server/target"
     })
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritableWithoutOverflowingSlot() throws Exception
@@ -96,7 +96,7 @@ public class ServerPartialWriteLimitsIT
         HandleWriteHelper.fragmentWrites(generate(() -> dataFramesReceived.get() >= 2 ? ALL : 0));
 
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
@@ -128,7 +128,7 @@ public class ServerPartialWriteLimitsIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/server.sent.data.multiple.streams.second.was.reset/server/target"
     })
     public void shouldResetStreamsExceedingPartialWriteStreamsLimit() throws Exception
@@ -138,7 +138,7 @@ public class ServerPartialWriteLimitsIT
         HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? ALL : 0));
 
         k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
+        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel1 = SocketChannel.open();
              SocketChannel channel2 = SocketChannel.open())

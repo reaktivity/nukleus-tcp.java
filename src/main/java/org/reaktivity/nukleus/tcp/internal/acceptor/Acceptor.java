@@ -17,35 +17,51 @@ package org.reaktivity.nukleus.tcp.internal.acceptor;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
-import static org.agrona.CloseHelper.quietClose;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.NetworkChannel;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.ToIntFunction;
+
+import javax.annotation.Resource;
 
 import org.agrona.CloseHelper;
 import org.agrona.LangUtil;
-import org.agrona.nio.TransportPoller;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
+import org.reaktivity.nukleus.tcp.internal.poller.Poller;
+import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.router.Router;
 
 /**
- * The {@code Acceptor} nukleus accepts new socket connections and informs the {@code Router} nukleus.
+ * The {@code Poller} nukleus accepts new socket connections and informs the {@code Router} nukleus.
  */
 @Reaktive
-public final class Acceptor extends TransportPoller implements Nukleus
+public final class Acceptor implements Nukleus
 {
+    private final Map<SocketAddress, String> sourcesByLocalAddress;
+    private final Function<SocketAddress, PollerKey> registerHandler;
+    private final ToIntFunction<PollerKey> acceptHandler;
+
     private Conductor conductor;
     private Router router;
+    private Poller poller;
+
+    public Acceptor()
+    {
+        this.sourcesByLocalAddress = new HashMap<>();
+        this.registerHandler = this::handleRegister;
+        this.acceptHandler = this::handleAccept;
+    }
 
     public void setConductor(
         Conductor conductor)
@@ -59,27 +75,23 @@ public final class Acceptor extends TransportPoller implements Nukleus
         this.router = router;
     }
 
+    @Resource
+    public void setPoller(
+        Poller poller)
+    {
+        this.poller = poller;
+    }
+
     @Override
     public int process()
     {
-        selectNow();
-        return selectedKeySet.forEach(this::processAccept);
+        return 0;
     }
 
     @Override
     public String name()
     {
         return "acceptor";
-    }
-
-    @Override
-    public void close()
-    {
-        for (SelectionKey key : selector.keys())
-        {
-            quietClose(key.channel());
-        }
-        super.close();
     }
 
     public void doRegister(
@@ -90,11 +102,11 @@ public final class Acceptor extends TransportPoller implements Nukleus
     {
         try
         {
-            final SelectionKey key = findOrRegisterKey(address);
+            findOrRegisterKey(address);
 
             // TODO: detect collision on different source name for same key
             // TODO: maintain register count
-            attach(key, sourceName);
+            sourcesByLocalAddress.putIfAbsent(address, sourceName);
 
             conductor.onRoutedResponse(correlationId, sourceRef);
         }
@@ -110,13 +122,12 @@ public final class Acceptor extends TransportPoller implements Nukleus
         String sourceName,
         SocketAddress address)
     {
-        final SelectionKey key = findRegisteredKey(address);
-
-        if (Objects.equals(sourceName, attachment(key)))
+        if (Objects.equals(sourceName, sourcesByLocalAddress.get(address)))
         {
+            final PollerKey key = findRegisteredKey(address);
+
             // TODO: maintain count for auto close when unregistered for last time
             CloseHelper.quietClose(key.channel());
-            selectNowWithoutProcessing();
 
             conductor.onUnroutedResponse(correlationId);
         }
@@ -126,30 +137,18 @@ public final class Acceptor extends TransportPoller implements Nukleus
         }
     }
 
-    private void selectNow()
+    private int handleAccept(
+        PollerKey key)
     {
         try
         {
-            selector.selectNow();
-        }
-        catch (IOException ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
-        }
-    }
-
-    private int processAccept(
-        SelectionKey selectionKey)
-    {
-        try
-        {
-            final ServerSocketChannel serverChannel = channel(selectionKey);
+            final ServerSocketChannel serverChannel = channel(key);
 
             final SocketChannel channel = serverChannel.accept();
             channel.configureBlocking(false);
 
-            final String sourceName = attachment(selectionKey);
             final InetSocketAddress address = localAddress(channel);
+            final String sourceName = sourcesByLocalAddress.get(address);
             final long sourceRef = address.getPort();
 
             router.onAccepted(sourceName, sourceRef, channel, address);
@@ -162,32 +161,32 @@ public final class Acceptor extends TransportPoller implements Nukleus
         return 1;
     }
 
-    private SelectionKey findRegisteredKey(
+    private PollerKey findRegisteredKey(
         SocketAddress localAddress)
     {
-        return findSelectionKey(localAddress, a -> null);
+        return findPollerKey(localAddress, a -> null);
     }
 
-    private SelectionKey findOrRegisterKey(
+    private PollerKey findOrRegisterKey(
         SocketAddress address)
     {
-        return findSelectionKey(address, this::registerKey);
+        return findPollerKey(address, registerHandler);
     }
 
-    private SelectionKey findSelectionKey(
+    private PollerKey findPollerKey(
         SocketAddress localAddress,
-        Function<SocketAddress, SelectionKey> mappingFunction)
+        Function<SocketAddress, PollerKey> mappingFunction)
     {
-        final Optional<SelectionKey> optional =
-                selector.keys()
-                        .stream()
-                        .filter(k -> hasLocalAddress(channel(k), localAddress))
-                        .findFirst();
+        final Optional<PollerKey> optional =
+                poller.keys()
+                      .filter(k -> ServerSocketChannel.class.isInstance(k.channel()))
+                      .filter(k -> hasLocalAddress(channel(k), localAddress))
+                      .findFirst();
 
         return optional.orElse(mappingFunction.apply(localAddress));
     }
 
-    private SelectionKey registerKey(
+    private PollerKey handleRegister(
         SocketAddress localAddress)
     {
         try
@@ -197,7 +196,7 @@ public final class Acceptor extends TransportPoller implements Nukleus
             serverChannel.bind(localAddress);
             serverChannel.configureBlocking(false);
 
-            return serverChannel.register(selector, OP_ACCEPT);
+            return poller.doRegister(serverChannel, OP_ACCEPT, acceptHandler);
         }
         catch (IOException ex)
         {
@@ -226,27 +225,14 @@ public final class Acceptor extends TransportPoller implements Nukleus
     }
 
     private static ServerSocketChannel channel(
-        SelectionKey selectionKey)
+        PollerKey key)
     {
-        return (ServerSocketChannel) selectionKey.channel();
+        return (ServerSocketChannel) key.channel();
     }
 
     private static InetSocketAddress localAddress(
         SocketChannel channel) throws IOException
     {
         return (InetSocketAddress) channel.getLocalAddress();
-    }
-
-    private static String attachment(
-        SelectionKey key)
-    {
-        return key != null ? (String) key.attachment() : null;
-    }
-
-    private static void attach(
-        SelectionKey key,
-        String sourceName)
-    {
-        key.attach(sourceName);
     }
 }

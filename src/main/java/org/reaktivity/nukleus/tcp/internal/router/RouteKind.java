@@ -24,7 +24,7 @@ public enum RouteKind
     INPUT_NEW
     {
         @Override
-        protected final long nextRef(
+        protected long nextRef(
             LongSupplier getAndIncrement)
         {
             // positive, even, non-zero
@@ -35,7 +35,7 @@ public enum RouteKind
     OUTPUT_ESTABLISHED
     {
         @Override
-        protected final long nextRef(
+        protected long nextRef(
             LongSupplier getAndIncrement)
         {
             // negative, even, non-zero
@@ -46,7 +46,7 @@ public enum RouteKind
     OUTPUT_NEW
     {
         @Override
-        protected final long nextRef(
+        protected long nextRef(
             LongSupplier getAndIncrement)
         {
             // positive, odd
@@ -57,7 +57,7 @@ public enum RouteKind
     INPUT_ESTABLISHED
     {
         @Override
-        protected final long nextRef(
+        protected long nextRef(
             LongSupplier getAndIncrement)
         {
             // negative, odd
