@@ -66,7 +66,7 @@ public class ClientIOExceptionFromReadIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/server.close/client/source"
     })
     public void shouldReportIOExceptionFromReadAsEndOfStream() throws Exception
@@ -77,11 +77,11 @@ public class ClientIOExceptionFromReadIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 channel.setOption(StandardSocketOptions.SO_LINGER, 0);
                 channel.close();
@@ -93,7 +93,7 @@ public class ClientIOExceptionFromReadIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/server.then.client.sent.end/client/source"
     })
     public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
@@ -104,11 +104,11 @@ public class ClientIOExceptionFromReadIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 channel.setOption(StandardSocketOptions.SO_LINGER, 0);
                 channel.close();

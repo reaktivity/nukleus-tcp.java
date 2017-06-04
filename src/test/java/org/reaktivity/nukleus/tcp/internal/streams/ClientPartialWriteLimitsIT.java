@@ -87,7 +87,7 @@ public class ClientPartialWriteLimitsIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data.multiple.frames.partial.writes/client/source"
     })
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritableWithoutOverflowingSlot() throws Exception
@@ -103,11 +103,11 @@ public class ClientPartialWriteLimitsIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 ByteBuffer buf = ByteBuffer.allocate(256);
                 boolean closed = false;
@@ -136,7 +136,7 @@ public class ClientPartialWriteLimitsIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data.multiple.streams.second.was.reset/client/source"
     })
     public void shouldResetStreamsExceedingPartialWriteStreamsLimit() throws Exception
@@ -151,14 +151,15 @@ public class ClientPartialWriteLimitsIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel1 = server.accept();
                  SocketChannel channel2 = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT_ONE");
+                k3po.notifyBarrier("CONNECTED_CLIENT_TWO");
 
-                k3po.awaitBarrier("SECOND_STREAM_RESET_RECEIVED");
+                k3po.awaitBarrier("RESET_CLIENT_TWO");
                 resetReceived.set(true);
 
                 ByteBuffer buf = ByteBuffer.allocate(256);

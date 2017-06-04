@@ -35,7 +35,6 @@ import org.reaktivity.nukleus.tcp.internal.types.control.ErrorFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.RoutedFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.State;
 import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnroutedFW;
@@ -140,21 +139,20 @@ public final class Conductor implements Nukleus
         int index,
         int length)
     {
-        routeRO.wrap(buffer, index, index + length);
+        final RouteFW route = routeRO.wrap(buffer, index, index + length);
 
-        final long correlationId = routeRO.correlationId();
-        final Role role = routeRO.role().get();
-        final State state = routeRO.state().get();
-        final String source = routeRO.source().asString();
-        final long sourceRef = routeRO.sourceRef();
-        final String target = routeRO.target().asString();
-        final long targetRef = routeRO.targetRef();
-        final OctetsFW extension = routeRO.extension();
+        final long correlationId = route.correlationId();
+        final Role role = route.role().get();
+        final String source = route.source().asString();
+        final long sourceRef = route.sourceRef();
+        final String target = route.target().asString();
+        final long targetRef = route.targetRef();
+        final OctetsFW extension = route.extension();
 
         final TcpRouteExFW routeEx = extension.get(routeExRO::wrap);
         final InetAddress address = inetAddress(routeEx.address());
 
-        router.doRoute(correlationId, role, state, source, sourceRef, target, targetRef, address);
+        router.doRoute(correlationId, role, source, sourceRef, target, targetRef, address);
     }
 
     private void handleUnrouteCommand(
@@ -162,20 +160,19 @@ public final class Conductor implements Nukleus
         int index,
         int length)
     {
-        unrouteRO.wrap(buffer, index, index + length);
+        final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
 
-        final long correlationId = unrouteRO.correlationId();
-        final Role role = unrouteRO.role().get();
-        final State state = unrouteRO.state().get();
-        final String source = unrouteRO.source().asString();
-        final long sourceRef = unrouteRO.sourceRef();
-        final String target = unrouteRO.target().asString();
-        final long targetRef = unrouteRO.targetRef();
-        final OctetsFW extension = unrouteRO.extension();
+        final long correlationId = unroute.correlationId();
+        final Role role = unroute.role().get();
+        final String source = unroute.source().asString();
+        final long sourceRef = unroute.sourceRef();
+        final String target = unroute.target().asString();
+        final long targetRef = unroute.targetRef();
+        final OctetsFW extension = unroute.extension();
 
         final TcpRouteExFW unrouteEx = extension.get(routeExRO::wrap);
         final InetAddress address = inetAddress(unrouteEx.address());
 
-        router.doUnroute(correlationId, role, state, source, sourceRef, target, targetRef, address);
+        router.doUnroute(correlationId, role, source, sourceRef, target, targetRef, address);
     }
 }

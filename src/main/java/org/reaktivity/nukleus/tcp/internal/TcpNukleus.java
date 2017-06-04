@@ -27,7 +27,7 @@ import org.reaktivity.nukleus.tcp.internal.watcher.Watcher;
 
 public final class TcpNukleus extends Nukleus.Composite
 {
-    static final String NAME = "tcp";
+    public static final String NAME = "tcp";
 
     private final Closeable cleaner;
 

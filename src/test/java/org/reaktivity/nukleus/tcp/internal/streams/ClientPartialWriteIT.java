@@ -71,7 +71,7 @@ public class ClientPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data/client/source"
     })
     public void shouldSpinWrite() throws Exception
@@ -83,7 +83,7 @@ public class ClientPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data/client/source"
     })
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
@@ -94,7 +94,7 @@ public class ClientPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data/client/source"
     })
     public void shouldHandleMultiplePartialWrites() throws Exception
@@ -106,7 +106,7 @@ public class ClientPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data.multiple.frames/client/source"
     })
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
@@ -124,7 +124,7 @@ public class ClientPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data.then.end/client/source"
     })
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
@@ -139,11 +139,11 @@ public class ClientPartialWriteIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
                 k3po.awaitBarrier("END_WRITTEN");
                 endWritten.set(true);
 
@@ -177,7 +177,7 @@ public class ClientPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data.after.end/client/source"
     })
     public void shouldResetIfDataReceivedAfterEndOfStreamWithPendingWrite() throws Exception
@@ -192,13 +192,13 @@ public class ClientPartialWriteIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
-                k3po.awaitBarrier("RESET_RECEIVED");
+                k3po.awaitBarrier("RESET_CLIENT");
                 resetReceived.set(true);
 
                 ByteBuffer buf = ByteBuffer.allocate("client data".length() + 10);
@@ -242,11 +242,11 @@ public class ClientPartialWriteIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 ByteBuffer buf = ByteBuffer.allocate(expectedData.length() + 10);
                 boolean closed = false;

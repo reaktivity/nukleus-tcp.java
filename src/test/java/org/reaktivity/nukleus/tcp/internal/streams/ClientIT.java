@@ -63,7 +63,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/connection.established/client/source"
     })
     public void shouldEstablishConnection() throws Exception
@@ -74,11 +74,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
                 k3po.finish();
             }
         }
@@ -86,19 +86,19 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/connection.failed/client/source"
     })
     public void connnectionFailed() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_OUTPUT");
+        k3po.awaitBarrier("ROUTED_CLIENT");
         k3po.finish();
     }
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/server.sent.data/client/source"
     })
     public void shouldReceiveServerSentData() throws Exception
@@ -109,11 +109,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 channel.write(UTF_8.encode("server data"));
 
@@ -128,7 +128,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/server.sent.data.flow.control/client/source"
     })
     public void shouldReceiveServerSentDataWithFlowControl() throws Exception
@@ -139,11 +139,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 channel.write(UTF_8.encode("server data"));
 
@@ -158,7 +158,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/server.sent.data.multiple.frames/client/source"
     })
     public void shouldReceiveServerSentDataMultipleFrames() throws Exception
@@ -169,11 +169,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
                 channel.write(UTF_8.encode("server data 1"));
 
                 k3po.awaitBarrier("FIRST_DATA_FRAME_RECEIVED");
@@ -186,7 +186,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/server.sent.data.multiple.streams/client/source"
     })
     public void shouldReceiveServerSentDataMultipleStreams() throws Exception
@@ -197,14 +197,16 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel1 = server.accept();
                  SocketChannel channel2 = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT_ONE");
 
                 channel1.write(UTF_8.encode("server data 1"));
+
+                k3po.notifyBarrier("CONNECTED_CLIENT_TWO");
 
                 channel2.write(UTF_8.encode("server data 2"));
 
@@ -219,7 +221,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/server.sent.data.then.end/client/source"
     })
     public void shouldReceiveServerSentDataAndEnd() throws Exception
@@ -230,11 +232,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 channel.write(UTF_8.encode("server data"));
 
@@ -247,7 +249,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data/client/source"
     })
     public void shouldReceiveClientSentData() throws Exception
@@ -258,11 +260,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 ByteBuffer buf = ByteBuffer.allocate(256);
                 channel.read(buf);
@@ -281,7 +283,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data.multiple.frames/client/source"
     })
     public void shouldReceiveClientSentDataMultipleFrames() throws Exception
@@ -292,11 +294,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 ByteBuffer buf = ByteBuffer.allocate(256);
                 while (channel.read(buf) != -1 && buf.position() < 26)
@@ -315,7 +317,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data.multiple.streams/client/source"
     })
     public void shouldReceiveClientSentDataMultipleStreams() throws Exception
@@ -326,17 +328,19 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel1 = server.accept();
                  SocketChannel channel2 = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT_ONE");
 
                 ByteBuffer buf = ByteBuffer.allocate(256);
                 channel1.read(buf);
                 buf.flip();
                 assertEquals("client data 1", UTF_8.decode(buf).toString());
+
+                k3po.notifyBarrier("CONNECTED_CLIENT_TWO");
 
                 buf.rewind();
                 channel2.read(buf);
@@ -354,7 +358,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data.then.end/client/source"
     })
     public void shouldReceiveClientSentDataAndEnd() throws Exception
@@ -365,11 +369,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 ByteBuffer buf = ByteBuffer.allocate(256);
                 channel.read(buf);
@@ -389,7 +393,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.and.server.sent.data.multiple.frames/client/source"
     })
     public void shouldSendAndReceiveData() throws Exception
@@ -400,11 +404,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 channel.write(UTF_8.encode("server data 1"));
 
@@ -428,7 +432,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/server.close/client/source"
     })
     public void shouldInitiateServerClose() throws Exception
@@ -439,11 +443,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 channel.shutdownOutput();
 
@@ -455,7 +459,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.close/client/source"
     })
     public void shouldInitiateClientClose() throws Exception
@@ -466,11 +470,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 ByteBuffer buf = ByteBuffer.allocate(256);
                 int len = channel.read(buf);
@@ -484,7 +488,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/server.sent.end.then.received.data/client/source"
     })
     public void shouldWriteDataAfterReceiveEnd() throws Exception
@@ -495,11 +499,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 channel.shutdownOutput();
 
@@ -516,7 +520,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.end.then.received.data/client/source"
     })
     public void shouldReceiveDataAfterSendingEnd() throws Exception
@@ -527,11 +531,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 ByteBuffer buf = ByteBuffer.allocate(256);
                 int len = channel.read(buf);
@@ -547,7 +551,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data.after.end/client/source"
     })
     public void shouldResetIfDataReceivedAfterEndOfStream() throws Exception
@@ -558,11 +562,11 @@ public class ClientIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 ByteBuffer buf = ByteBuffer.allocate(256);
                 channel.read(buf);

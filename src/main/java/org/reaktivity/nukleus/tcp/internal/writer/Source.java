@@ -15,8 +15,8 @@
  */
 package org.reaktivity.nukleus.tcp.internal.writer;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
-import static org.reaktivity.nukleus.tcp.internal.writer.Route.sourceRefMatches;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -26,15 +26,17 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
-import java.util.function.Predicate;
 
+import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.MessageHandler;
+import org.agrona.concurrent.UnsafeBuffer;
 import org.agrona.concurrent.ringbuffer.RingBuffer;
 import org.reaktivity.nukleus.Nukleus;
+import org.reaktivity.nukleus.tcp.internal.TcpNukleus;
 import org.reaktivity.nukleus.tcp.internal.connector.Connector;
 import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
 import org.reaktivity.nukleus.tcp.internal.router.Correlation;
@@ -47,6 +49,8 @@ import org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory;
 
 public final class Source implements Nukleus
 {
+    private static final DirectBuffer SOURCE_NAME_BUFFER = new UnsafeBuffer(TcpNukleus.NAME.getBytes(UTF_8));
+
     private final FrameFW frameRO = new FrameFW();
     private final BeginFW beginRO = new BeginFW();
 
@@ -150,22 +154,19 @@ public final class Source implements Nukleus
         beginRO.wrap(buffer, index, index + length);
 
         final long streamId = beginRO.streamId();
-        final long referenceId = beginRO.referenceId();
+        final long sourceRef = beginRO.sourceRef();
         final long correlationId = beginRO.correlationId();
 
-        if (referenceId == 0L)
+        if (sourceRef == 0L)
         {
-            handleBeginDefaultOutputEstablished(buffer, index, length, streamId, correlationId);
+            handleBeginServerReply(buffer, index, length, streamId, correlationId);
         }
         else
         {
-            switch (RouteKind.match(referenceId))
+            switch (RouteKind.match(sourceRef))
             {
             case OUTPUT_NEW:
-                handleBeginOutputNew(streamId, referenceId, correlationId);
-                break;
-            case OUTPUT_ESTABLISHED:
-                handleBeginOutputEstablished(buffer, index, length, streamId, referenceId, correlationId);
+                handleBeginClient(streamId, sourceRef, correlationId);
                 break;
             default:
                 doReset(streamId);
@@ -174,7 +175,7 @@ public final class Source implements Nukleus
         }
     }
 
-    private void handleBeginDefaultOutputEstablished(
+    private void handleBeginServerReply(
         MutableDirectBuffer buffer,
         int index,
         int length,
@@ -201,43 +202,7 @@ public final class Source implements Nukleus
         }
     }
 
-    private void handleBeginOutputEstablished(
-        MutableDirectBuffer buffer,
-        int index,
-        int length,
-        final long streamId,
-        final long referenceId,
-        final long correlationId)
-    {
-        final List<Route> routes = lookupRoutes.apply(referenceId);
-        final Correlation correlation = resolveCorrelation.apply(correlationId);
-
-        final Predicate<Route> filter =
-                sourceRefMatches(referenceId);
-
-        final Optional<Route> optional = routes.stream()
-                .filter(filter)
-                .findFirst();
-
-        if (optional.isPresent() && correlation != null)
-        {
-            final SocketChannel channel = correlation.channel();
-
-            final Route route = optional.get();
-            final Target target = route.target();
-            final MessageHandler newStream = streamFactory.newStream(streamId, target, channel);
-
-            streams.put(streamId, newStream);
-
-            newStream.onMessage(BeginFW.TYPE_ID, buffer, index, length);
-        }
-        else
-        {
-            doReset(streamId);
-        }
-    }
-
-    private void handleBeginOutputNew(
+    private void handleBeginClient(
         final long streamId,
         final long referenceId,
         final long correlationId)
@@ -299,7 +264,8 @@ public final class Source implements Nukleus
 
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .streamId(sourceId)
-            .referenceId(sourceRef)
+            .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
+            .sourceRef(sourceRef)
             .correlationId(correlationId)
             .build();
 

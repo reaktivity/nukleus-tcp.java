@@ -61,7 +61,7 @@ public class ClientIOExceptionFromWriteIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data.received.reset/client/source"
     })
     @BMRule(name = "processData",
@@ -79,11 +79,11 @@ public class ClientIOExceptionFromWriteIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 k3po.finish();
             }
@@ -92,7 +92,7 @@ public class ClientIOExceptionFromWriteIT
 
     @Test
     @Specification({
-        "${route}/output/new/controller",
+        "${route}/client/controller",
         "${streams}/client.sent.data.received.reset/client/source"
     })
     @BMRules(rules = {
@@ -121,11 +121,11 @@ public class ClientIOExceptionFromWriteIT
             server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_OUTPUT");
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("ROUTED_INPUT");
+                k3po.notifyBarrier("CONNECTED_CLIENT");
 
                 k3po.finish();
             }

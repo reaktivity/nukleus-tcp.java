@@ -85,13 +85,13 @@ public class TcpServerBM
     public void reinit() throws Exception
     {
         reaktor.start();
-        controller.routeInputNew("any", 8080, "tcp", 0L, getByName("127.0.0.1")).get();
+        controller.routeServer("any", 8080, "tcp", 0L, getByName("127.0.0.1")).get();
     }
 
     @TearDown(Level.Trial)
     public void reset() throws Exception
     {
-        controller.unrouteInputNew("any", 8080, "tcp", 0L, getByName("127.0.0.1")).get();
+        controller.unrouteServer("any", 8080, "tcp", 0L, getByName("127.0.0.1")).get();
         reaktor.close();
     }
 
