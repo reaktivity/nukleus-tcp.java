@@ -25,7 +25,6 @@ import java.util.function.ToIntFunction;
 
 import org.agrona.LangUtil;
 import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
@@ -34,7 +33,6 @@ import org.reaktivity.nukleus.tcp.internal.router.Router;
 /**
  * The {@code Connector} nukleus accepts new socket connections and informs the {@code Router} nukleus.
  */
-@Reaktive
 public final class Connector implements Nukleus
 {
     private final LongSupplier supplyTargetId;

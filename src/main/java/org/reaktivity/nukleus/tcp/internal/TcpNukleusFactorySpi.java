@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.tcp.internal;
 
 import org.reaktivity.nukleus.Configuration;
+import org.reaktivity.nukleus.NukleusBuilder;
 import org.reaktivity.nukleus.NukleusFactorySpi;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
@@ -33,7 +34,9 @@ public final class TcpNukleusFactorySpi implements NukleusFactorySpi
     }
 
     @Override
-    public TcpNukleus create(Configuration config)
+    public TcpNukleus create(
+        Configuration config,
+        NukleusBuilder builder)
     {
         Context context = new Context();
         context.conclude(config);

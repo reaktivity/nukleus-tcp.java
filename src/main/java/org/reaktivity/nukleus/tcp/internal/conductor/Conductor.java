@@ -27,7 +27,6 @@ import org.agrona.concurrent.UnsafeBuffer;
 import org.agrona.concurrent.broadcast.BroadcastTransmitter;
 import org.agrona.concurrent.ringbuffer.RingBuffer;
 import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.router.Router;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
@@ -39,7 +38,6 @@ import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnroutedFW;
 
-@Reaktive
 public final class Conductor implements Nukleus
 {
     private static final int SEND_BUFFER_CAPACITY = 1024; // TODO: Configuration and Context

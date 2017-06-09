@@ -22,11 +22,9 @@ import java.util.function.ToIntFunction;
 
 import org.agrona.LangUtil;
 import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 
-@Reaktive
 public final class Target implements Nukleus
 {
     private final Poller poller;

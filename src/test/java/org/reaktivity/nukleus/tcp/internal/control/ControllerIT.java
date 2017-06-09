@@ -29,7 +29,7 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
-import org.reaktivity.reaktor.test.ControllerRule;
+import org.reaktivity.reaktor.test.ReaktorRule;
 
 public class ControllerIT
 {
@@ -39,14 +39,15 @@ public class ControllerIT
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
-    private final ControllerRule controller = new ControllerRule(TcpController.class)
+    private final ReaktorRule reaktor = new ReaktorRule()
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024);
+        .counterValuesBufferCapacity(1024)
+        .controller(TcpController.class::isAssignableFrom);
 
     @Rule
-    public final TestRule chain = outerRule(k3po).around(timeout).around(controller);
+    public final TestRule chain = outerRule(k3po).around(timeout).around(reaktor);
 
     @Test
     @Specification({
@@ -59,9 +60,9 @@ public class ControllerIT
 
         k3po.start();
 
-        controller.controller(TcpController.class)
-                  .routeServer("any", 8080, "target", targetRef, address)
-                  .get();
+        reaktor.controller(TcpController.class)
+               .routeServer("any", 8080, "target", targetRef, address)
+               .get();
 
         k3po.finish();
     }
@@ -74,9 +75,9 @@ public class ControllerIT
     {
         k3po.start();
 
-        controller.controller(TcpController.class)
-                  .routeClient("source", 0L, "localhost", 8080, null)
-                  .get();
+        reaktor.controller(TcpController.class)
+               .routeClient("source", 0L, "localhost", 8080, null)
+               .get();
 
         k3po.finish();
     }
@@ -92,9 +93,9 @@ public class ControllerIT
 
         k3po.start();
 
-        controller.controller(TcpController.class)
-                  .unrouteServer("any", 8080, "target", targetRef, address)
-                  .get();
+        reaktor.controller(TcpController.class)
+               .unrouteServer("any", 8080, "target", targetRef, address)
+               .get();
 
         k3po.finish();
     }
@@ -109,9 +110,9 @@ public class ControllerIT
 
         k3po.start();
 
-        controller.controller(TcpController.class)
-                  .unrouteClient("source", sourceRef, "localhost", 8080, null)
-                  .get();
+        reaktor.controller(TcpController.class)
+               .unrouteClient("source", sourceRef, "localhost", 8080, null)
+               .get();
 
         k3po.finish();
     }

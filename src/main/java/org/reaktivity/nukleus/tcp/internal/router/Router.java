@@ -30,7 +30,6 @@ import java.util.regex.Pattern;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.status.AtomicCounter;
 import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
@@ -44,7 +43,6 @@ import org.reaktivity.nukleus.tcp.internal.writer.Writer;
  * The {@code Router} nukleus manages in-bound and out-bound routes, coordinating with the {@code Acceptable},
  * {@code Readable} and {@code Writable} nuklei as needed.
  */
-@Reaktive
 public final class Router extends Nukleus.Composite
 {
     private static final Pattern SOURCE_NAME = Pattern.compile("([^#]+).*");
