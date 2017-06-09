@@ -36,7 +36,6 @@ import javax.annotation.Resource;
 import org.agrona.CloseHelper;
 import org.agrona.LangUtil;
 import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
@@ -45,7 +44,6 @@ import org.reaktivity.nukleus.tcp.internal.router.Router;
 /**
  * The {@code Poller} nukleus accepts new socket connections and informs the {@code Router} nukleus.
  */
-@Reaktive
 public final class Acceptor implements Nukleus
 {
     private final Map<SocketAddress, String> sourcesByLocalAddress;

@@ -40,7 +40,6 @@ import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
@@ -53,7 +52,6 @@ import org.reaktivity.nukleus.tcp.internal.router.RouteKind;
  * The {@code Readable} nukleus reads network traffic via a {@code Source} nukleus and control flow commands
  * from multiple {@code Target} nuklei.
  */
-@Reaktive
 public final class Reader extends Nukleus.Composite
 {
     private static final List<Route> EMPTY_ROUTES = emptyList();

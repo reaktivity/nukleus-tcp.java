@@ -16,10 +16,10 @@
 package org.reaktivity.nukleus.tcp.internal;
 
 import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.Controller;
+import org.reaktivity.nukleus.ControllerBuilder;
 import org.reaktivity.nukleus.ControllerFactorySpi;
 
-public final class TcpControllerFactorySpi implements ControllerFactorySpi
+public final class TcpControllerFactorySpi implements ControllerFactorySpi<TcpController>
 {
     @Override
     public String name()
@@ -34,15 +34,15 @@ public final class TcpControllerFactorySpi implements ControllerFactorySpi
     }
 
     @Override
-    public <T extends Controller> T create(
-        Class<T> kind,
-        Configuration config)
+    public TcpController create(
+        Configuration config,
+        ControllerBuilder<TcpController> builder)
     {
         Context context = new Context();
         context.readonly(true)
                .conclude(config);
 
-        return kind.cast(new TcpController(context));
+        return new TcpController(context);
     }
 
 }
