@@ -274,11 +274,13 @@ public final class Source implements Nukleus
 
     public void doWindow(
         final long streamId,
-        final int update)
+        final int windowBytes,
+        final int windowFrames)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
-                .update(update)
+                .update(windowBytes)
+                .frames(windowFrames)
                 .build();
 
         throttleBuffer.write(window.typeId(), window.buffer(), window.offset(), window.sizeof());

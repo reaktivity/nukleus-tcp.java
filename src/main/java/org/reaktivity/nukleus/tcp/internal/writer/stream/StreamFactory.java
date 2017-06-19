@@ -286,7 +286,7 @@ public final class StreamFactory
             if (readableBytes > EOS_REQUESTED)
             {
                 readableBytes += update;
-                source.doWindow(id, update);
+                source.doWindow(id, update, update);
             }
         }
     }
