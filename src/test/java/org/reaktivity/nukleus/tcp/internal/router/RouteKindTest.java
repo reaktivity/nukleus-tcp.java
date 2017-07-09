@@ -52,7 +52,7 @@ public class RouteKindTest
 
         for (RouteKind kind : RouteKind.values())
         {
-            long ref = kind.nextRef(counter::getAndIncrement);
+            long ref = kind.nextRef(counter::getAndIncrement, counter::get);
 
             String message = String.format("%s ref does not match", kind);
             assertSame(message, kind, RouteKind.match(ref));
