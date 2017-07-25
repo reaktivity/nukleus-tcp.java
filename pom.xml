@@ -53,10 +53,10 @@
     <k3po.nukleus.ext.version>0.7</k3po.nukleus.ext.version>
 
     <nukleus.plugin.version>0.7.8</nukleus.plugin.version>
-    <nukleus.version>0.6.2</nukleus.version>
+    <nukleus.version>0.8</nukleus.version>
 
     <nukleus.tcp.spec.version>0.14</nukleus.tcp.spec.version>
-    <reaktor.test.version>0.10</reaktor.test.version>
+    <reaktor.test.version>0.11</reaktor.test.version>
   </properties>
 
   <dependencies>
@@ -64,6 +64,7 @@
       <groupId>org.reaktivity</groupId>
       <artifactId>nukleus</artifactId>
       <version>${nukleus.version}</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.reaktivity</groupId>
