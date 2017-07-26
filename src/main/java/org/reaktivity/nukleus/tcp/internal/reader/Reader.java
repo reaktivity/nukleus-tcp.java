@@ -18,15 +18,10 @@ package org.reaktivity.nukleus.tcp.internal.reader;
 import static java.util.Collections.emptyList;
 import static org.reaktivity.nukleus.tcp.internal.reader.Route.addressMatches;
 import static org.reaktivity.nukleus.tcp.internal.reader.Route.sourceMatches;
-import static org.reaktivity.nukleus.tcp.internal.reader.Route.sourceRefMatches;
-import static org.reaktivity.nukleus.tcp.internal.reader.Route.targetMatches;
-import static org.reaktivity.nukleus.tcp.internal.reader.Route.targetRefMatches;
 import static org.reaktivity.nukleus.tcp.internal.router.RouteKind.OUTPUT_NEW;
 
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,14 +30,12 @@ import java.util.function.LongFunction;
 import java.util.function.Predicate;
 
 import org.agrona.CloseHelper;
-import org.agrona.LangUtil;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.tcp.internal.Context;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
-import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.router.Correlation;
@@ -57,8 +50,6 @@ public final class Reader extends Nukleus.Composite
     private static final List<Route> EMPTY_ROUTES = emptyList();
 
     private final Context context;
-    private final Conductor conductor;
-    private final Acceptor acceptor;
     private final String sourceName;
     private final Source source;
     private final Map<String, Target> targetsByName;
@@ -68,15 +59,12 @@ public final class Reader extends Nukleus.Composite
 
     public Reader(
         Context context,
-        Conductor conductor,
         Acceptor acceptor,
         Poller poller,
         String sourceName,
         LongFunction<Correlation> resolveCorrelation)
     {
         this.context = context;
-        this.conductor = conductor;
-        this.acceptor = acceptor;
         this.sourceName = sourceName;
         this.source = new Source(poller, sourceName, context.maxMessageLength(), resolveCorrelation);
         this.writeBuffer = new UnsafeBuffer(new byte[context.maxMessageLength()]);
@@ -158,121 +146,6 @@ public final class Reader extends Nukleus.Composite
         }
     }
 
-    public void doRouteDefault(
-        long correlationId,
-        String targetName)
-    {
-        try
-        {
-            targetsByName.computeIfAbsent(targetName, this::newTarget);
-        }
-        catch (Exception ex)
-        {
-            conductor.onErrorResponse(correlationId);
-            LangUtil.rethrowUnchecked(ex);
-        }
-    }
-
-    public void doRouteAccept(
-        long correlationId,
-        long sourceRef,
-        String targetName,
-        long targetRef,
-        InetSocketAddress address)
-    {
-        try
-        {
-            final Target target = targetsByName.computeIfAbsent(targetName, this::newTarget);
-            final Route newRoute = new Route(sourceName, sourceRef, target, targetRef, address);
-
-            routesByRef.computeIfAbsent(sourceRef, this::newRoutes)
-                       .add(newRoute);
-
-            acceptor.doRegister(correlationId, sourceName, sourceRef, address);
-        }
-        catch (Exception ex)
-        {
-            conductor.onErrorResponse(correlationId);
-            LangUtil.rethrowUnchecked(ex);
-        }
-    }
-
-    public void doUnrouteAccept(
-        long correlationId,
-        long sourceRef,
-        String targetName,
-        long targetRef,
-        InetSocketAddress address)
-    {
-        final List<Route> routes = lookupRoutes(sourceRef);
-
-        final Predicate<Route> filter =
-                sourceMatches(sourceName)
-                 .and(sourceRefMatches(sourceRef))
-                 .and(targetMatches(targetName))
-                 .and(targetRefMatches(targetRef))
-                 .and(addressMatches(address));
-
-        if (routes.removeIf(filter))
-        {
-            acceptor.doUnregister(correlationId, sourceName, address);
-        }
-        else
-        {
-            conductor.onErrorResponse(correlationId);
-        }
-    }
-
-    public void doRoute(
-        long correlationId,
-        long sourceRef,
-        String targetName,
-        long targetRef,
-        SocketAddress address)
-    {
-        try
-        {
-            final Target target = targetsByName.computeIfAbsent(targetName, this::newTarget);
-            final Route newRoute = new Route(sourceName, sourceRef, target, targetRef, address);
-
-            routesByRef.computeIfAbsent(sourceRef, this::newRoutes)
-                       .add(newRoute);
-
-            conductor.onRoutedResponse(correlationId, sourceRef);
-        }
-        catch (Exception ex)
-        {
-            conductor.onErrorResponse(correlationId);
-            LangUtil.rethrowUnchecked(ex);
-        }
-    }
-
-    public void doUnroute(
-        long correlationId,
-        long sourceRef,
-        String targetName,
-        long targetRef,
-        SocketAddress address)
-    {
-        final List<Route> routes = lookupRoutes(sourceRef);
-
-        final Predicate<Route> filter =
-                sourceMatches(sourceName)
-                 .and(sourceRefMatches(sourceRef))
-                 .and(targetMatches(targetName))
-                 .and(targetRefMatches(targetRef))
-                 .and(addressMatches(address));
-
-        if (routes.removeIf(filter))
-        {
-            conductor.onUnroutedResponse(correlationId);
-        }
-        else
-        {
-            conductor.onErrorResponse(correlationId);
-        }
-    }
-
     @Override
     protected void toString(
         StringBuilder builder)
@@ -280,17 +153,6 @@ public final class Reader extends Nukleus.Composite
         builder.append(String.format("%s[name=%s]", getClass().getSimpleName(), sourceName));
     }
 
-    private List<Route> newRoutes(
-        long sourceRef)
-    {
-        return new ArrayList<>();
-    }
-
-    private List<Route> lookupRoutes(
-        long referenceId)
-    {
-        return routesByRef.getOrDefault(referenceId, EMPTY_ROUTES);
-    }
 
     private Target newTarget(
         String targetName)

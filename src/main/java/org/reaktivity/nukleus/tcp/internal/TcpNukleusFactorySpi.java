@@ -16,13 +16,17 @@
 package org.reaktivity.nukleus.tcp.internal;
 
 import org.reaktivity.nukleus.Configuration;
+import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.NukleusBuilder;
 import org.reaktivity.nukleus.NukleusFactorySpi;
+import org.reaktivity.nukleus.route.RouteKind;
 import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.connector.Connector;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.router.Router;
+import org.reaktivity.nukleus.tcp.internal.stream.ClientStreamFactoryBuilder;
+import org.reaktivity.nukleus.tcp.internal.stream.ServerStreamFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.watcher.Watcher;
 
 public final class TcpNukleusFactorySpi implements NukleusFactorySpi
@@ -34,35 +38,17 @@ public final class TcpNukleusFactorySpi implements NukleusFactorySpi
     }
 
     @Override
-    public TcpNukleus create(
+    public Nukleus create(
         Configuration config,
         NukleusBuilder builder)
     {
-        Context context = new Context();
-        context.conclude(config);
-
-        Conductor conductor = new Conductor(context);
-        Router router = new Router(context);
-        Watcher watcher = new Watcher(context);
         Acceptor acceptor = new Acceptor();
-        Connector connector = new Connector(context);
         Poller poller = new Poller();
-
-        router.setConductor(conductor);
-        acceptor.setConductor(conductor);
-
         acceptor.setPoller(poller);
-        connector.setPoller(poller);
-        router.setPoller(poller);
 
-        router.setAcceptor(acceptor);
-        router.setConnector(connector);
+        return builder.streamFactory(RouteKind.CLIENT, new ClientStreamFactoryBuilder(config))
+                      .streamFactory(RouteKind.SERVER, new ServerStreamFactoryBuilder(config))
+                      .build();
 
-        watcher.setRouter(router);
-        conductor.setRouter(router);
-        acceptor.setRouter(router);
-        connector.setRouter(router);
-
-        return new TcpNukleus(conductor, router, watcher, acceptor, connector, poller, context);
     }
 }

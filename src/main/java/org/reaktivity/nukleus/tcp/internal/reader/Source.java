@@ -27,14 +27,14 @@ import org.agrona.CloseHelper;
 import org.agrona.LangUtil;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
-import org.reaktivity.nukleus.tcp.internal.reader.stream.StreamFactory;
+import org.reaktivity.nukleus.tcp.internal.reader.stream.ReaderStreamFactory;
 import org.reaktivity.nukleus.tcp.internal.router.Correlation;
 
 public final class Source
 {
     private final Poller poller;
     private final String sourceName;
-    private final StreamFactory streamFactory;
+    private final ReaderStreamFactory streamFactory;
 
     public Source(
         Poller poller,
@@ -44,7 +44,7 @@ public final class Source
     {
         this.poller = poller;
         this.sourceName = sourceName;
-        this.streamFactory = new StreamFactory(maxMessageLength, resolveCorrelation);
+        this.streamFactory = new ReaderStreamFactory(maxMessageLength, resolveCorrelation);
     }
 
     @Override

@@ -29,6 +29,8 @@ import java.util.function.ToIntFunction;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.concurrent.MessageHandler;
+import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
@@ -37,7 +39,7 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.tcp.internal.writer.Source;
 import org.reaktivity.nukleus.tcp.internal.writer.Target;
 
-public final class StreamFactory
+public final class WriterStreamFactory
 {
     // Mina uses a value of 256 (see AbstractPollingIoProcessor.writeBuffer).
     // Netty uses a configurable value, defaulting to 16
@@ -50,19 +52,22 @@ public final class StreamFactory
 
     private final Source source;
     private final int windowSize;
-    private final Slab writeSlab;
+    private final BufferPool writeSlab;
     private final LongSupplier incrementOverflow;
+    private final Poller poller;
 
-    public StreamFactory(
+    public WriterStreamFactory(
         Source source,
         int windowSize,
-        int maxPartiallyWrittenStreams,
-        LongSupplier incrementOverflow)
+        BufferPool bufferPool,
+        LongSupplier incrementOverflow,
+        Poller poller)
     {
         this.source = source;
         this.windowSize = windowSize;
         this.incrementOverflow = incrementOverflow;
-        this.writeSlab = new Slab(maxPartiallyWrittenStreams, windowSize);
+        this.writeSlab = bufferPool;
+        this.poller = poller;
     }
 
     public MessageHandler newStream(
@@ -137,7 +142,7 @@ public final class StreamFactory
         {
             beginRO.wrap(buffer, offset, limit);
 
-            this.key = target.doRegister(channel, writeHandler);
+            this.key = poller.doRegister(channel, OP_WRITE, writeHandler);
 
             offerWindow(windowSize);
         }

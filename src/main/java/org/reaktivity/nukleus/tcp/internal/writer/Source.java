@@ -45,7 +45,7 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.FrameFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
-import org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory;
+import org.reaktivity.nukleus.tcp.internal.writer.stream.WriterStreamFactory;
 
 public final class Source implements Nukleus
 {
@@ -67,7 +67,7 @@ public final class Source implements Nukleus
     private final AtomicBuffer writeBuffer;
     private final RingBuffer streamsBuffer;
     private final RingBuffer throttleBuffer;
-    private final StreamFactory streamFactory;
+    private final WriterStreamFactory streamFactory;
     private final Long2ObjectHashMap<MessageHandler> streams;
     private final MessageHandler readHandler;
 
@@ -92,7 +92,7 @@ public final class Source implements Nukleus
         this.writeBuffer = writeBuffer;
         this.streamsBuffer = layout.streamsBuffer();
         this.throttleBuffer = layout.throttleBuffer();
-        this.streamFactory = new StreamFactory(this, WINDOW_SIZE.intValue(), maximumStreamsCount, incrementOverflow);
+        this.streamFactory = new WriterStreamFactory(this, WINDOW_SIZE.intValue(), maximumStreamsCount, incrementOverflow);
         this.streams = streams;
         this.readHandler = this::handleRead;
     }

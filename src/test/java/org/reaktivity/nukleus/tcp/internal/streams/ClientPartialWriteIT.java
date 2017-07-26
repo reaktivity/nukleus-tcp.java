@@ -25,7 +25,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ALL;
-import static org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory.WRITE_SPIN_COUNT;
+import static org.reaktivity.nukleus.tcp.internal.writer.stream.WriterStreamFactory.WRITE_SPIN_COUNT;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
