@@ -99,7 +99,7 @@ public final class StreamFactory
         {
             assert readableBytes > 0;
 
-            final int limit = Math.min(readableBytes, bufferSize);
+            final int limit = Math.min(readableBytes, Math.min(bufferSize, (1 << Short.SIZE) - 1));
 
             readBuffer.position(0);
             readBuffer.limit(limit);
