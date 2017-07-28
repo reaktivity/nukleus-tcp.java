@@ -25,7 +25,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ALL;
-import static org.reaktivity.nukleus.tcp.internal.writer.stream.WriterStreamFactory.WRITE_SPIN_COUNT;
+import static org.reaktivity.nukleus.tcp.internal.stream.WriteStream.WRITE_SPIN_COUNT;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -46,7 +46,7 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.HandleWriteHelper;
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDataHelper;
-import org.reaktivity.reaktor.test.NukleusRule;
+import org.reaktivity.reaktor.test.ReaktorRule;
 
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 @BMUnitConfig(loadDirectory="src/test/resources")
@@ -59,15 +59,16 @@ public class ClientPartialWriteIT
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
-    private final NukleusRule nukleus = new NukleusRule("tcp")
+    private final ReaktorRule reaktor = new ReaktorRule()
+        .nukleus("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .streams("tcp", "source#partition");
+        .clean();
 
     @Rule
-    public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(nukleus).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(reaktor).around(k3po).around(timeout);
 
     @Test
     @Specification({

@@ -20,7 +20,7 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
 
-final class WriteStream
+public final class WriteStream
 {
     // Mina uses a value of 256 (see AbstractPollingIoProcessor.writeBuffer).
     // Netty uses a configurable value, defaulting to 16
