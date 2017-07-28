@@ -75,13 +75,15 @@ public class TcpCountersRule implements TestRule
             public void evaluate() throws Throwable
             {
                 Configuration configuration = new Configuration(properties);
-                Context context = new Context().readonly(true).conclude(configuration);
-                Counters counters = context.counters();
-                TcpCountersRule.this.counters = counters;
-                assertEquals(0, counters.routes());
-                assertEquals(0, counters.streams());
-                assertEquals(0, counters.counter("overflows"));
-                base.evaluate();
+                try(Context context = new Context().name("tcp").readonly(true).conclude(configuration);
+                    Counters counters = context.counters())
+                {
+                    TcpCountersRule.this.counters = counters;
+                    assertEquals(0, counters.routes().get());
+                    assertEquals(0, counters.streams().get());
+                    assertEquals(0, counters.counter("overflows").get());
+                    base.evaluate();
+                }
             }
 
         };

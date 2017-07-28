@@ -80,7 +80,7 @@ public class ServerStreamFactory implements StreamFactory
             Poller poller)
     {
         this.router = requireNonNull(router);
-        this.writeByteBuffer = writeBuffer.byteBuffer();
+        this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
         this.writer = new MessageWriter(requireNonNull(writeBuffer));
         this.bufferPool = bufferPool;
         this.incrementOverflow = incrementOverflow;
@@ -198,6 +198,7 @@ public class ServerStreamFactory implements StreamFactory
 
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
                     bufferPool, writeByteBuffer, writer);
+            stream.doConnected();
             result = stream::handleStream;
         }
         else

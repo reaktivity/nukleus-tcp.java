@@ -128,7 +128,9 @@ public class ClientStreamFactory implements StreamFactory
     {
         MessageConsumer result = null;
         final long streamId = begin.streamId();
+        final String sourceName = begin.source().asString();
         final long sourceRef = begin.sourceRef();
+        final long correlationId = begin.correlationId();
 
         MessagePredicate filter = (t, b, o, l) ->
         {
@@ -142,6 +144,8 @@ public class ClientStreamFactory implements StreamFactory
         {
             final SocketChannel channel = newSocketChannel();
             final OctetsFW extension = routeRO.extension();
+            String targetName = route.target().asString();
+            long targetRef = route.targetRef();
             InetSocketAddress remoteAddress = null;
             if (extension.sizeof() > 0)
             {
@@ -149,11 +153,15 @@ public class ClientStreamFactory implements StreamFactory
                 final InetAddress inetAddress = inetAddress(routeEx.address());
                 remoteAddress = new InetSocketAddress(inetAddress, (int)sourceRef);
             }
+            else
+            {
+                remoteAddress = new InetSocketAddress(targetName, (int)targetRef);
+            }
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
                     bufferPool, writeByteBuffer, writer);
             result = stream::handleStream;
 
-            doConnect(stream, channel, remoteAddress, route.target().asString(), route.targetRef());
+            doConnect(stream, channel, remoteAddress, sourceName, sourceRef, correlationId);
         }
         else
         {
@@ -190,9 +198,11 @@ public class ClientStreamFactory implements StreamFactory
         WriteStream stream,
         SocketChannel channel,
         InetSocketAddress remoteAddress,
-        String targetName, long targetRef)
+        String acceptReplyName,
+        long acceptReplyRef,
+        long correlationId)
     {
-        final Request request = new Request(channel, stream, targetName, targetRef);
+        final Request request = new Request(channel, stream, acceptReplyName, acceptReplyRef, correlationId);
 
         try
         {
@@ -221,10 +231,10 @@ public class ClientStreamFactory implements StreamFactory
     private void newConnectReplyStream(Request request)
     {
         final SocketChannel channel = request.channel;
-        final String targetName = request.targetName;
-        final long targetRef = request.targetRef;
+        final String targetName = request.acceptReplyName;
+        final long targetRef = request.acceptReplyRef;
         final long targetId = supplyStreamId.getAsLong();
-        final long correlationId = supplyCorrelationId.getAsLong();
+        final long correlationId = request.correlationId;
 
         try
         {
@@ -262,18 +272,21 @@ public class ClientStreamFactory implements StreamFactory
     {
         private final WriteStream stream;
         private final SocketChannel channel;
-        private final String targetName;
-        private final long targetRef;
+        private final String acceptReplyName;
+        private final long acceptReplyRef;
+        private final long correlationId;
 
         private Request(SocketChannel channel,
                         WriteStream stream,
-                        String targetName,
-                        long targetRef)
+                        String acceptReplyName,
+                        long acceptReplyRef,
+                        long correlationId)
         {
             this.channel = channel;
             this.stream = stream;
-            this.targetName = targetName;
-            this.targetRef= targetRef;
+            this.acceptReplyName = acceptReplyName;
+            this.acceptReplyRef = acceptReplyRef;
+            this.correlationId = correlationId;
         }
 
         @Override
