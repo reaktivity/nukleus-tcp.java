@@ -37,7 +37,6 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier incrementOverflow;
     private RouteManager router;
     private Supplier<BufferPool> supplyBufferPool;
-    private LongSupplier supplyCorrelationId;
     private LongSupplier supplyStreamId;
 
     private MutableDirectBuffer writeBuffer;
@@ -61,7 +60,6 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     public ClientStreamFactoryBuilder setCorrelationIdSupplier(
         LongSupplier supplyCorrelationId)
     {
-        this.supplyCorrelationId = supplyCorrelationId;
         return this;
     }
 
@@ -102,6 +100,6 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
         final BufferPool bufferPool = supplyBufferPool.get();
 
         return new ClientStreamFactory(config, router, poller, writeBuffer, bufferPool,
-                incrementOverflow, supplyStreamId, supplyCorrelationId, correlations);
+                incrementOverflow, supplyStreamId, correlations);
     }
 }

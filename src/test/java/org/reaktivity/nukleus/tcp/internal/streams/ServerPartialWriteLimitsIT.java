@@ -46,6 +46,7 @@ import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.HandleWri
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDataHelper;
 import org.reaktivity.reaktor.internal.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.specification.nukleus.NukleusRule;
 
 /**
  * Tests the handling of capacity exceeded conditions in the context of incomplete writes
@@ -68,10 +69,9 @@ public class ServerPartialWriteLimitsIT
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
         // Initial window size for output to network:
-        .configure(ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY, 64)
+        .configure(ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY, 16)
         // Overall buffer pool size same as slot size so maximum concurrent streams with partial writes = 1
-        .configure(ReaktorConfiguration.BUFFER_POOL_CAPACITY_PROPERTY, 64)
-        .clean();
+        .configure(ReaktorConfiguration.BUFFER_POOL_CAPACITY_PROPERTY, 16);
 
     private final TcpCountersRule counters = new TcpCountersRule()
         .directory("target/nukleus-itests")
@@ -79,9 +79,14 @@ public class ServerPartialWriteLimitsIT
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024);
 
+    private final NukleusRule file = new NukleusRule()
+            .directory("target/nukleus-itests")
+            .streams("tcp", "target#partition")
+            .streams("target", "tcp#any");
+
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE)
-                                  .around(reaktor).around(counters).around(k3po).around(timeout);
+                                  .around(file).around(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -185,3 +190,4 @@ public class ServerPartialWriteLimitsIT
         assertEquals(1, counters.overflows());
     }
 }
+

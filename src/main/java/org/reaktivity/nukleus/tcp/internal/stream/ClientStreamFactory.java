@@ -61,7 +61,6 @@ public class ClientStreamFactory implements StreamFactory
     private Poller poller;
     private final RouteManager router;
     private final LongSupplier supplyStreamId;
-    private final LongSupplier supplyCorrelationId;
     private final ByteBuffer readByteBuffer;
     private final MutableDirectBuffer readBuffer;
     private final ByteBuffer writeByteBuffer;
@@ -75,16 +74,14 @@ public class ClientStreamFactory implements StreamFactory
             BufferPool bufferPool,
             LongSupplier incrementOverflow,
             LongSupplier supplyStreamId,
-            LongSupplier supplyCorrelationId,
             Long2ObjectHashMap<Correlation> correlations)
     {
         this.router = requireNonNull(router);
         this.poller = poller;
-        this.writeByteBuffer = writeBuffer.byteBuffer();
+        this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
         this.bufferPool = requireNonNull(bufferPool);
         this.incrementOverflow = incrementOverflow;
         this.supplyStreamId = requireNonNull(supplyStreamId);
-        this.supplyCorrelationId = supplyCorrelationId;
         this.writer = new MessageWriter(requireNonNull(writeBuffer));
         this.correlations = requireNonNull(correlations);
         int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
@@ -161,7 +158,7 @@ public class ClientStreamFactory implements StreamFactory
                     bufferPool, writeByteBuffer, writer);
             result = stream::handleStream;
 
-            doConnect(stream, channel, remoteAddress, sourceName, sourceRef, correlationId);
+            doConnect(stream, channel, remoteAddress, sourceName, correlationId);
         }
         else
         {
@@ -199,10 +196,9 @@ public class ClientStreamFactory implements StreamFactory
         SocketChannel channel,
         InetSocketAddress remoteAddress,
         String acceptReplyName,
-        long acceptReplyRef,
         long correlationId)
     {
-        final Request request = new Request(channel, stream, acceptReplyName, acceptReplyRef, correlationId);
+        final Request request = new Request(channel, stream, acceptReplyName, correlationId);
 
         try
         {
@@ -232,7 +228,6 @@ public class ClientStreamFactory implements StreamFactory
     {
         final SocketChannel channel = request.channel;
         final String targetName = request.acceptReplyName;
-        final long targetRef = request.acceptReplyRef;
         final long targetId = supplyStreamId.getAsLong();
         final long correlationId = request.correlationId;
 
@@ -241,7 +236,7 @@ public class ClientStreamFactory implements StreamFactory
             final InetSocketAddress localAddress = (InetSocketAddress) channel.getLocalAddress();
             final InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
             final MessageConsumer target = router.supplyTarget(targetName);
-            writer.doTcpBegin(target, targetId, targetRef, correlationId, localAddress, remoteAddress);
+            writer.doTcpBegin(target, targetId, 0L, correlationId, localAddress, remoteAddress);
 
             final PollerKey key = poller.doRegister(channel, 0, null);
 
@@ -273,19 +268,16 @@ public class ClientStreamFactory implements StreamFactory
         private final WriteStream stream;
         private final SocketChannel channel;
         private final String acceptReplyName;
-        private final long acceptReplyRef;
         private final long correlationId;
 
         private Request(SocketChannel channel,
                         WriteStream stream,
                         String acceptReplyName,
-                        long acceptReplyRef,
                         long correlationId)
         {
             this.channel = channel;
             this.stream = stream;
             this.acceptReplyName = acceptReplyName;
-            this.acceptReplyRef = acceptReplyRef;
             this.correlationId = correlationId;
         }
 

@@ -155,16 +155,17 @@ public final class WriteStream
             }
 
             int originalSlot = slot;
-            handleUnwrittenData(writeBuffer, bytesWritten);
-
-            if (bytesWritten < writableBytes)
+            if (handleUnwrittenData(writeBuffer, bytesWritten))
             {
-                key.register(OP_WRITE);
-            }
-            else if (originalSlot != NO_SLOT)
-            {
-                // we just flushed out a pending write
-                key.clear(OP_WRITE);
+                if (bytesWritten < writableBytes)
+                {
+                    key.register(OP_WRITE);
+                }
+                else if (originalSlot != NO_SLOT)
+                {
+                    // we just flushed out a pending write
+                    key.clear(OP_WRITE);
+                }
             }
         }
         else
@@ -238,13 +239,16 @@ public final class WriteStream
             buffer.position(slotPosition);
             data.getBytes(dataOffset, buffer, dataLength);
             slotPosition += dataLength;
+            buffer.position(slotOffset);
+            buffer.limit(slotPosition);
             result = buffer;
         }
         return result;
     }
 
-    private void handleUnwrittenData(ByteBuffer written, int bytesWritten)
+    private boolean handleUnwrittenData(ByteBuffer written, int bytesWritten)
     {
+        boolean result = true;
         if (slot == NO_SLOT)
         {
             if (written.hasRemaining())
@@ -255,7 +259,7 @@ public final class WriteStream
                 {
                     incrementOverflow.getAsLong();
                     doFail();
-                    return;
+                    result = false;
                 }
                 else
                 {
@@ -285,13 +289,13 @@ public final class WriteStream
             else
             {
                 // Free the slot, but first send a window update for all data that had ever been saved in the slot
-                slotPosition += bytesWritten;
                 int slotStart = bufferPool.byteBuffer(slot).position();
                 offerWindow(slotPosition - slotStart);
                 bufferPool.release(slot);
                 slot = NO_SLOT;
             }
         }
+        return result;
     }
 
     private int handleWrite(

@@ -56,7 +56,7 @@ public class ClientIT
     private final NukleusRule file = new NukleusRule()
             .directory("target/nukleus-itests")
             .streams("tcp", "source#partition")
-            .streams("source", "tcp#any");
+            .streams("source", "tcp#source");
 
     private final TcpCountersRule counters = new TcpCountersRule()
         .directory("target/nukleus-itests")
@@ -65,7 +65,7 @@ public class ClientIT
         .counterValuesBufferCapacity(1024);
 
     @Rule
-    public final TestRule chain = outerRule(file).around(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(file).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
