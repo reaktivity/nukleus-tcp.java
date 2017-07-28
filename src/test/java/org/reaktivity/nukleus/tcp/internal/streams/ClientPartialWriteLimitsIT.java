@@ -71,9 +71,9 @@ public class ClientPartialWriteLimitsIT
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
         // Initial window size for output to network:
-        .configure(ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY, 64)
+        .configure(ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY, 16)
         // Overall buffer pool size same as slot size so maximum concurrent streams with partial writes = 1
-        .configure(ReaktorConfiguration.BUFFER_POOL_CAPACITY_PROPERTY, 64);
+        .configure(ReaktorConfiguration.BUFFER_POOL_CAPACITY_PROPERTY, 16);
 
     private final TcpCountersRule counters = new TcpCountersRule()
         .directory("target/nukleus-itests")
