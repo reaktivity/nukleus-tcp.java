@@ -20,21 +20,19 @@ import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.NukleusBuilder;
 import org.reaktivity.nukleus.NukleusFactorySpi;
 import org.reaktivity.nukleus.route.RouteKind;
-import org.reaktivity.nukleus.tcp.internal.acceptor.Acceptor;
-import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
-import org.reaktivity.nukleus.tcp.internal.connector.Connector;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
-import org.reaktivity.nukleus.tcp.internal.router.Router;
+import org.reaktivity.nukleus.tcp.internal.stream.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.stream.ClientStreamFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.stream.ServerStreamFactoryBuilder;
-import org.reaktivity.nukleus.tcp.internal.watcher.Watcher;
 
 public final class TcpNukleusFactorySpi implements NukleusFactorySpi
 {
+    public static final String NAME = "tcp";
+
     @Override
     public String name()
     {
-        return TcpNukleus.NAME;
+        return NAME;
     }
 
     @Override
@@ -46,8 +44,9 @@ public final class TcpNukleusFactorySpi implements NukleusFactorySpi
         Poller poller = new Poller();
         acceptor.setPoller(poller);
 
-        return builder.streamFactory(RouteKind.CLIENT, new ClientStreamFactoryBuilder(config))
-                      .streamFactory(RouteKind.SERVER, new ServerStreamFactoryBuilder(config))
+        return builder.streamFactory(RouteKind.CLIENT, new ClientStreamFactoryBuilder(config, poller))
+                      .streamFactory(RouteKind.SERVER, new ServerStreamFactoryBuilder(config, acceptor, poller))
+                      .routeHandler(RouteKind.SERVER, acceptor::handleRoute)
                       .build();
 
     }

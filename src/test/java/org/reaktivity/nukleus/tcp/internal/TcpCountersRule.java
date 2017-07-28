@@ -28,11 +28,13 @@ import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
 import org.reaktivity.nukleus.Configuration;
+import org.reaktivity.reaktor.internal.Context;
+import org.reaktivity.reaktor.internal.Counters;
 
 public class TcpCountersRule implements TestRule
 {
     private final Properties properties;
-    private TcpCounters counters;
+    private Counters counters;
 
     public TcpCountersRule()
     {
@@ -73,14 +75,13 @@ public class TcpCountersRule implements TestRule
             public void evaluate() throws Throwable
             {
                 Configuration configuration = new Configuration(properties);
-                try (TcpCounters counters = new TcpCounters(configuration))
-                {
-                    TcpCountersRule.this.counters = counters;
-                    assertEquals(0, counters.routes());
-                    assertEquals(0, counters.streams());
-                    assertEquals(0, counters.overflows());
-                    base.evaluate();
-                }
+                Context context = new Context().readonly(true).conclude(configuration);
+                Counters counters = context.counters();
+                TcpCountersRule.this.counters = counters;
+                assertEquals(0, counters.routes());
+                assertEquals(0, counters.streams());
+                assertEquals(0, counters.counter("overflows"));
+                base.evaluate();
             }
 
         };
@@ -88,17 +89,17 @@ public class TcpCountersRule implements TestRule
 
     public long routes()
     {
-        return counters.routes();
+        return counters.routes().get();
     }
 
     public long streams()
     {
-        return counters.streams();
+        return counters.streams().get();
     }
 
     public long overflows()
     {
-        return counters.overflows();
+        return counters.counter("overflows").get();
     }
 
 }

@@ -24,8 +24,8 @@ import static java.util.stream.IntStream.of;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.MAXIMUM_STREAMS_WITH_PENDING_WRITES;
-import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.MAXIMUM_STREAMS_WITH_PENDING_WRITES;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.WINDOW_SIZE;
 import static org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ALL;
 
 import java.net.InetSocketAddress;

@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.acceptor;
+package org.reaktivity.nukleus.tcp.internal.stream;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
@@ -40,7 +40,6 @@ import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
-import org.reaktivity.nukleus.tcp.internal.router.Router;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
@@ -61,7 +60,7 @@ public final class Acceptor
     private final ToIntFunction<PollerKey> acceptHandler;
 
     private Poller poller;
-    private Router router;
+    private ServerStreamFactory serverStreamFactory;
 
     public Acceptor()
     {
@@ -83,9 +82,9 @@ public final class Acceptor
         switch(msgTypeId)
         {
         case RouteFW.TYPE_ID:
-            final RouteFW route = routeRO.wrap(buffer, index, index + length);
-            if (route.role().get() == Role.SERVER)
             {
+                final RouteFW route = routeRO.wrap(buffer, index, index + length);
+                assert route.role().get() == Role.SERVER;
                 final long correlationId = route.correlationId();
                 final String source = route.source().asString();
                 final long sourceRef = route.sourceRef();
@@ -98,9 +97,9 @@ public final class Acceptor
             }
             break;
         case UnrouteFW.TYPE_ID:
-            final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
-            if (unroute.role().get() == Role.SERVER)
             {
+                final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
+                assert unroute.role().get() == Role.SERVER;
                 final long correlationId = unroute.correlationId();
                 final String source = unroute.source().asString();
                 final long sourceRef = unroute.sourceRef();
@@ -118,8 +117,16 @@ public final class Acceptor
                     result = false;
                 }
             }
+            break;
+
         }
         return result;
+    }
+
+    void setServerStreamFactory(ServerStreamFactory serverStreamFactory)
+    {
+        this.serverStreamFactory = serverStreamFactory;
+
     }
 
     private boolean doRegister(

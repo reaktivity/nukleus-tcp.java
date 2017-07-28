@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.reader;
+package org.reaktivity.nukleus.tcp.internal.stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.socketAddress;
@@ -22,94 +22,45 @@ import java.net.InetSocketAddress;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.Long2ObjectHashMap;
-import org.agrona.concurrent.AtomicBuffer;
-import org.agrona.concurrent.MessageHandler;
 import org.agrona.concurrent.UnsafeBuffer;
-import org.agrona.concurrent.ringbuffer.RingBuffer;
-import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.tcp.internal.TcpNukleus;
-import org.reaktivity.nukleus.tcp.internal.layouts.StreamsLayout;
+import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.tcp.internal.TcpNukleusFactorySpi;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
-import org.reaktivity.nukleus.tcp.internal.types.stream.FrameFW;
+import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.TcpBeginExFW;
+import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
 
-public final class Target implements Nukleus
+final class MessageWriter
 {
-    private static final DirectBuffer SOURCE_NAME_BUFFER = new UnsafeBuffer(TcpNukleus.NAME.getBytes(UTF_8));
+    private static final DirectBuffer SOURCE_NAME_BUFFER = new UnsafeBuffer(TcpNukleusFactorySpi.NAME.getBytes(UTF_8));
 
-    private final FrameFW frameRO = new FrameFW();
+    final BeginFW beginRO = new BeginFW();
+    final DataFW dataRO = new DataFW();
+    final EndFW endRO = new EndFW();
+    final ResetFW resetRO = new ResetFW();
+    final WindowFW windowRO = new WindowFW();
 
     private final BeginFW.Builder beginRW = new BeginFW.Builder();
     private final DataFW.Builder tcpDataRW = new DataFW.Builder();
     private final EndFW.Builder tcpEndRW = new EndFW.Builder();
+    private final WindowFW.Builder windowRW = new WindowFW.Builder();
+    private final ResetFW.Builder resetRW = new ResetFW.Builder();
+
 
     private final TcpBeginExFW.Builder beginExRW = new TcpBeginExFW.Builder();
 
-    private final String name;
-    private final StreamsLayout layout;
-    private final AtomicBuffer writeBuffer;
+    private final MutableDirectBuffer writeBuffer;
 
-    private final RingBuffer streamsBuffer;
-    private final RingBuffer throttleBuffer;
-    private final Long2ObjectHashMap<MessageHandler> throttles;
-    private final MessageHandler readHandler;
-
-    public Target(
-        String name,
-        StreamsLayout layout,
-        AtomicBuffer writeBuffer)
+    MessageWriter(MutableDirectBuffer writeBuffer)
     {
-        this.name = name;
-        this.layout = layout;
         this.writeBuffer = writeBuffer;
-        this.streamsBuffer = layout.streamsBuffer();
-        this.throttleBuffer = layout.throttleBuffer();
-        this.throttles = new Long2ObjectHashMap<>();
-        this.readHandler = this::handleRead;
-    }
-
-    @Override
-    public int process()
-    {
-        return throttleBuffer.read(readHandler);
-    }
-
-    @Override
-    public void close() throws Exception
-    {
-        layout.close();
-    }
-
-    @Override
-    public String name()
-    {
-        return name;
-    }
-
-    @Override
-    public String toString()
-    {
-        return String.format("%s[name=%s]", getClass().getSimpleName(), name);
-    }
-
-    public void addThrottle(
-        long streamId,
-        MessageHandler throttle)
-    {
-        throttles.put(streamId, throttle);
-    }
-
-    public void removeThrottle(
-        long streamId)
-    {
-        throttles.remove(streamId);
     }
 
     public void doTcpBegin(
+        MessageConsumer stream,
         long streamId,
         long referenceId,
         long correlationId,
@@ -124,10 +75,11 @@ public final class Target implements Nukleus
                 .extension(b -> b.set(visitBeginEx(localAddress, remoteAddress)))
                 .build();
 
-        streamsBuffer.write(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+        stream.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
     public void doTcpData(
+        MessageConsumer stream,
         long streamId,
         DirectBuffer payload,
         int offset,
@@ -138,10 +90,11 @@ public final class Target implements Nukleus
                 .payload(payload, offset, length)
                 .build();
 
-        streamsBuffer.write(tcpData.typeId(), tcpData.buffer(), tcpData.offset(), tcpData.sizeof());
+        stream.accept(tcpData.typeId(), tcpData.buffer(), tcpData.offset(), tcpData.sizeof());
     }
 
     public void doTcpEnd(
+        MessageConsumer stream,
         long streamId)
     {
         EndFW tcpEnd = tcpEndRW.wrap(writeBuffer, 0, writeBuffer.capacity())
@@ -149,8 +102,36 @@ public final class Target implements Nukleus
                 .extension(b -> b.set((buf, off, len) -> 0))
                 .build();
 
-        streamsBuffer.write(tcpEnd.typeId(), tcpEnd.buffer(), tcpEnd.offset(), tcpEnd.sizeof());
+       stream.accept(tcpEnd.typeId(), tcpEnd.buffer(), tcpEnd.offset(), tcpEnd.sizeof());
     }
+
+    void doWindow(
+        final MessageConsumer throttle,
+        final long throttleId,
+        final int writableBytes,
+        final int writableFrames)
+    {
+        final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .streamId(throttleId)
+                .update(writableBytes)
+                .frames(writableFrames)
+                .build();
+
+        throttle.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
+    }
+
+    void doReset(
+        final MessageConsumer throttle,
+        final long throttleId)
+    {
+        final ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+               .streamId(throttleId)
+               .build();
+
+        throttle.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
+    }
+
+
 
     private Flyweight.Builder.Visitor visitBeginEx(
         InetSocketAddress localAddress,
@@ -166,20 +147,4 @@ public final class Target implements Nukleus
                      .sizeof();
     }
 
-    private void handleRead(
-        int msgTypeId,
-        MutableDirectBuffer buffer,
-        int index,
-        int length)
-    {
-        frameRO.wrap(buffer, index, index + length);
-
-        final long streamId = frameRO.streamId();
-        final MessageHandler throttle = throttles.get(streamId);
-
-        if (throttle != null)
-        {
-            throttle.onMessage(msgTypeId, buffer, index, length);
-        }
-    }
 }

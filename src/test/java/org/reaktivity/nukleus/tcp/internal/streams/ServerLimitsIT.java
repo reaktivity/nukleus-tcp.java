@@ -18,7 +18,7 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.WINDOW_SIZE;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

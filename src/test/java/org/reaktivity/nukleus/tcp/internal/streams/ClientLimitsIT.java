@@ -19,8 +19,8 @@ import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.MAXIMUM_STREAMS_WITH_PENDING_WRITES;
-import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.MAXIMUM_STREAMS_WITH_PENDING_WRITES;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.WINDOW_SIZE;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
