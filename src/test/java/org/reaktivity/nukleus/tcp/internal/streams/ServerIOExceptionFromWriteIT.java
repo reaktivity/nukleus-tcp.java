@@ -33,7 +33,8 @@ import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDataHelper;
-import org.reaktivity.reaktor.test.NukleusRule;
+import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.specification.nukleus.NukleusRule;
 
 /**
  * Tests the handling of IOException thrown from SocketChannel.read (see issue #9).
@@ -47,15 +48,20 @@ public class ServerIOExceptionFromWriteIT
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
-    private final NukleusRule nukleus = new NukleusRule("tcp")
+    private final ReaktorRule reaktor = new ReaktorRule()
+        .nukleus("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024)
-        .streams("tcp", "target#partition");
+        .counterValuesBufferCapacity(1024);
+
+    private final NukleusRule file = new NukleusRule()
+            .directory("target/nukleus-itests")
+            .streams("tcp", "target#partition")
+            .streams("target", "tcp#any");
 
     @Rule
-    public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(nukleus).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(file).around(reaktor).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -66,7 +72,7 @@ public class ServerIOExceptionFromWriteIT
     targetClass = "^java.nio.channels.SocketChannel",
     targetMethod = "write(java.nio.ByteBuffer)",
     condition =
-      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData\", true, true)",
+      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
       action = "throw new IOException(\"Simulating an IOException from write\")"
     )
     public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
@@ -93,14 +99,14 @@ public class ServerIOExceptionFromWriteIT
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
         condition =
-          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.processData\", true, true)",
+          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
         action = "return doWrite($0, $1);"
         ),
         @BMRule(name = "handleWrite",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
         condition =
-          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.writer.stream.StreamFactory$Stream.handleWrite\", true, true)",
+          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.handleWrite\", true, true)",
           action = "throw new IOException(\"Simulating an IOException from write\")"
         )
     })

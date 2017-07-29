@@ -27,7 +27,7 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
-import org.reaktivity.reaktor.test.NukleusRule;
+import org.reaktivity.reaktor.test.ReaktorRule;
 
 public class ControlIT
 {
@@ -37,7 +37,8 @@ public class ControlIT
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
-    private final NukleusRule nukleus = new NukleusRule("tcp")
+    private final ReaktorRule controller = new ReaktorRule()
+        .nukleus("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
@@ -50,7 +51,7 @@ public class ControlIT
             .counterValuesBufferCapacity(1024);
 
     @Rule
-    public final TestRule chain = outerRule(k3po).around(timeout).around(nukleus).around(counters);
+    public final TestRule chain = outerRule(k3po).around(timeout).around(controller).around(counters);
 
     @Test
     @Specification({

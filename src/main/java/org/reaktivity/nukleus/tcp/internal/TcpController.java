@@ -22,22 +22,15 @@ import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
 import java.net.InetAddress;
 import java.util.concurrent.CompletableFuture;
 
-import org.agrona.DirectBuffer;
-import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
-import org.agrona.concurrent.broadcast.BroadcastReceiver;
-import org.agrona.concurrent.broadcast.CopyBroadcastReceiver;
-import org.agrona.concurrent.ringbuffer.RingBuffer;
 import org.reaktivity.nukleus.Controller;
+import org.reaktivity.nukleus.ControllerSpi;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
-import org.reaktivity.nukleus.tcp.internal.types.control.ErrorFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.RoutedFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.UnroutedFW;
 
 
 public final class TcpController implements Controller
@@ -50,39 +43,25 @@ public final class TcpController implements Controller
 
     private final TcpRouteExFW.Builder routeExRW = new TcpRouteExFW.Builder();
 
-    private final ErrorFW errorRO = new ErrorFW();
-    private final RoutedFW routedRO = new RoutedFW();
-    private final UnroutedFW unroutedRO = new UnroutedFW();
-
-    private final Context context;
-    private final RingBuffer conductorCommands;
-    private final CopyBroadcastReceiver conductorResponses;
+    private final ControllerSpi controllerSpi;
     private final AtomicBuffer atomicBuffer;
-    private final Long2ObjectHashMap<CompletableFuture<?>> promisesByCorrelationId;
 
-    public TcpController(Context context)
+    public TcpController(ControllerSpi controllerSpi)
     {
-        this.context = context;
-        this.conductorCommands = context.conductorCommands();
-        this.conductorResponses = new CopyBroadcastReceiver(new BroadcastReceiver(context.conductorResponseBuffer()));
+        this.controllerSpi = controllerSpi;
         this.atomicBuffer = new UnsafeBuffer(allocateDirect(MAX_SEND_LENGTH).order(nativeOrder()));
-        this.promisesByCorrelationId = new Long2ObjectHashMap<>();
     }
 
     @Override
     public int process()
     {
-        int weight = 0;
-
-        weight += conductorResponses.receive(this::handleResponse);
-
-        return weight;
+        return controllerSpi.doProcess();
     }
 
     @Override
     public void close() throws Exception
     {
-        context.close();
+        controllerSpi.doClose();
     }
 
     @Override
@@ -137,13 +116,6 @@ public final class TcpController implements Controller
         return unroute(Role.CLIENT, source, sourceRef, target, targetRef, address);
     }
 
-    public TcpStreams streams(
-        String source,
-        String target)
-    {
-        return new TcpStreams(context, source, target);
-    }
-
     private Flyweight.Builder.Visitor visitRouteEx(
         InetAddress address)
     {
@@ -159,110 +131,6 @@ public final class TcpController implements Controller
                      .sizeof();
     }
 
-    private int handleResponse(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        switch (msgTypeId)
-        {
-        case ErrorFW.TYPE_ID:
-            handleErrorResponse(buffer, index, length);
-            break;
-        case RoutedFW.TYPE_ID:
-            handleRoutedResponse(buffer, index, length);
-            break;
-        case UnroutedFW.TYPE_ID:
-            handleUnroutedResponse(buffer, index, length);
-            break;
-        default:
-            break;
-        }
-
-        return 1;
-    }
-
-    private void handleErrorResponse(
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        errorRO.wrap(buffer, index, length);
-        long correlationId = errorRO.correlationId();
-
-        CompletableFuture<?> promise = promisesByCorrelationId.remove(correlationId);
-        if (promise != null)
-        {
-            commandFailed(promise, "command failed");
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private void handleRoutedResponse(
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        routedRO.wrap(buffer, index, length);
-        long correlationId = routedRO.correlationId();
-        final long sourceRef = routedRO.sourceRef();
-
-        CompletableFuture<Long> promise = (CompletableFuture<Long>) promisesByCorrelationId.remove(correlationId);
-        if (promise != null)
-        {
-            commandSucceeded(promise, sourceRef);
-        }
-    }
-
-    private void handleUnroutedResponse(
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        unroutedRO.wrap(buffer, index, length);
-        long correlationId = unroutedRO.correlationId();
-
-        CompletableFuture<?> promise = promisesByCorrelationId.remove(correlationId);
-        if (promise != null)
-        {
-            commandSucceeded(promise);
-        }
-    }
-
-    private void commandSent(
-        final long correlationId,
-        final CompletableFuture<?> promise)
-    {
-        promisesByCorrelationId.put(correlationId, promise);
-    }
-
-    private <T> boolean commandSucceeded(
-        final CompletableFuture<T> promise)
-    {
-        return commandSucceeded(promise, null);
-    }
-
-    private <T> boolean commandSucceeded(
-        final CompletableFuture<T> promise,
-        final T value)
-    {
-        return promise.complete(value);
-    }
-
-    private boolean commandSendFailed(
-        final CompletableFuture<?> promise)
-    {
-        return commandFailed(promise, "unable to offer command");
-    }
-
-    private boolean commandFailed(
-        final CompletableFuture<?> promise,
-        final String message)
-    {
-        return promise.completeExceptionally(new IllegalStateException(message).fillInStackTrace());
-    }
-
     private CompletableFuture<Long> route(
         Role role,
         String source,
@@ -271,9 +139,7 @@ public final class TcpController implements Controller
         long targetRef,
         InetAddress address)
     {
-        final CompletableFuture<Long> promise = new CompletableFuture<>();
-
-        long correlationId = conductorCommands.nextCorrelationId();
+        long correlationId = controllerSpi.nextCorrelationId();
 
         RouteFW routeRO = routeRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
                                  .correlationId(correlationId)
@@ -285,16 +151,7 @@ public final class TcpController implements Controller
                                  .extension(b -> b.set(visitRouteEx(address)))
                                  .build();
 
-        if (!conductorCommands.write(routeRO.typeId(), routeRO.buffer(), routeRO.offset(), routeRO.sizeof()))
-        {
-            commandSendFailed(promise);
-        }
-        else
-        {
-            commandSent(correlationId, promise);
-        }
-
-        return promise;
+        return controllerSpi.doRoute(routeRO.typeId(), routeRO.buffer(), routeRO.offset(), routeRO.sizeof());
     }
 
     private CompletableFuture<Void> unroute(
@@ -305,9 +162,7 @@ public final class TcpController implements Controller
         long targetRef,
         InetAddress address)
     {
-        final CompletableFuture<Void> promise = new CompletableFuture<>();
-
-        long correlationId = conductorCommands.nextCorrelationId();
+        long correlationId = controllerSpi.nextCorrelationId();
 
         UnrouteFW unrouteRO = unrouteRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
                                  .correlationId(correlationId)
@@ -319,16 +174,7 @@ public final class TcpController implements Controller
                                  .extension(b -> b.set(visitRouteEx(address)))
                                  .build();
 
-        if (!conductorCommands.write(unrouteRO.typeId(), unrouteRO.buffer(), unrouteRO.offset(), unrouteRO.sizeof()))
-        {
-            commandSendFailed(promise);
-        }
-        else
-        {
-            commandSent(correlationId, promise);
-        }
-
-        return promise;
+        return controllerSpi.doUnroute(unrouteRO.typeId(), unrouteRO.buffer(), unrouteRO.offset(), unrouteRO.sizeof());
     }
 
 }

@@ -30,7 +30,8 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
-import org.reaktivity.reaktor.test.NukleusRule;
+import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.specification.nukleus.NukleusRule;
 
 /**
  * Tests the handling of IOException thrown from SocketChannel.read (see issue #9).
@@ -43,12 +44,12 @@ public class ServerIOExceptionFromReadIT
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
-    private final NukleusRule nukleus = new NukleusRule("tcp")
+    private final ReaktorRule reaktor = new ReaktorRule()
+        .nukleus("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024)
-        .streams("tcp", "target#partition");
+        .counterValuesBufferCapacity(1024);
 
     private final TcpCountersRule counters = new TcpCountersRule()
         .directory("target/nukleus-itests")
@@ -56,8 +57,13 @@ public class ServerIOExceptionFromReadIT
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024);
 
+    private final NukleusRule file = new NukleusRule()
+            .directory("target/nukleus-itests")
+            .streams("tcp", "target#partition")
+            .streams("target", "tcp#any");
+
     @Rule
-    public final TestRule chain = outerRule(nukleus).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(file).around(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
