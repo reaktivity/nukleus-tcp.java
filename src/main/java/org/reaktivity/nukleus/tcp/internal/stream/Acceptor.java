@@ -13,12 +13,14 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.acceptor;
+package org.reaktivity.nukleus.tcp.internal.stream;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.NetworkChannel;
@@ -34,43 +36,37 @@ import java.util.function.ToIntFunction;
 import javax.annotation.Resource;
 
 import org.agrona.CloseHelper;
+import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
-import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.tcp.internal.conductor.Conductor;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
-import org.reaktivity.nukleus.tcp.internal.router.Router;
+import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
+import org.reaktivity.nukleus.tcp.internal.types.control.Role;
+import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
+import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
+import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
 
 /**
  * The {@code Poller} nukleus accepts new socket connections and informs the {@code Router} nukleus.
  */
-public final class Acceptor implements Nukleus
+public final class Acceptor
 {
+    private final RouteFW routeRO = new RouteFW();
+    private final TcpRouteExFW routeExRO = new TcpRouteExFW();
+    private final UnrouteFW unrouteRO = new UnrouteFW();
+
     private final Map<SocketAddress, String> sourcesByLocalAddress;
     private final Function<SocketAddress, PollerKey> registerHandler;
     private final ToIntFunction<PollerKey> acceptHandler;
 
-    private Conductor conductor;
-    private Router router;
     private Poller poller;
+    private ServerStreamFactory serverStreamFactory;
 
     public Acceptor()
     {
         this.sourcesByLocalAddress = new HashMap<>();
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
-    }
-
-    public void setConductor(
-        Conductor conductor)
-    {
-        this.conductor = conductor;
-    }
-
-    public void setRouter(
-        Router router)
-    {
-        this.router = router;
     }
 
     @Resource
@@ -80,19 +76,60 @@ public final class Acceptor implements Nukleus
         this.poller = poller;
     }
 
-    @Override
-    public int process()
+    public boolean handleRoute(int msgTypeId, DirectBuffer buffer, int index, int length)
     {
-        return 0;
+        boolean result = true;
+        switch(msgTypeId)
+        {
+        case RouteFW.TYPE_ID:
+            {
+                final RouteFW route = routeRO.wrap(buffer, index, index + length);
+                assert route.role().get() == Role.SERVER;
+                final long correlationId = route.correlationId();
+                final String source = route.source().asString();
+                final long sourceRef = route.sourceRef();
+                final OctetsFW extension = route.extension();
+
+                final TcpRouteExFW routeEx = extension.get(routeExRO::wrap);
+                final InetAddress address = inetAddress(routeEx.address());
+                InetSocketAddress localAddress = new InetSocketAddress(address, (int)sourceRef);
+                result = doRegister(correlationId, source, sourceRef, localAddress);
+            }
+            break;
+        case UnrouteFW.TYPE_ID:
+            {
+                final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
+                assert unroute.role().get() == Role.SERVER;
+                final long correlationId = unroute.correlationId();
+                final String source = unroute.source().asString();
+                final long sourceRef = unroute.sourceRef();
+                final OctetsFW extension = unroute.extension();
+
+                final TcpRouteExFW unrouteEx = extension.get(routeExRO::wrap);
+                final InetAddress address = inetAddress(unrouteEx.address());
+                if (sourceRef > 0L && sourceRef <= 65535L && address != null)
+                {
+                    InetSocketAddress localAddress = new InetSocketAddress(address, (int)sourceRef);
+                    result = doUnregister(correlationId, source, localAddress);
+                }
+                else
+                {
+                    result = false;
+                }
+            }
+            break;
+
+        }
+        return result;
     }
 
-    @Override
-    public String name()
+    void setServerStreamFactory(ServerStreamFactory serverStreamFactory)
     {
-        return "acceptor";
+        this.serverStreamFactory = serverStreamFactory;
+
     }
 
-    public void doRegister(
+    private boolean doRegister(
         long correlationId,
         String sourceName,
         long sourceRef,
@@ -105,34 +142,34 @@ public final class Acceptor implements Nukleus
             // TODO: detect collision on different source name for same key
             // TODO: maintain register count
             sourcesByLocalAddress.putIfAbsent(address, sourceName);
-
-            conductor.onRoutedResponse(correlationId, sourceRef);
         }
         catch (Exception ex)
         {
-            conductor.onErrorResponse(correlationId);
             LangUtil.rethrowUnchecked(ex);
         }
+        return true;
     }
 
-    public void doUnregister(
+    private boolean doUnregister(
         long correlationId,
         String sourceName,
         SocketAddress address)
     {
+        boolean result;
         if (Objects.equals(sourceName, sourcesByLocalAddress.get(address)))
         {
             final PollerKey key = findRegisteredKey(address);
 
             // TODO: maintain count for auto close when unregistered for last time
             CloseHelper.quietClose(key.channel());
+            result = true;
 
-            conductor.onUnroutedResponse(correlationId);
         }
         else
         {
-            conductor.onErrorResponse(correlationId);
+            result = false;
         }
+        return result;
     }
 
     private int handleAccept(
@@ -149,7 +186,7 @@ public final class Acceptor implements Nukleus
             final String sourceName = sourcesByLocalAddress.get(address);
             final long sourceRef = address.getPort();
 
-            router.onAccepted(sourceName, sourceRef, channel, address);
+            serverStreamFactory.onAccepted(sourceName, sourceRef, channel, address);
         }
         catch (Exception ex)
         {

@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.nukleus.tcp.internal.InternalSystemProperty.WINDOW_SIZE;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -32,7 +31,9 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.reaktor.test.NukleusRule;
+import org.reaktivity.reaktor.internal.ReaktorConfiguration;
+import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.specification.nukleus.NukleusRule;
 
 /**
  * Verifies behavior when capacity limits are exceeded
@@ -45,18 +46,22 @@ public class ServerLimitsIT
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
-    private final NukleusRule nukleus = new NukleusRule("tcp")
+    private final ReaktorRule reaktor = new ReaktorRule()
+        .nukleus("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .streams("tcp", "target#partition");
+        // Initial window size for output to network:
+        .configure(ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY, 16);
 
-    private final TestRule properties = new SystemPropertiesRule()
-        .setProperty(WINDOW_SIZE.propertyName(), "15");
+    private final NukleusRule file = new NukleusRule()
+            .directory("target/nukleus-itests")
+            .streams("tcp", "target#partition")
+            .streams("target", "tcp#any");
 
     @Rule
-    public final TestRule chain = outerRule(properties).around(nukleus).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(file).around(reaktor).around(k3po).around(timeout);
 
     @Test
     @Specification({

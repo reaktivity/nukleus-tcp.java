@@ -38,11 +38,9 @@ public final class TcpControllerFactorySpi implements ControllerFactorySpi<TcpCo
         Configuration config,
         ControllerBuilder<TcpController> builder)
     {
-        Context context = new Context();
-        context.readonly(true)
-               .conclude(config);
-
-        return new TcpController(context);
+        return builder.setName(name())
+                .setFactory(TcpController::new)
+                .build();
     }
 
 }
