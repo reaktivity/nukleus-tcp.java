@@ -74,8 +74,8 @@ public class ServerPartialWriteIT
 
     private final NukleusRule file = new NukleusRule()
             .directory("target/nukleus-itests")
-            .streams("tcp", "source#partition")
-            .streams("source", "tcp#source");
+            .streams("tcp", "target#partition")
+            .streams("target", "tcp#any");
 
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(file).around(reaktor).around(k3po).around(timeout);

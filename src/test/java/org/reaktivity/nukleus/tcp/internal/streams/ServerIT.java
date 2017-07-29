@@ -54,7 +54,8 @@ public class ServerIT
 
     private final NukleusRule file = new NukleusRule()
             .directory("target/nukleus-itests")
-            .streams("tcp", "target#partition");
+            .streams("tcp", "target#partition")
+            .streams("target", "tcp#any");
 
     private final TcpCountersRule counters = new TcpCountersRule()
         .directory("target/nukleus-itests")
