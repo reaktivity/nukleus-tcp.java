@@ -42,6 +42,7 @@ import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.HandleWriteHelper;
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
@@ -67,6 +68,7 @@ public class ServerPartialWriteIT
 
     private final ReaktorRule reaktor = new ReaktorRule()
         .nukleus("tcp"::equals)
+        .controller(TcpController.class::isAssignableFrom)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
@@ -74,8 +76,8 @@ public class ServerPartialWriteIT
 
     private final NukleusRule file = new NukleusRule()
             .directory("target/nukleus-itests")
-            .streams("tcp", "source#partition")
-            .streams("source", "tcp#source");
+            .streams("tcp", "target#partition")
+            .streams("target", "tcp#any");
 
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(file).around(reaktor).around(k3po).around(timeout);
