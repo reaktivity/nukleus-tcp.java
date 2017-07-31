@@ -15,54 +15,20 @@
  */
 package org.reaktivity.nukleus.tcp.internal;
 
-import static java.lang.String.valueOf;
 import static org.junit.Assert.assertEquals;
-import static org.reaktivity.nukleus.Configuration.COMMAND_BUFFER_CAPACITY_PROPERTY_NAME;
-import static org.reaktivity.nukleus.Configuration.COUNTERS_BUFFER_CAPACITY_PROPERTY_NAME;
-import static org.reaktivity.nukleus.Configuration.DIRECTORY_PROPERTY_NAME;
-import static org.reaktivity.nukleus.Configuration.RESPONSE_BUFFER_CAPACITY_PROPERTY_NAME;
-
-import java.util.Properties;
 
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
-import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.reaktor.internal.Context;
-import org.reaktivity.reaktor.internal.Counters;
+import org.reaktivity.reaktor.test.ReaktorRule;
 
 public class TcpCountersRule implements TestRule
 {
-    private final Properties properties;
-    private Counters counters;
+    private final ReaktorRule reaktor;
 
-    public TcpCountersRule()
+    public TcpCountersRule(ReaktorRule reaktor)
     {
-        this.properties = new Properties();
-    }
-
-    public TcpCountersRule directory(String directory)
-    {
-        properties.setProperty(DIRECTORY_PROPERTY_NAME, directory);
-        return this;
-    }
-
-    public TcpCountersRule commandBufferCapacity(int commandBufferCapacity)
-    {
-        properties.setProperty(COMMAND_BUFFER_CAPACITY_PROPERTY_NAME, valueOf(commandBufferCapacity));
-        return this;
-    }
-
-    public TcpCountersRule responseBufferCapacity(int responseBufferCapacity)
-    {
-        properties.setProperty(RESPONSE_BUFFER_CAPACITY_PROPERTY_NAME, valueOf(responseBufferCapacity));
-        return this;
-    }
-
-    public TcpCountersRule counterValuesBufferCapacity(int counterValuesBufferCapacity)
-    {
-        properties.setProperty(COUNTERS_BUFFER_CAPACITY_PROPERTY_NAME, valueOf(counterValuesBufferCapacity));
-        return this;
+        this.reaktor = reaktor;
     }
 
     @Override
@@ -74,16 +40,11 @@ public class TcpCountersRule implements TestRule
             @Override
             public void evaluate() throws Throwable
             {
-                Configuration configuration = new Configuration(properties);
-                try(Context context = new Context().name("tcp").readonly(true).conclude(configuration);
-                    Counters counters = context.counters())
-                {
-                    TcpCountersRule.this.counters = counters;
-                    assertEquals(0, counters.routes().get());
-                    assertEquals(0, counters.streams().get());
-                    assertEquals(0, counters.counter("overflows").get());
-                    base.evaluate();
-                }
+                TcpController controller = controller();
+                assertEquals(0, controller.count("streams"));
+                assertEquals(0, controller.count("routes"));
+                assertEquals(0, controller.count("overflows"));
+                base.evaluate();
             }
 
         };
@@ -91,17 +52,22 @@ public class TcpCountersRule implements TestRule
 
     public long routes()
     {
-        return counters.routes().get();
+        return controller().count("routes");
     }
 
     public long streams()
     {
-        return counters.streams().get();
+        return controller().count("streams");
     }
 
     public long overflows()
     {
-        return counters.counter("overflows").get();
+        return controller().count("overflows");
+    }
+
+    private TcpController controller()
+    {
+        return reaktor.controller(TcpController.class);
     }
 
 }

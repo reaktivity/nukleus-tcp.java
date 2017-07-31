@@ -116,6 +116,11 @@ public final class TcpController implements Controller
         return unroute(Role.CLIENT, source, sourceRef, target, targetRef, address);
     }
 
+    public long count(String name)
+    {
+        return controllerSpi.doCount(name);
+    }
+
     private Flyweight.Builder.Visitor visitRouteEx(
         InetAddress address)
     {

@@ -43,6 +43,7 @@ import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.HandleWriteHelper;
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDataHelper;
@@ -66,6 +67,7 @@ public class ClientPartialWriteLimitsIT
 
     private final ReaktorRule reaktor = new ReaktorRule()
         .nukleus("tcp"::equals)
+        .controller(TcpController.class::isAssignableFrom)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
@@ -75,11 +77,7 @@ public class ClientPartialWriteLimitsIT
         // Overall buffer pool size same as slot size so maximum concurrent streams with partial writes = 1
         .configure(ReaktorConfiguration.BUFFER_POOL_CAPACITY_PROPERTY, 16);
 
-    private final TcpCountersRule counters = new TcpCountersRule()
-        .directory("target/nukleus-itests")
-        .commandBufferCapacity(1024)
-        .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024);
+    private final TcpCountersRule counters = new TcpCountersRule(reaktor);
 
     private final NukleusRule file = new NukleusRule()
             .directory("target/nukleus-itests")
