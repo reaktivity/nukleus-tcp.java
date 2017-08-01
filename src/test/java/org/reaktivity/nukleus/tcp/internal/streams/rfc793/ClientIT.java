@@ -17,6 +17,8 @@ package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import static org.junit.rules.RuleChain.outerRule;
 
 import java.io.IOException;
@@ -63,12 +65,12 @@ public class ClientIT
     @Rule
     public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
 
-    @Test(expected = IOException.class)
+    @Test
     @Specification({
         "${route}/client/controller",
         "${client}/client.sent.abort/client"
     })
-    public void shouldCauseTcpResetWhenClientSendsAbort() throws Exception
+    public void shouldShutdownOutputWhenClientSendsAbort() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
@@ -81,14 +83,8 @@ public class ClientIT
             try (SocketChannel channel = server.accept())
             {
                 ByteBuffer buf = ByteBuffer.allocate(20);
-                int read = 0;
-                read = channel.read(buf);
-                System.out.println("read = " + read);
-            }
-            catch(IOException e)
-            {
-                e.printStackTrace();
-                throw e;
+                int len = channel.read(buf);
+                assertEquals(-1, len);
             }
             finally
             {
@@ -97,12 +93,12 @@ public class ClientIT
         }
     }
 
-    @Test(expected = IOException.class)
+    @Test
     @Specification({
         "${route}/client/controller",
         "${client}/client.sent.abort.and.reset/client"
     })
-    public void shouldCauseTcpResetWhenClientSendsAbortAndReset() throws Exception
+    public void shouldShutdownOutputAndInputWhenClientSendsAbortAndReset() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
@@ -115,14 +111,8 @@ public class ClientIT
             try (SocketChannel channel = server.accept())
             {
                 ByteBuffer buf = ByteBuffer.allocate(20);
-                int read = 0;
-                read = channel.read(buf);
-                System.out.println("read = " + read);
-            }
-            catch(IOException e)
-            {
-                e.printStackTrace();
-                throw e;
+                int len = channel.read(buf);
+                assertEquals(-1, len);
             }
             finally
             {
@@ -134,7 +124,7 @@ public class ClientIT
     @Test(expected = IOException.class)
     @Specification({
         "${route}/client/controller",
-        "${client}/client.sent.reset.and.end/client"
+        "${client}/client.sent.reset/client"
     })
     public void shouldShutdownInputWhenClientSendsReset() throws Exception
     {
@@ -148,20 +138,28 @@ public class ClientIT
 
             try (SocketChannel channel = server.accept())
             {
-                // Send data, this should cause other end to sent TCP RST if input was shutdown
+                channel.configureBlocking(false);
+
                 channel.write(ByteBuffer.wrap("some data".getBytes()));
 
                 ByteBuffer buf = ByteBuffer.allocate(20);
-                int read = 0;
                 try
                 {
-                    read = channel.read(buf);
-                    System.out.println("read = " + read);
+                    k3po.awaitBarrier("READ_ABORTED");
+
+                    int len;
+                    // Send more data, this should cause other end to send TCP RST if input was shutdown
+                    // Depending on timing we may need to repeat this operation till we get the IOException
+                    do
+                    {
+                        channel.write(ByteBuffer.wrap("more data".getBytes()));
+                        len = channel.read(buf);
+                    }
+                    while (len == 0);
+                    fail(String.format("channel.read returned %d instead of throwing IOException", len));
                 }
                 catch(IOException e)
                 {
-                    // expected
-                    e.printStackTrace();
                     throw e;
                 }
             }
@@ -171,7 +169,6 @@ public class ClientIT
             }
         }
     }
-
 
 
 }

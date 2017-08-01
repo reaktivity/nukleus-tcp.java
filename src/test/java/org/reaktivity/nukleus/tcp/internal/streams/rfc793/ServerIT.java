@@ -16,6 +16,8 @@
 package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import static org.junit.rules.RuleChain.outerRule;
 
 import java.io.IOException;
@@ -32,6 +34,7 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
+import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
@@ -52,19 +55,20 @@ public class ServerIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024);
+        .counterValuesBufferCapacity(1024)
+        .configure("reaktor.abort.stream.frame.type.id", AbortFW.TYPE_ID);
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
 
     @Rule
     public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
 
-    @Test(expected = IOException.class)
+    @Test
     @Specification({
         "${route}/server/controller",
         "${server}/server.sent.abort/server"
     })
-    public void shouldCauseTcpResetWhenServerSendsAbort() throws Exception
+    public void shouldShutdownOutputWhenServerSendsAbort() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
@@ -74,14 +78,8 @@ public class ServerIT
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             ByteBuffer buf = ByteBuffer.allocate(20);
-            int read = 0;
-            read = channel.read(buf);
-            System.out.println("read = " + read);
-        }
-        catch(IOException e)
-        {
-            e.printStackTrace();
-            throw e;
+            int len = channel.read(buf);
+            assertEquals(-1, len);
         }
         finally
         {
@@ -89,12 +87,12 @@ public class ServerIT
         }
     }
 
-    @Test(expected = IOException.class)
+    @Test
     @Specification({
         "${route}/server/controller",
         "${server}/server.sent.abort.and.reset/server"
     })
-    public void shouldCauseTcpResetWhenServerSendsAbortAndReset() throws Exception
+    public void shouldShutdownOutputAndInputWhenServerSendsAbortAndReset() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
@@ -104,14 +102,8 @@ public class ServerIT
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
             ByteBuffer buf = ByteBuffer.allocate(20);
-            int read = 0;
-            read = channel.read(buf);
-            System.out.println("read = " + read);
-        }
-        catch(IOException e)
-        {
-            e.printStackTrace();
-            throw e;
+            int len = channel.read(buf);
+            assertEquals(-1, len);
         }
         finally
         {
@@ -122,7 +114,7 @@ public class ServerIT
     @Test(expected = IOException.class)
     @Specification({
         "${route}/server/controller",
-        "${server}/server.sent.reset.and.end/server"
+        "${server}/server.sent.reset/server"
     })
     public void shouldShutdownInputWhenServerSendsReset() throws Exception
     {
@@ -133,20 +125,28 @@ public class ServerIT
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            // Send data, this should cause other end to sent TCP RST if input was shutdown
+            channel.configureBlocking(false);
+
             channel.write(ByteBuffer.wrap("some data".getBytes()));
 
             ByteBuffer buf = ByteBuffer.allocate(20);
-            int read = 0;
             try
             {
-                read = channel.read(buf);
-                System.out.println("read = " + read);
+                k3po.awaitBarrier("READ_ABORTED");
+
+                int len;
+                // Send more data, this should cause other end to send TCP RST if input was shutdown
+                // Depending on timing we may need to repeat this operation till we get the IOException
+                do
+                {
+                    channel.write(ByteBuffer.wrap("more data".getBytes()));
+                    len = channel.read(buf);
+                }
+                while (len == 0);
+                fail(String.format("channel.read returned %d instead of throwing IOException", len));
             }
             catch(IOException e)
             {
-                // expected
-                e.printStackTrace();
                 throw e;
             }
         }
