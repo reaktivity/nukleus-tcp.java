@@ -17,30 +17,35 @@ package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 import static org.junit.rules.RuleChain.outerRule;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.CountDownLatch;
 
+import org.jboss.byteman.contrib.bmunit.BMRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
+import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper;
+import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.CountDownHelper;
 import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
  * Tests use of the nukleus as an HTTP server.
  */
-public class ServerIT
+@RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
+public class ServerIResetAndAbortT
 {
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
@@ -56,12 +61,14 @@ public class ServerIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
+        .clean()
         .configure("reaktor.abort.stream.frame.type.id", AbortFW.TYPE_ID);
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
 
     @Rule
-    public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(SocketChannelHelper.RULE)
+            .around(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -92,8 +99,18 @@ public class ServerIT
         "${route}/server/controller",
         "${server}/server.sent.abort.and.reset/server"
     })
+    @BMRule(name = "shutdownInput",
+    targetClass = "^java.nio.channels.SocketChannel",
+    targetMethod = "shutdownInput()",
+    helper = "org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$CountDownHelper",
+    condition =
+      "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+      action = "countDown()"
+    )
     public void shouldShutdownOutputAndInputWhenServerSendsAbortAndReset() throws Exception
     {
+        CountDownLatch shutdownInputCalled = new CountDownLatch(1);
+        CountDownHelper.initialize(shutdownInputCalled);
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
 
@@ -104,6 +121,7 @@ public class ServerIT
             ByteBuffer buf = ByteBuffer.allocate(20);
             int len = channel.read(buf);
             assertEquals(-1, len);
+            shutdownInputCalled.await();
         }
         finally
         {
@@ -111,13 +129,23 @@ public class ServerIT
         }
     }
 
-    @Test(expected = IOException.class)
+    @Test
     @Specification({
         "${route}/server/controller",
         "${server}/server.sent.reset/server"
     })
+    @BMRule(name = "shutdownInput",
+    targetClass = "^java.nio.channels.SocketChannel",
+    targetMethod = "shutdownInput()",
+    helper = "org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$CountDownHelper",
+    condition =
+      "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+      action = "countDown()"
+    )
     public void shouldShutdownInputWhenServerSendsReset() throws Exception
     {
+        CountDownLatch shutdownInputCalled = new CountDownLatch(1);
+        CountDownHelper.initialize(shutdownInputCalled);
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
 
@@ -129,21 +157,10 @@ public class ServerIT
 
             channel.write(ByteBuffer.wrap("some data".getBytes()));
 
-            ByteBuffer buf = ByteBuffer.allocate(20);
             try
             {
                 k3po.awaitBarrier("READ_ABORTED");
-
-                int len;
-                // Send more data, this should cause other end to send TCP RST if input was shutdown
-                // Depending on timing we may need to repeat this operation till we get the IOException
-                do
-                {
-                    channel.write(ByteBuffer.wrap("more data".getBytes()));
-                    len = channel.read(buf);
-                }
-                while (len == 0);
-                fail(String.format("channel.read returned %d instead of throwing IOException", len));
+                shutdownInputCalled.await();
             }
             catch(IOException e)
             {

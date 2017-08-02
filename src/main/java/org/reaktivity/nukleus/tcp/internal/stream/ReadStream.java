@@ -43,6 +43,7 @@ final class ReadStream
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
     private int readableBytes;
+    private boolean resetRequired;
 
     ReadStream(
         MessageConsumer target,
@@ -115,6 +116,10 @@ final class ReadStream
         {
             writer.doReset(correlatedThrottle, correlatedStreamId);
         }
+        else
+        {
+            resetRequired = true;
+        }
     }
 
     void handleThrottle(
@@ -141,6 +146,10 @@ final class ReadStream
     {
         this.correlatedThrottle = correlatedThrottle;
         this.correlatedStreamId = correlatedStreamId;
+        if (resetRequired)
+        {
+            writer.doReset(correlatedThrottle, correlatedStreamId);
+        }
     }
 
     private void processWindow(

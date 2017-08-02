@@ -58,6 +58,7 @@ public class ClientIOExceptionFromReadIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
+        .clean()
         .configure("reaktor.abort.stream.frame.type.id", AbortFW.TYPE_ID);
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);

@@ -53,6 +53,7 @@ public class ServerIOExceptionFromReadIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
+        .clean()
         .configure("reaktor.abort.stream.frame.type.id", AbortFW.TYPE_ID);
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -78,9 +79,6 @@ public class ServerIOExceptionFromReadIT
 
             channel.setOption(StandardSocketOptions.SO_LINGER, 0);
             channel.close();
-        }
-        finally
-        {
 
             k3po.finish();
         }
@@ -104,9 +102,7 @@ public class ServerIOExceptionFromReadIT
 
             channel.setOption(StandardSocketOptions.SO_LINGER, 0);
             channel.close();
-        }
-        finally
-        {
+
             k3po.finish();
         }
     }
