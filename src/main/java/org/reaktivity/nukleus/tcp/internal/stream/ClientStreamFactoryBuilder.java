@@ -20,7 +20,6 @@ import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.Configuration;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.route.RouteManager;
@@ -32,7 +31,6 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 {
     private final Configuration config;
     private final Poller poller;
-    private final Long2ObjectHashMap<Correlation> correlations;
 
     private LongSupplier incrementOverflow;
     private RouteManager router;
@@ -45,7 +43,6 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     {
         this.config = config;
         this.poller = poller;
-        this.correlations = new Long2ObjectHashMap<>();
     }
 
     @Override
@@ -100,6 +97,6 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
         final BufferPool bufferPool = supplyBufferPool.get();
 
         return new ClientStreamFactory(config, router, poller, writeBuffer, bufferPool,
-                incrementOverflow, supplyStreamId, correlations);
+                incrementOverflow, supplyStreamId);
     }
 }

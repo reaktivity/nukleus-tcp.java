@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams;
+package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
@@ -31,8 +31,8 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
+import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.reaktor.test.ReaktorRule;
-import org.reaktivity.specification.nukleus.NukleusRule;
 
 /**
  * Tests the handling of IOException thrown from SocketChannel.read (see issue #9).
@@ -40,8 +40,9 @@ import org.reaktivity.specification.nukleus.NukleusRule;
 public class ServerIOExceptionFromReadIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/tcp/streams");
+            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+            .addScriptRoot("client", "org/reaktivity/specification/tcp/rfc793")
+            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -51,24 +52,21 @@ public class ServerIOExceptionFromReadIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024);
+        .counterValuesBufferCapacity(1024)
+        .clean()
+        .configure("reaktor.abort.stream.frame.type.id", AbortFW.TYPE_ID);
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
 
-    private final NukleusRule file = new NukleusRule()
-            .directory("target/nukleus-itests")
-            .streams("tcp", "target#partition")
-            .streams("target", "tcp#any");
-
     @Rule
-    public final TestRule chain = outerRule(file).around(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
         "${route}/server/controller",
-        "${streams}/client.close/server/target"
+        "${server}/server.received.reset.and.abort/server"
     })
-    public void shouldReportIOExceptionFromReadAsEndOfStream() throws Exception
+    public void shouldReportIOExceptionFromReadAsAbortAndReset() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
@@ -77,7 +75,7 @@ public class ServerIOExceptionFromReadIT
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            k3po.awaitBarrier("WINDOW_UPDATED");
+            k3po.awaitBarrier("CONNECTED");
 
             channel.setOption(StandardSocketOptions.SO_LINGER, 0);
             channel.close();
@@ -89,7 +87,7 @@ public class ServerIOExceptionFromReadIT
     @Test
     @Specification({
         "${route}/server/controller",
-        "${streams}/client.then.server.sent.end/server/target"
+        "${server}/server.received.abort.sent.end/server"
     })
     public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
     {
@@ -100,7 +98,7 @@ public class ServerIOExceptionFromReadIT
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            k3po.awaitBarrier("WINDOW_UPDATED");
+            k3po.awaitBarrier("CONNECTED");
 
             channel.setOption(StandardSocketOptions.SO_LINGER, 0);
             channel.close();

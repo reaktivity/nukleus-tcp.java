@@ -151,8 +151,6 @@ public class ServerStreamFactory implements StreamFactory
             final String targetName = route.target().asString();
             final long targetId = supplyStreamId.getAsLong();
             final long correlationId = supplyCorrelationId.getAsLong();
-            final Correlation correlation = new Correlation(sourceName, channel);
-            correlations.put(correlationId, correlation);
 
             try
             {
@@ -163,8 +161,11 @@ public class ServerStreamFactory implements StreamFactory
 
                 final PollerKey key = poller.doRegister(channel, 0, null);
 
-                final ReadStream stream = new ReadStream(target, targetId, key, channel, correlationId,
-                        correlations, readByteBuffer, readBuffer, writer);
+                final ReadStream stream = new ReadStream(target, targetId, key, channel,
+                        readByteBuffer, readBuffer, writer);
+                final Correlation correlation = new Correlation(sourceName, channel, stream::setCorrelatedThrottle,
+                        target, targetId);
+                correlations.put(correlationId, correlation);
 
                 router.setThrottle(targetName, targetId, stream::handleThrottle);
 
@@ -194,10 +195,12 @@ public class ServerStreamFactory implements StreamFactory
 
         if (correlation != null)
         {
+            correlation.setCorrelatedThrottle(throttle, streamId);
             final SocketChannel channel = correlation.channel();
 
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
                     bufferPool, writeByteBuffer, writer);
+            stream.setCorrelatedInput(correlation.correlatedStreamId(), correlation.correlatedStream());
             stream.doConnected();
             result = stream::handleStream;
         }
