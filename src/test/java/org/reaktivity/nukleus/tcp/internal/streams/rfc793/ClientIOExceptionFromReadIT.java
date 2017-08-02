@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams;
+package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -31,9 +31,10 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
+import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.reaktor.test.ReaktorRule;
-import org.reaktivity.specification.nukleus.NukleusRule;
 
 /**
  * Tests the handling of IOException thrown from SocketChannel.read (see issue #9). This condition  is forced
@@ -44,38 +45,33 @@ import org.reaktivity.specification.nukleus.NukleusRule;
 public class ClientIOExceptionFromReadIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/tcp/streams");
+            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+            .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
+            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
         .nukleus("tcp"::equals)
+        .controller(TcpController.class::isAssignableFrom)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024);
+        .counterValuesBufferCapacity(1024)
+        .clean()
+        .configure("reaktor.abort.stream.frame.type.id", AbortFW.TYPE_ID);
 
-    private final NukleusRule file = new NukleusRule()
-            .directory("target/nukleus-itests")
-            .streams("tcp", "source#partition")
-            .streams("source", "tcp#source");
-
-    private final TcpCountersRule counters = new TcpCountersRule()
-        .directory("target/nukleus-itests")
-        .commandBufferCapacity(1024)
-        .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024);
+    private final TcpCountersRule counters = new TcpCountersRule(reaktor);
 
     @Rule
-    public final TestRule chain = outerRule(file).around(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
         "${route}/client/controller",
-        "${streams}/server.close/client/source"
+        "${client}/client.received.reset.and.abort/client"
     })
-    public void shouldReportIOExceptionFromReadAsEndOfStream() throws Exception
+    public void shouldReportIOExceptionFromReadAsAbortAndReset() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
@@ -87,7 +83,7 @@ public class ClientIOExceptionFromReadIT
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("CONNECTED_CLIENT");
+                k3po.awaitBarrier("CONNECTED");
 
                 channel.setOption(StandardSocketOptions.SO_LINGER, 0);
                 channel.close();
@@ -100,7 +96,7 @@ public class ClientIOExceptionFromReadIT
     @Test
     @Specification({
         "${route}/client/controller",
-        "${streams}/server.then.client.sent.end/client/source"
+        "${client}/client.received.abort.sent.end/client"
     })
     public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
     {
@@ -114,7 +110,7 @@ public class ClientIOExceptionFromReadIT
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("CONNECTED_CLIENT");
+                k3po.awaitBarrier("CONNECTED");
 
                 channel.setOption(StandardSocketOptions.SO_LINGER, 0);
                 channel.close();

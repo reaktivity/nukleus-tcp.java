@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.PrimitiveIterator;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.IntStream;
 
 import org.jboss.byteman.rule.helper.Helper;
@@ -81,6 +82,27 @@ public final class SocketChannelHelper
         {
             handleWrite = IntStream.empty().iterator();
         }
+    }
+
+    public static class CountDownHelper extends Helper
+    {
+        private static CountDownLatch latch;
+
+        protected CountDownHelper(org.jboss.byteman.rule.Rule rule)
+        {
+            super(rule);
+        }
+
+        public void countDown()
+        {
+            latch.countDown();
+        }
+
+        public static void initialize(CountDownLatch latch)
+        {
+            CountDownHelper.latch = latch;
+        }
+
     }
 
     private static class Rule implements TestRule
