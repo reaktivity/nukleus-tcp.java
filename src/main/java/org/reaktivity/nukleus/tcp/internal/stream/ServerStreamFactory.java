@@ -200,7 +200,7 @@ public class ServerStreamFactory implements StreamFactory
 
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
                     bufferPool, writeByteBuffer, writer);
-            stream.setCorrelatedInput(correlation.correlatedStream(), correlation.correlatedStreamId());
+            stream.setCorrelatedInput(correlation.correlatedStreamId(), correlation.correlatedStream());
             stream.doConnected();
             result = stream::handleStream;
         }

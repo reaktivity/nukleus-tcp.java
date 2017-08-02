@@ -26,7 +26,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.function.BiConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
@@ -48,6 +47,7 @@ import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
+import org.reaktivity.nukleus.tcp.internal.util.function.LongObjectBiConsumer;
 
 public class ClientStreamFactory implements StreamFactory
 {
@@ -196,7 +196,7 @@ public class ClientStreamFactory implements StreamFactory
         long correlationId,
         MessageConsumer outputThrottle,
         long outputStreamId,
-        BiConsumer<MessageConsumer, Long> setCorrelatedInput)
+        LongObjectBiConsumer<MessageConsumer> setCorrelatedInput)
     {
         final Request request = new Request(channel, stream, acceptReplyName, correlationId,
                 outputThrottle, outputStreamId, setCorrelatedInput);
@@ -239,14 +239,14 @@ public class ClientStreamFactory implements StreamFactory
             final InetSocketAddress localAddress = (InetSocketAddress) channel.getLocalAddress();
             final InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
             final MessageConsumer target = router.supplyTarget(targetName);
-            request.setCorrelatedInput.accept(target, targetId);
+            request.setCorrelatedInput.accept(targetId, target);
             writer.doTcpBegin(target, targetId, 0L, correlationId, localAddress, remoteAddress);
 
             final PollerKey key = poller.doRegister(channel, 0, null);
 
             final ReadStream stream = new ReadStream(target, targetId, key, channel,
                     readByteBuffer, readBuffer, writer);
-            stream.setCorrelatedThrottle(correlatedThrottle, correlatedStreamId);
+            stream.setCorrelatedThrottle(correlatedStreamId, correlatedThrottle);
 
             router.setThrottle(targetName, targetId, stream::handleThrottle);
 
@@ -276,7 +276,7 @@ public class ClientStreamFactory implements StreamFactory
         private final long correlationId;
         private final MessageConsumer outputThrottle;
         private final long outputStreamdId;
-        private final BiConsumer<MessageConsumer, Long> setCorrelatedInput;
+        private final LongObjectBiConsumer<MessageConsumer> setCorrelatedInput;
 
         private Request(SocketChannel channel,
                         WriteStream stream,
@@ -284,7 +284,7 @@ public class ClientStreamFactory implements StreamFactory
                         long correlationId,
                         MessageConsumer outputThrottle,
                         long outputStreamId,
-                        BiConsumer<MessageConsumer, Long> setCorrelatedInput)
+                        LongObjectBiConsumer<MessageConsumer> setCorrelatedInput)
         {
             this.channel = channel;
             this.stream = stream;

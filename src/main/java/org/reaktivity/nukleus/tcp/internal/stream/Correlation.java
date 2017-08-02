@@ -19,22 +19,22 @@ import static java.util.Objects.requireNonNull;
 
 import java.nio.channels.SocketChannel;
 import java.util.Objects;
-import java.util.function.BiConsumer;
 
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.tcp.internal.util.function.LongObjectBiConsumer;
 
 public class Correlation
 {
     private final String sourceName;
     private final SocketChannel channel;
-    private final BiConsumer<MessageConsumer, Long> setCorrelatedThrottle;
+    private final LongObjectBiConsumer<MessageConsumer> setCorrelatedThrottle;
     private MessageConsumer correlatedStream;
     private long correlatedStreamId;
 
     public Correlation(
         String sourceName,
         SocketChannel channel,
-        BiConsumer<MessageConsumer, Long> setCorrelatedThrottle,
+        LongObjectBiConsumer<MessageConsumer> setCorrelatedThrottle,
         MessageConsumer target,
         long targetId)
     {
@@ -67,7 +67,7 @@ public class Correlation
 
     public void setCorrelatedThrottle(MessageConsumer throttle, long streamId)
     {
-        setCorrelatedThrottle.accept(throttle, streamId);
+        setCorrelatedThrottle.accept(streamId, throttle);
     }
 
     @Override

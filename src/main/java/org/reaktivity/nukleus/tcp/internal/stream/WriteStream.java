@@ -133,7 +133,7 @@ public final class WriteStream
         writer.doReset(sourceThrottle, streamId);
     }
 
-    void setCorrelatedInput(MessageConsumer correlatedInput, long correlatedStreamId)
+    void setCorrelatedInput(long correlatedStreamId, MessageConsumer correlatedInput)
     {
         this.correlatedInput = correlatedInput;
         this.correlatedStreamId = correlatedStreamId;

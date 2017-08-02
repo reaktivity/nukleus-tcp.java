@@ -137,7 +137,7 @@ final class ReadStream
         }
     }
 
-    void setCorrelatedThrottle(MessageConsumer correlatedThrottle, long correlatedStreamId)
+    void setCorrelatedThrottle(long correlatedStreamId, MessageConsumer correlatedThrottle)
     {
         this.correlatedThrottle = correlatedThrottle;
         this.correlatedStreamId = correlatedStreamId;
