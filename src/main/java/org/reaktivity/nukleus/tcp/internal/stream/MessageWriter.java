@@ -65,12 +65,12 @@ final class MessageWriter
             MessageConsumer stream,
             long streamId)
     {
-        AbortFW tcpAbort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+        AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
                 .extension(b -> b.set((buf, off, len) -> 0))
                 .build();
 
-        stream.accept(tcpAbort.typeId(), tcpAbort.buffer(), tcpAbort.offset(), tcpAbort.sizeof());
+        stream.accept(abort.typeId(), abort.buffer(), abort.offset(), abort.sizeof());
     }
 
     public void doTcpBegin(
@@ -99,24 +99,24 @@ final class MessageWriter
         int offset,
         int length)
     {
-        DataFW tcpData = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+        DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
                 .payload(payload, offset, length)
                 .build();
 
-        stream.accept(tcpData.typeId(), tcpData.buffer(), tcpData.offset(), tcpData.sizeof());
+        stream.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
 
     public void doTcpEnd(
         MessageConsumer stream,
         long streamId)
     {
-        EndFW tcpEnd = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+        EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
                 .extension(b -> b.set((buf, off, len) -> 0))
                 .build();
 
-       stream.accept(tcpEnd.typeId(), tcpEnd.buffer(), tcpEnd.offset(), tcpEnd.sizeof());
+       stream.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
     }
 
     void doWindow(
