@@ -19,18 +19,30 @@ import static java.util.Objects.requireNonNull;
 
 import java.nio.channels.SocketChannel;
 import java.util.Objects;
+import java.util.function.BiConsumer;
+
+import org.reaktivity.nukleus.function.MessageConsumer;
 
 public class Correlation
 {
     private final String sourceName;
     private final SocketChannel channel;
+    private final BiConsumer<MessageConsumer, Long> setCorrelatedThrottle;
+    private MessageConsumer correlatedStream;
+    private long correlatedStreamId;
 
     public Correlation(
         String sourceName,
-        SocketChannel channel)
+        SocketChannel channel,
+        BiConsumer<MessageConsumer, Long> setCorrelatedThrottle,
+        MessageConsumer target,
+        long targetId)
     {
         this.sourceName = requireNonNull(sourceName, "sourceName");
         this.channel = requireNonNull(channel, "channel");
+        this.setCorrelatedThrottle = setCorrelatedThrottle;
+        this.correlatedStream = target;
+        this.correlatedStreamId = targetId;
     }
 
     public String source()
@@ -38,9 +50,24 @@ public class Correlation
         return sourceName;
     }
 
+    public MessageConsumer correlatedStream()
+    {
+        return correlatedStream;
+    }
+
+    public long correlatedStreamId()
+    {
+        return correlatedStreamId;
+    }
+
     public SocketChannel channel()
     {
         return channel;
+    }
+
+    public void setCorrelatedThrottle(MessageConsumer throttle, long streamId)
+    {
+        setCorrelatedThrottle.accept(throttle, streamId);
     }
 
     @Override

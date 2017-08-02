@@ -25,7 +25,6 @@ import java.nio.channels.SocketChannel;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
@@ -37,12 +36,12 @@ final class ReadStream
     private final long streamId;
     private final PollerKey key;
     private final SocketChannel channel;
-    private final long correlationId;
-    private final Long2ObjectHashMap<?> correlations;
     private final ByteBuffer readBuffer;
     private final MutableDirectBuffer atomicBuffer;
     private final MessageWriter writer;
 
+    private MessageConsumer correlatedThrottle;
+    private long correlatedStreamId;
     private int readableBytes;
 
     ReadStream(
@@ -50,8 +49,6 @@ final class ReadStream
         long streamId,
         PollerKey key,
         SocketChannel channel,
-        long correlationId,
-        Long2ObjectHashMap<?> correlations,
         ByteBuffer readByteBuffer,
         MutableDirectBuffer readBuffer,
         MessageWriter writer)
@@ -60,8 +57,6 @@ final class ReadStream
         this.streamId = streamId;
         this.key = key;
         this.channel = channel;
-        this.correlationId = correlationId;
-        this.correlations = correlations;
         this.readBuffer = readByteBuffer;
         this.atomicBuffer = readBuffer;
         this.writer = writer;
@@ -77,23 +72,21 @@ final class ReadStream
         readBuffer.position(0);
         readBuffer.limit(limit);
 
-        int bytesRead;
+        int bytesRead = 0;
         try
         {
             bytesRead = channel.read(readBuffer);
         }
         catch(IOException ex)
         {
-            // treat TCP reset as end-of-stream
-            bytesRead = -1;
+            // TCP reset
+            handleIOExceptionFromRead();
         }
-
         if (bytesRead == -1)
         {
             // channel input closed
             readableBytes = -1;
             writer.doTcpEnd(target, streamId);
-
             key.cancel(OP_READ);
         }
         else if (bytesRead != 0)
@@ -110,6 +103,18 @@ final class ReadStream
         }
 
         return 1;
+    }
+
+    private void handleIOExceptionFromRead()
+    {
+        // IOException from read implies channel input and output will no longer function
+        readableBytes = -1;
+        writer.doTcpAbort(target, streamId);
+        key.cancel(OP_READ);
+        if (correlatedThrottle != null)
+        {
+            writer.doReset(correlatedThrottle, correlatedStreamId);
+        }
     }
 
     void handleThrottle(
@@ -130,6 +135,12 @@ final class ReadStream
             // ignore
             break;
         }
+    }
+
+    void setCorrelatedThrottle(MessageConsumer correlatedThrottle, long correlatedStreamId)
+    {
+        this.correlatedThrottle = correlatedThrottle;
+        this.correlatedStreamId = correlatedStreamId;
     }
 
     private void processWindow(
@@ -163,9 +174,9 @@ final class ReadStream
 
         try
         {
-            if (correlations.remove(correlationId) == null)
+            if (correlatedThrottle != null)
             {
-                // Begin on correlated output stream was already processed
+                // Begin on correlated WriteStream was already processed
                 channel.shutdownInput();
             }
             else

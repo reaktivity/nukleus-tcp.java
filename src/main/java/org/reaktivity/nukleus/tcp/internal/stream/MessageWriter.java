@@ -26,6 +26,7 @@ import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.tcp.internal.TcpNukleusFactorySpi;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
+import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
@@ -43,9 +44,10 @@ final class MessageWriter
     final ResetFW resetRO = new ResetFW();
     final WindowFW windowRO = new WindowFW();
 
+    private final AbortFW.Builder abortRW = new AbortFW.Builder();
     private final BeginFW.Builder beginRW = new BeginFW.Builder();
-    private final DataFW.Builder tcpDataRW = new DataFW.Builder();
-    private final EndFW.Builder tcpEndRW = new EndFW.Builder();
+    private final DataFW.Builder dataRW = new DataFW.Builder();
+    private final EndFW.Builder endRW = new EndFW.Builder();
     private final WindowFW.Builder windowRW = new WindowFW.Builder();
     private final ResetFW.Builder resetRW = new ResetFW.Builder();
 
@@ -57,6 +59,18 @@ final class MessageWriter
     MessageWriter(MutableDirectBuffer writeBuffer)
     {
         this.writeBuffer = writeBuffer;
+    }
+
+    public void doTcpAbort(
+            MessageConsumer stream,
+            long streamId)
+    {
+        AbortFW tcpAbort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .streamId(streamId)
+                .extension(b -> b.set((buf, off, len) -> 0))
+                .build();
+
+        stream.accept(tcpAbort.typeId(), tcpAbort.buffer(), tcpAbort.offset(), tcpAbort.sizeof());
     }
 
     public void doTcpBegin(
@@ -85,7 +99,7 @@ final class MessageWriter
         int offset,
         int length)
     {
-        DataFW tcpData = tcpDataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+        DataFW tcpData = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
                 .payload(payload, offset, length)
                 .build();
@@ -97,7 +111,7 @@ final class MessageWriter
         MessageConsumer stream,
         long streamId)
     {
-        EndFW tcpEnd = tcpEndRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+        EndFW tcpEnd = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
                 .extension(b -> b.set((buf, off, len) -> 0))
                 .build();

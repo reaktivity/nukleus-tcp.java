@@ -78,6 +78,9 @@ public class ServerIOExceptionFromReadIT
 
             channel.setOption(StandardSocketOptions.SO_LINGER, 0);
             channel.close();
+        }
+        finally
+        {
 
             k3po.finish();
         }
@@ -101,7 +104,9 @@ public class ServerIOExceptionFromReadIT
 
             channel.setOption(StandardSocketOptions.SO_LINGER, 0);
             channel.close();
-
+        }
+        finally
+        {
             k3po.finish();
         }
     }

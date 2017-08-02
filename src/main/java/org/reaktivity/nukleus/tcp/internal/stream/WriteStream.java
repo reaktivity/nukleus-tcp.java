@@ -31,6 +31,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
+import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
@@ -63,6 +64,10 @@ public final class WriteStream
 
     private ByteBuffer writeBuffer;
 
+    private MessageConsumer correlatedInput;
+
+    private long correlatedStreamId;
+
     WriteStream(
         MessageConsumer sourceThrottle,
         long streamId,
@@ -90,27 +95,30 @@ public final class WriteStream
         int index,
         int length)
     {
-        try
+        switch (msgTypeId)
         {
-            switch (msgTypeId)
+        case AbortFW.TYPE_ID:
+            processAbort(buffer, index, index + length);
+            break;
+        case BeginFW.TYPE_ID:
+            processBegin(buffer, index, index + length);
+            break;
+        case DataFW.TYPE_ID:
+            try
             {
-            case BeginFW.TYPE_ID:
-                processBegin(buffer, index, index + length);
-                break;
-            case DataFW.TYPE_ID:
                 processData(buffer, index, index + length);
-                break;
-            case EndFW.TYPE_ID:
-                processEnd(buffer, index, index + length);
-                break;
-            default:
-                // ignore
-                break;
             }
-        }
-        catch (IOException ex)
-        {
-            doFail();
+            catch (IOException ex)
+            {
+                handleIOExceptionFromWrite();
+            }
+            break;
+        case EndFW.TYPE_ID:
+            processEnd(buffer, index, index + length);
+            break;
+        default:
+            // ignore
+            break;
         }
     }
 
@@ -120,9 +128,37 @@ public final class WriteStream
         offerWindow(bufferPool.slotCapacity());
     }
 
-    public void doConnectFailed()
+    void doConnectFailed()
     {
         writer.doReset(sourceThrottle, streamId);
+    }
+
+    void setCorrelatedInput(MessageConsumer correlatedInput, long correlatedStreamId)
+    {
+        this.correlatedInput = correlatedInput;
+        this.correlatedStreamId = correlatedStreamId;
+    }
+
+    private void handleIOExceptionFromWrite()
+    {
+        // IOEXception from write implies channel input and output will no longer function
+        if (correlatedInput != null)
+        {
+            writer.doTcpAbort(correlatedInput, correlatedStreamId);
+        }
+        doFail();
+    }
+
+    private void processAbort(
+        DirectBuffer buffer,
+        int offset,
+        int limit)
+    {
+        if (slot != NO_SLOT) // partial writes pending
+        {
+            bufferPool.release(slot);
+        }
+        doCleanup();
     }
 
     private void processBegin(
@@ -313,7 +349,7 @@ public final class WriteStream
         }
         catch (IOException ex)
         {
-            doFail();
+            handleIOExceptionFromWrite();
             return 0;
         }
 

@@ -82,7 +82,7 @@ public class ClientIOExceptionFromReadIT
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("CONNECTED_CLIENT");
+                k3po.awaitBarrier("CONNECTED");
 
                 channel.setOption(StandardSocketOptions.SO_LINGER, 0);
                 channel.close();
@@ -109,7 +109,7 @@ public class ClientIOExceptionFromReadIT
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("CONNECTED_CLIENT");
+                k3po.awaitBarrier("CONNECTED");
 
                 channel.setOption(StandardSocketOptions.SO_LINGER, 0);
                 channel.close();
