@@ -37,7 +37,6 @@ import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDataHelper;
-import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
@@ -60,8 +59,7 @@ public class ClientIOExceptionFromWriteIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .clean()
-        .configure("reaktor.abort.stream.frame.type.id", AbortFW.TYPE_ID);
+        .clean();
 
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE)

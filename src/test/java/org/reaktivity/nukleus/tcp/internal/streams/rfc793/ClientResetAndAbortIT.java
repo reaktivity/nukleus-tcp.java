@@ -39,7 +39,6 @@ import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.CountDownHelper;
-import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
@@ -62,8 +61,7 @@ public class ClientResetAndAbortIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .clean()
-        .configure("reaktor.abort.stream.frame.type.id", AbortFW.TYPE_ID);
+        .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
 
