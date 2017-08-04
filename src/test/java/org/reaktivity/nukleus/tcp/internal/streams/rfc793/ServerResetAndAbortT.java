@@ -44,7 +44,7 @@ import org.reaktivity.reaktor.test.ReaktorRule;
  * Tests use of the nukleus as an HTTP server.
  */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-public class ServerIResetAndAbortT
+public class ServerResetAndAbortT
 {
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")

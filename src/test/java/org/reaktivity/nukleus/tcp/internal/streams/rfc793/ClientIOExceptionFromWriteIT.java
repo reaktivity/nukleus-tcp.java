@@ -89,8 +89,6 @@ public class ClientIOExceptionFromWriteIT
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("CONNECTED_CLIENT");
-
                 k3po.finish();
             }
         }
@@ -131,8 +129,6 @@ public class ClientIOExceptionFromWriteIT
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("CONNECTED_CLIENT");
-
                 k3po.finish();
             }
         }
