@@ -1,7 +1,7 @@
 RULE processData
 CLASS ^java.nio.channels.SocketChannel
 METHOD write(java.nio.ByteBuffer)
-HELPER org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$ProcessDataHelper
+HELPER org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$ProcessDataHelper
 IF callerEquals("org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData", true, true)
 DO return doWrite($0, $1);
 ENDRULE
@@ -9,7 +9,7 @@ ENDRULE
 RULE handleWrite
 CLASS ^java.nio.channels.SocketChannel
 METHOD write(java.nio.ByteBuffer)
-HELPER org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$HandleWriteHelper
+HELPER org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$HandleWriteHelper
 IF callerEquals("org.reaktivity.nukleus.tcp.internal.stream.WriteStream.handleWrite", true, true)
 DO return doWrite($0, $1);
 ENDRULE
