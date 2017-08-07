@@ -121,7 +121,6 @@ public class ServerResetAndAbortIT
             ByteBuffer buf = ByteBuffer.allocate(20);
             int len = channel.read(buf);
             assertEquals(-1, len);
-            k3po.notifyBarrier("EOS_DETECTED");
             shutdownInputCalled.await();
         }
         finally
