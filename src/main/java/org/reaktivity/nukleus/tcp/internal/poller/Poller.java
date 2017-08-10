@@ -17,7 +17,6 @@ package org.reaktivity.nukleus.tcp.internal.poller;
 
 import static org.agrona.CloseHelper.quietClose;
 
-import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -49,8 +48,9 @@ public final class Poller extends TransportPoller implements Nukleus
                 workDone = selectedKeySet.forEach(selectHandler);
             }
         }
-        catch (IOException ex)
+        catch (Throwable ex)
         {
+            selectedKeySet.reset();
             LangUtil.rethrowUnchecked(ex);
         }
 

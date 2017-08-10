@@ -106,7 +106,7 @@ public final class PollerKey
     int handleSelect(
         SelectionKey key)
     {
-        final int readyOps = key.readyOps();
+        final int readyOps = key.readyOps() & this.interestOps;
 
         int workDone = 0;
 
