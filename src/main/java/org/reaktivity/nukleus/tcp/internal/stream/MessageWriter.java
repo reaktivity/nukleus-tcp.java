@@ -82,9 +82,9 @@ final class MessageWriter
         InetSocketAddress remoteAddress)
     {
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .streamId(streamId)
                 .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
                 .sourceRef(referenceId)
-                .streamId(streamId)
                 .correlationId(correlationId)
                 .extension(b -> b.set(visitBeginEx(localAddress, remoteAddress)))
                 .build();
