@@ -98,7 +98,7 @@ final class ReadStream
 
             readableBytes -= bytesRead;
 
-            if (readableBytes == 0)
+            if (readableBytes < readPadding)
             {
                 key.clear(OP_READ);
             }
