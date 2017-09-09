@@ -385,7 +385,7 @@ public final class WriteStream
         if (readableBytes > EOS_REQUESTED)
         {
             readableBytes += update;
-            writer.doWindow(sourceThrottle, streamId, update, update);
+            writer.doWindow(sourceThrottle, streamId, update, 0);
         }
     }
 

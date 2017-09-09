@@ -123,12 +123,12 @@ final class MessageWriter
         final MessageConsumer throttle,
         final long throttleId,
         final int writableBytes,
-        final int writableFrames)
+        final int padding)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(throttleId)
-                .update(writableBytes)
-                .frames(writableFrames)
+                .credit(writableBytes)
+                .padding(padding)
                 .build();
 
         throttle.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());

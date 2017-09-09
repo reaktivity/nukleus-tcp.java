@@ -43,6 +43,7 @@ final class ReadStream
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
     private int readableBytes;
+    private int readPadding;
     private boolean resetRequired;
 
     ReadStream(
@@ -66,9 +67,9 @@ final class ReadStream
     int handleStream(
         PollerKey key)
     {
-        assert readableBytes > 0;
+        assert readableBytes > readPadding;
 
-        final int limit = Math.min(readableBytes, readBuffer.capacity());
+        final int limit = Math.min(readableBytes - readPadding, readBuffer.capacity());
 
         readBuffer.position(0);
         readBuffer.limit(limit);
@@ -161,13 +162,14 @@ final class ReadStream
 
         if (readableBytes != -1)
         {
-            final int update = writer.windowRO.update();
+            final int credit = writer.windowRO.credit();
+            readPadding = writer.windowRO.padding();
 
-            readableBytes += update;
+            readableBytes += credit;
 
             handleStream(key);
 
-            if (readableBytes > 0)
+            if (readableBytes > readPadding)
             {
                 key.register(OP_READ);
             }
