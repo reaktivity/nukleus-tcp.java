@@ -96,9 +96,9 @@ final class ReadStream
             // atomic buffer is zero copy with read buffer
             writer.doTcpData(target, streamId, atomicBuffer, 0, bytesRead);
 
-            readableBytes -= bytesRead;
+            readableBytes -= bytesRead + readPadding;
 
-            if (readableBytes < readPadding)
+            if (readableBytes <= readPadding)
             {
                 key.clear(OP_READ);
             }
@@ -132,10 +132,12 @@ final class ReadStream
         switch (msgTypeId)
         {
         case WindowFW.TYPE_ID:
-            processWindow(buffer, index, length);
+            final WindowFW window = writer.windowRO.wrap(buffer, index, index + length);
+            processWindow(window);
             break;
         case ResetFW.TYPE_ID:
-            processReset(buffer, index, length);
+            final ResetFW reset = writer.resetRO.wrap(buffer, index, index + length);
+            processReset(reset);
             break;
         default:
             // ignore
@@ -154,16 +156,12 @@ final class ReadStream
     }
 
     private void processWindow(
-        DirectBuffer buffer,
-        int index,
-        int length)
+        WindowFW window)
     {
-        writer.windowRO.wrap(buffer, index, index + length);
-
         if (readableBytes != -1)
         {
-            final int credit = writer.windowRO.credit();
-            readPadding = writer.windowRO.padding();
+            final int credit = window.credit();
+            readPadding = window.padding();
 
             readableBytes += credit;
 
@@ -177,12 +175,8 @@ final class ReadStream
     }
 
     private void processReset(
-        DirectBuffer buffer,
-        int index,
-        int length)
+        ResetFW reset)
     {
-        writer.resetRO.wrap(buffer, index, index + length);
-
         try
         {
             if (correlatedThrottle != null)

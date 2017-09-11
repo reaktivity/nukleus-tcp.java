@@ -376,7 +376,7 @@ public final class WriteStream
         return readableBytes >= 0;
     }
 
-    private void offerWindow(final int update)
+    private void offerWindow(final int credit)
     {
         // If readableBytes indicates EOS has been received we must not destroy that information
         // (and in this case there is no need to write the window update)
@@ -384,8 +384,8 @@ public final class WriteStream
         // we have data waiting to be written (incomplete writes)
         if (readableBytes > EOS_REQUESTED)
         {
-            readableBytes += update;
-            writer.doWindow(sourceThrottle, streamId, update, 0);
+            readableBytes += credit;
+            writer.doWindow(sourceThrottle, streamId, credit, 0);
         }
     }
 
