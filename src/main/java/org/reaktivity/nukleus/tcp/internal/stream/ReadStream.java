@@ -160,10 +160,8 @@ final class ReadStream
     {
         if (readableBytes != -1)
         {
-            final int credit = window.credit();
             readPadding = window.padding();
-
-            readableBytes += credit;
+            readableBytes += window.credit();
 
             handleStream(key);
 
