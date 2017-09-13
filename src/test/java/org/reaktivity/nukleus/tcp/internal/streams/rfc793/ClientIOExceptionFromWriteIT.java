@@ -34,10 +34,9 @@ import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
-import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper;
-import org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper.ProcessDataHelper;
-import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ProcessDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
@@ -60,8 +59,7 @@ public class ClientIOExceptionFromWriteIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .clean()
-        .configure("reaktor.abort.stream.frame.type.id", AbortFW.TYPE_ID);
+        .clean();
 
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE)
@@ -91,8 +89,6 @@ public class ClientIOExceptionFromWriteIT
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("CONNECTED_CLIENT");
-
                 k3po.finish();
             }
         }
@@ -105,7 +101,7 @@ public class ClientIOExceptionFromWriteIT
     })
     @BMRules(rules = {
         @BMRule(name = "processData",
-        helper = "org.reaktivity.nukleus.tcp.internal.streams.SocketChannelHelper$ProcessDataHelper",
+        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$ProcessDataHelper",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
         condition =
@@ -133,8 +129,6 @@ public class ClientIOExceptionFromWriteIT
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.notifyBarrier("CONNECTED_CLIENT");
-
                 k3po.finish();
             }
         }
