@@ -16,8 +16,8 @@
 package org.reaktivity.nukleus.tcp.internal.util;
 
 import static java.net.InetAddress.getLocalHost;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -32,7 +32,7 @@ public final class IpUtilTest
     {
         InetSocketAddress address1 = new InetSocketAddress(InetAddress.getLocalHost(), 8080);
         InetSocketAddress address2 = new InetSocketAddress(InetAddress.getLocalHost(), 8080);
-        assertTrue(IpUtil.addressesMatch(address1, address2));
+        assertEquals(0, IpUtil.compareAddresses(address1, address2));
     }
 
     @Test
@@ -40,7 +40,7 @@ public final class IpUtilTest
     {
         InetSocketAddress address1 = new InetSocketAddress(8080);
         InetSocketAddress address2 = new InetSocketAddress(InetAddress.getLocalHost(), 8080);
-        assertTrue(IpUtil.addressesMatch(address1, address2));
+        assertEquals(0, IpUtil.compareAddresses(address1, address2));
     }
 
     @Test
@@ -48,7 +48,7 @@ public final class IpUtilTest
     {
         InetSocketAddress address1 = new InetSocketAddress(getLocalHost(), 8080);
         InetSocketAddress address2 = new InetSocketAddress(8080);
-        assertTrue(IpUtil.addressesMatch(address1, address2));
+        assertEquals(0, IpUtil.compareAddresses(address1, address2));
     }
 
     @Test
@@ -56,7 +56,7 @@ public final class IpUtilTest
     {
         InetSocketAddress address1 = new InetSocketAddress(InetAddress.getLocalHost(), 8080);
         InetSocketAddress address2 = new InetSocketAddress(InetAddress.getLocalHost(), 8081);
-        assertFalse(IpUtil.addressesMatch(address1, address2));
+        assertFalse(0 == IpUtil.compareAddresses(address1, address2));
     }
 
     @Test
@@ -64,7 +64,7 @@ public final class IpUtilTest
     {
         InetSocketAddress address1 = new InetSocketAddress(8080);
         InetSocketAddress address2 = new InetSocketAddress(InetAddress.getLocalHost(), 8081);
-        assertFalse(IpUtil.addressesMatch(address1, address2));
+        assertFalse(0 == IpUtil.compareAddresses(address1, address2));
     }
 
     @Test
@@ -72,7 +72,7 @@ public final class IpUtilTest
     {
         InetSocketAddress address1 = new InetSocketAddress(InetAddress.getLocalHost(), 8081);
         InetSocketAddress address2 = new InetSocketAddress(8080);
-        assertFalse(IpUtil.addressesMatch(address1, address2));
+        assertFalse(0 == IpUtil.compareAddresses(address1, address2));
     }
 
 }

@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.tcp.internal.stream;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.addressesMatch;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
 
 import java.io.IOException;
@@ -46,6 +46,7 @@ import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
+import org.reaktivity.nukleus.tcp.internal.util.IpUtil;
 
 /**
  * The {@code Poller} nukleus accepts new socket connections and informs the {@code Router} nukleus.
@@ -65,7 +66,7 @@ public final class Acceptor
 
     public Acceptor()
     {
-        this.sourcesByLocalAddress = new TreeMap<>((a, b) -> addressesMatch(a, b) ? 0 : 1);
+        this.sourcesByLocalAddress = new TreeMap<>(IpUtil::compareAddresses);
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
     }
@@ -249,7 +250,7 @@ public final class Acceptor
     {
         try
         {
-            return addressesMatch(channel.getLocalAddress(), address);
+            return compareAddresses(channel.getLocalAddress(), address) == 0;
         }
         catch (IOException ex)
         {

@@ -44,12 +44,12 @@ public final class IpUtil
         // no instances
     }
 
-    public static boolean addressesMatch(SocketAddress address1, SocketAddress address2)
+    public static int compareAddresses(SocketAddress address1, SocketAddress address2)
     {
-        boolean result = false;
+        boolean same = false;
         if (address1.equals(address2))
         {
-            result = true;
+            same = true;
         }
         else
         {
@@ -57,14 +57,14 @@ public final class IpUtil
             {
                 InetSocketAddress inet1 = (InetSocketAddress) address1;
                 InetSocketAddress inet2 = (InetSocketAddress) address2;
-                result = inet1.getPort() == inet2.getPort() &&
+                same = inet1.getPort() == inet2.getPort() &&
                          ((inet1.getAddress() != null && inet1.getAddress().isAnyLocalAddress())
                          ||
                          (inet2.getAddress() != null && inet2.getAddress().isAnyLocalAddress()));
             }
 
         }
-        return result;
+        return same ? 0 : 1;
     }
 
     public static InetAddress inetAddress(

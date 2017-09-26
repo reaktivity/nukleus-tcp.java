@@ -18,7 +18,7 @@ package org.reaktivity.nukleus.tcp.internal.stream;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.util.Objects.requireNonNull;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.addressesMatch;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
 
 import java.io.IOException;
@@ -140,7 +140,7 @@ public class ServerStreamFactory implements StreamFactory
             InetSocketAddress routedAddress = new InetSocketAddress(inetAddress, (int)sourceRef);
             return sourceRef == route.sourceRef() &&
                     sourceName.equals(route.source().asString()) &&
-                         addressesMatch(address, routedAddress);
+                         compareAddresses(address, routedAddress) == 0;
         };
 
         final RouteFW route = router.resolve(filter, this::wrapRoute);
