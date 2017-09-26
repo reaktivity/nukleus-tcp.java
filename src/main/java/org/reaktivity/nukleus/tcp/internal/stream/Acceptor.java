@@ -183,7 +183,7 @@ public final class Acceptor
             channel.configureBlocking(false);
 
             final InetSocketAddress address = localAddress(channel);
-            final String sourceName = sourcesByLocalAddress.get(address);
+            final String sourceName = sourcesByLocalAddress.getOrDefault(address, "any");
             final long sourceRef = address.getPort();
 
             serverStreamFactory.onAccepted(sourceName, sourceRef, channel, address);
