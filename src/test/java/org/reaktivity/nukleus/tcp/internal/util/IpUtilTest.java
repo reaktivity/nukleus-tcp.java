@@ -1,0 +1,78 @@
+/**
+ * Copyright 2016-2017 The Reaktivity Project
+ *
+ * The Reaktivity Project licenses this file to you under the Apache License,
+ * version 2.0 (the "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at:
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+package org.reaktivity.nukleus.tcp.internal.util;
+
+import static java.net.InetAddress.getLocalHost;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+
+import org.junit.Test;
+
+public final class IpUtilTest
+{
+
+    @Test
+    public void shouldMatchAddressesSameAddressAndPort() throws Exception
+    {
+        InetSocketAddress address1 = new InetSocketAddress(InetAddress.getLocalHost(), 8080);
+        InetSocketAddress address2 = new InetSocketAddress(InetAddress.getLocalHost(), 8080);
+        assertTrue(IpUtil.addressesMatch(address1, address2));
+    }
+
+    @Test
+    public void shouldMatchAddressesFirstIsAny() throws Exception
+    {
+        InetSocketAddress address1 = new InetSocketAddress(8080);
+        InetSocketAddress address2 = new InetSocketAddress(InetAddress.getLocalHost(), 8080);
+        assertTrue(IpUtil.addressesMatch(address1, address2));
+    }
+
+    @Test
+    public void shouldMatchAddressesSecondIsAny() throws Exception
+    {
+        InetSocketAddress address1 = new InetSocketAddress(getLocalHost(), 8080);
+        InetSocketAddress address2 = new InetSocketAddress(8080);
+        assertTrue(IpUtil.addressesMatch(address1, address2));
+    }
+
+    @Test
+    public void shouldNotMatchAddressesDifferentPort() throws Exception
+    {
+        InetSocketAddress address1 = new InetSocketAddress(InetAddress.getLocalHost(), 8080);
+        InetSocketAddress address2 = new InetSocketAddress(InetAddress.getLocalHost(), 8081);
+        assertFalse(IpUtil.addressesMatch(address1, address2));
+    }
+
+    @Test
+    public void shouldNotMatchAddressesFirstIsAnyDifferentPort() throws Exception
+    {
+        InetSocketAddress address1 = new InetSocketAddress(8080);
+        InetSocketAddress address2 = new InetSocketAddress(InetAddress.getLocalHost(), 8081);
+        assertFalse(IpUtil.addressesMatch(address1, address2));
+    }
+
+    @Test
+    public void shouldNotMatchAddressesSecondIsAnyDifferentPort() throws Exception
+    {
+        InetSocketAddress address1 = new InetSocketAddress(InetAddress.getLocalHost(), 8081);
+        InetSocketAddress address2 = new InetSocketAddress(8080);
+        assertFalse(IpUtil.addressesMatch(address1, address2));
+    }
+
+}

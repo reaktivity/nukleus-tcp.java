@@ -44,22 +44,23 @@ public final class IpUtil
         // no instances
     }
 
-    public static boolean addressesMatch(SocketAddress candidate, SocketAddress target)
+    public static boolean addressesMatch(SocketAddress address1, SocketAddress address2)
     {
         boolean result = false;
-        if (candidate.equals(target))
+        if (address1.equals(address2))
         {
             result = true;
         }
         else
         {
-            if (candidate instanceof InetSocketAddress && target instanceof InetSocketAddress)
+            if (address1 instanceof InetSocketAddress && address2 instanceof InetSocketAddress)
             {
-                InetSocketAddress candidateIsa = (InetSocketAddress) candidate;
-                InetSocketAddress targetIsa = (InetSocketAddress) target;
-                result = candidateIsa.getPort() == targetIsa.getPort() &&
-                         targetIsa.getAddress() != null &&
-                         targetIsa.getAddress().isAnyLocalAddress();
+                InetSocketAddress inet1 = (InetSocketAddress) address1;
+                InetSocketAddress inet2 = (InetSocketAddress) address2;
+                result = inet1.getPort() == inet2.getPort() &&
+                         ((inet1.getAddress() != null && inet1.getAddress().isAnyLocalAddress())
+                         ||
+                         (inet2.getAddress() != null && inet2.getAddress().isAnyLocalAddress()));
             }
 
         }

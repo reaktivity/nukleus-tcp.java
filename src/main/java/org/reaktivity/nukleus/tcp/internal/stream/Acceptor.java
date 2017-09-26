@@ -27,10 +27,10 @@ import java.net.SocketAddress;
 import java.nio.channels.NetworkChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
@@ -65,7 +65,7 @@ public final class Acceptor
 
     public Acceptor()
     {
-        this.sourcesByLocalAddress = new HashMap<>();
+        this.sourcesByLocalAddress = new TreeMap<>((a, b) -> addressesMatch(a, b) ? 0 : 1);
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
     }
@@ -184,7 +184,7 @@ public final class Acceptor
             channel.configureBlocking(false);
 
             final InetSocketAddress address = localAddress(channel);
-            final String sourceName = sourcesByLocalAddress.getOrDefault(address, "any");
+            final String sourceName = sourcesByLocalAddress.get(address);
             final long sourceRef = address.getPort();
 
             serverStreamFactory.onAccepted(sourceName, sourceRef, channel, address);
