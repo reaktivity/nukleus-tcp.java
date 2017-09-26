@@ -21,7 +21,6 @@ import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.MAXIMUM_BACKLOG_PROPERTY_NAME;
 
 import org.jboss.byteman.contrib.bmunit.BMRule;
-import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -35,7 +34,6 @@ import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-@BMUnitConfig(debug=true)
 public class ControlIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -73,7 +71,7 @@ public class ControlIT
     @Specification({
         "${route}/server/controller"
     })
-    @BMRule(name = "should route server",
+    @BMRule(name = "should route server with maxmimum backlog",
             targetClass = "^java.nio.channels.ServerSocketChannel",
             targetMethod = "bind(java.net.SocketAddress, int)",
             condition = "$2 != 50",
