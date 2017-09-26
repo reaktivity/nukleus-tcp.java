@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.tcp.internal.stream;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.addressesMatch;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
 
 import java.io.IOException;
@@ -107,7 +108,7 @@ public final class Acceptor
 
                 final TcpRouteExFW unrouteEx = extension.get(routeExRO::wrap);
                 final InetAddress address = inetAddress(unrouteEx.address());
-                if (sourceRef > 0L && sourceRef <= 65535L && address != null)
+                if (sourceRef > 0L && sourceRef <= 65535L)
                 {
                     InetSocketAddress localAddress = new InetSocketAddress(address, (int)sourceRef);
                     result = doUnregister(correlationId, source, localAddress);
@@ -183,7 +184,7 @@ public final class Acceptor
             channel.configureBlocking(false);
 
             final InetSocketAddress address = localAddress(channel);
-            final String sourceName = sourcesByLocalAddress.get(address);
+            final String sourceName = sourcesByLocalAddress.getOrDefault(address, "any");
             final long sourceRef = address.getPort();
 
             serverStreamFactory.onAccepted(sourceName, sourceRef, channel, address);
@@ -248,7 +249,7 @@ public final class Acceptor
     {
         try
         {
-            return channel.getLocalAddress().equals(address);
+            return addressesMatch(channel.getLocalAddress(), address);
         }
         catch (IOException ex)
         {
@@ -270,4 +271,5 @@ public final class Acceptor
     {
         return (InetSocketAddress) channel.getLocalAddress();
     }
+
 }
