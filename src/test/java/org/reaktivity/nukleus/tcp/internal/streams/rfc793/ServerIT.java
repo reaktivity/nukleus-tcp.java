@@ -234,6 +234,22 @@ public class ServerIT
         assertEquals(0, counters.overflows());
     }
 
+    @Test
+    @Specification({
+        "${control}/route/server/controller",
+        "${server}/connection.established/server",
+        "${client}/connection.established/client"
+    })
+    @ScriptProperty("address \"tcp://[::0]:8080\"")
+    public void shouldEstablishConnectionToAddressAnyIPv6() throws Exception
+    {
+        k3po.finish();
+
+        assertEquals(1, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
     @Test(expected = IOException.class)
     @Specification({
         "${route}/server/controller",
