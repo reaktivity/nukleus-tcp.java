@@ -18,18 +18,24 @@ package org.reaktivity.nukleus.tcp.internal.control;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.MAXIMUM_BACKLOG_PROPERTY_NAME;
 
+import org.jboss.byteman.contrib.bmunit.BMRule;
+import org.jboss.byteman.contrib.bmunit.BMUnitConfig;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
+@RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
+@BMUnitConfig(debug=true)
 public class ControlIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -46,6 +52,7 @@ public class ControlIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
+        .configure(MAXIMUM_BACKLOG_PROPERTY_NAME, 50)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -58,6 +65,20 @@ public class ControlIT
         "${control}/route/server/controller"
     })
     public void shouldRouteServerWithoutExtension() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/server/controller"
+    })
+    @BMRule(name = "should route server",
+            targetClass = "^java.nio.channels.ServerSocketChannel",
+            targetMethod = "bind(java.net.SocketAddress, int)",
+            condition = "$2 != 50",
+            action = "throw new java.io.IOException(\"Unexpected backlog: \" + $2)")
+    public void shouldRouteServerWithMaximumBacklog() throws Exception
     {
         k3po.finish();
     }

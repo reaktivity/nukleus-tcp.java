@@ -39,6 +39,7 @@ import javax.annotation.Resource;
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
+import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
@@ -57,6 +58,7 @@ public final class Acceptor
     private final TcpRouteExFW routeExRO = new TcpRouteExFW();
     private final UnrouteFW unrouteRO = new UnrouteFW();
 
+    private final int backlog;
     private final Map<SocketAddress, String> sourcesByLocalAddress;
     private final Function<SocketAddress, PollerKey> registerHandler;
     private final ToIntFunction<PollerKey> acceptHandler;
@@ -64,8 +66,10 @@ public final class Acceptor
     private Poller poller;
     private ServerStreamFactory serverStreamFactory;
 
-    public Acceptor()
+    public Acceptor(
+        TcpConfiguration config)
     {
+        this.backlog = config.maximumBacklog();
         this.sourcesByLocalAddress = new TreeMap<>(IpUtil::compareAddresses);
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
@@ -230,7 +234,7 @@ public final class Acceptor
         {
             final ServerSocketChannel serverChannel = ServerSocketChannel.open();
             serverChannel.setOption(SO_REUSEADDR, true);
-            serverChannel.bind(localAddress);
+            serverChannel.bind(localAddress, backlog);
             serverChannel.configureBlocking(false);
 
             return poller.doRegister(serverChannel, OP_ACCEPT, acceptHandler);
