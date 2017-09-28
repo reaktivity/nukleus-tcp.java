@@ -26,6 +26,7 @@ import java.nio.channels.SocketChannel;
 
 import org.jboss.byteman.contrib.bmunit.BMRule;
 import org.jboss.byteman.contrib.bmunit.BMRules;
+//import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -35,8 +36,8 @@ import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
-import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ProcessDataHelper;
+import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
@@ -78,6 +79,35 @@ public class ClientIOExceptionFromWriteIT
       action = "throw new IOException(\"Simulating an IOException from write\")"
     )
     public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
+    {
+        try (ServerSocketChannel server = ServerSocketChannel.open())
+        {
+            server.setOption(SO_REUSEADDR, true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_CLIENT");
+
+            try (SocketChannel channel = server.accept())
+            {
+                k3po.finish();
+            }
+        }
+    }
+
+    @Test
+    @Specification({
+        "${route}/client/controller",
+        "${client}/client.sent.data.received.abort.and.reset/client"
+    })
+    @BMRule(name = "processData",
+    targetClass = "^java.nio.channels.SocketChannel",
+    targetMethod = "write(java.nio.ByteBuffer)",
+    condition =
+      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
+      action = "throw new IOException(\"Simulating an IOException from write\")"
+    )
+    public void shouldAbortWhenImmediateWriteThrowsIOException() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {

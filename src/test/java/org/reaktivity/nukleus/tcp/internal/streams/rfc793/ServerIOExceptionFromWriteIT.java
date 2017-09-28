@@ -62,10 +62,35 @@ public class ServerIOExceptionFromWriteIT
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(reaktor).around(k3po).around(timeout);
 
+//    @Test
+//    @Specification({
+//        "${route}/server/controller",
+//        "${server}/server.sent.data.received.reset.and.abort/server"
+//    })
+//    @BMRule(name = "processData",
+//    targetClass = "^java.nio.channels.SocketChannel",
+//    targetMethod = "write(java.nio.ByteBuffer)",
+//    condition =
+//      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
+//      action = "throw new IOException(\"Simulating an IOException from write\")"
+//    )
+//    public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
+//    {
+//        k3po.start();
+//        k3po.awaitBarrier("ROUTED_SERVER");
+//
+//        try (SocketChannel channel = SocketChannel.open())
+//        {
+//            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+//
+//            k3po.finish();
+//        }
+//    }
+
     @Test
     @Specification({
         "${route}/server/controller",
-        "${server}/server.sent.data.received.reset.and.abort/server"
+        "${server}/server.sent.data.received.abort.and.reset/server"
     })
     @BMRule(name = "processData",
     targetClass = "^java.nio.channels.SocketChannel",
@@ -74,7 +99,7 @@ public class ServerIOExceptionFromWriteIT
       "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
       action = "throw new IOException(\"Simulating an IOException from write\")"
     )
-    public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
+    public void shouldAbortWhenImmediateWriteThrowsIOException() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
@@ -90,7 +115,7 @@ public class ServerIOExceptionFromWriteIT
     @Test
     @Specification({
         "${route}/server/controller",
-        "${server}/server.sent.data.received.reset.and.abort/server"
+        "${server}/server.sent.data.received.abort.and.reset/server"
     })
     @BMRules(rules = {
         @BMRule(name = "processData",

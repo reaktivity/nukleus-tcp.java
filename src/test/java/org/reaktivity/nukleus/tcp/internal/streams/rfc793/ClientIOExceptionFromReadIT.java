@@ -35,6 +35,7 @@ import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
+
 /**
  * Tests the handling of IOException thrown from SocketChannel.read (see issue #9). This condition  is forced
  * in this test by causing the remote end to send a TCP reset (RST) by setting SO_LINGER to 0 then closing the socket,
@@ -67,7 +68,7 @@ public class ClientIOExceptionFromReadIT
     @Test
     @Specification({
         "${route}/client/controller",
-        "${client}/client.received.reset.and.abort/client"
+        "${client}/client.received.abort.and.reset/client"
     })
     public void shouldReportIOExceptionFromReadAsAbortAndReset() throws Exception
     {
@@ -96,7 +97,7 @@ public class ClientIOExceptionFromReadIT
         "${route}/client/controller",
         "${client}/client.received.abort.sent.end/client"
     })
-    public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
+    public void shouldNotAbortWhenProcessingEndAfterIOExceptionFromRead() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
@@ -118,4 +119,30 @@ public class ClientIOExceptionFromReadIT
         }
     }
 
+    @Test
+    @Specification({
+        "${route}/client/controller",
+        "${client}/client.sent.reset.and.end/client"
+    })
+    public void shouldAbortWhenProcessingEndAfterIOExceptionFromRead() throws Exception
+    {
+        try (ServerSocketChannel server = ServerSocketChannel.open())
+        {
+            server.setOption(SO_REUSEADDR, true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_CLIENT");
+
+            try (SocketChannel channel = server.accept())
+            {
+                k3po.awaitBarrier("CONNECTED");
+
+                channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+                channel.close();
+
+                k3po.finish();
+            }
+        }
+    }
 }
