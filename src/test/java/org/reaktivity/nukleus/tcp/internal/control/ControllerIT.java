@@ -34,8 +34,8 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ControllerIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/tcp/control/unroute");
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
+        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/tcp/control/unroute.ext");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 

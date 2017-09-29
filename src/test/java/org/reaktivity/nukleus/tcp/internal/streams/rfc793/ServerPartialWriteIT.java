@@ -61,7 +61,7 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ServerPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
         .addScriptRoot("client", "org/reaktivity/specification/tcp/rfc793")
         .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
@@ -130,6 +130,25 @@ public class ServerPartialWriteIT
         AtomicBoolean finishWrite = new AtomicBoolean(false);
 
         ProcessDataHelper.fragmentWrites(concat(of(5), generate(() -> finishWrite.getAndSet(true) ? 0 : 0)));
+        HandleWriteHelper.fragmentWrites(generate(() -> finishWrite.get() ? ALL : 0));
+
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/server/controller",
+            "${server}/server.sent.data.multiple.frames/server",
+            "${client}/server.sent.data.multiple.frames/client"
+    })
+    public void shouldPartiallyWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
+    {
+        // processData will be called for each of the two data frames. Make the first and second
+        // each do a partial write, then write nothing until handleWrite is called after the
+        // second processData call, when we write everything.
+        AtomicBoolean finishWrite = new AtomicBoolean(false);
+
+        ProcessDataHelper.fragmentWrites(concat(of(5), generate(() -> finishWrite.getAndSet(true) ? 0 : 15)));
         HandleWriteHelper.fragmentWrites(generate(() -> finishWrite.get() ? ALL : 0));
 
         k3po.finish();

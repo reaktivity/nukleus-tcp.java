@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.tcp.internal.stream;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.util.Objects.requireNonNull;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
 
 import java.io.IOException;
@@ -25,7 +26,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.Objects;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
@@ -131,16 +131,16 @@ public class ServerStreamFactory implements StreamFactory
         {
             final RouteFW route = routeRO.wrap(b, o, l);
             final OctetsFW extension = routeRO.extension();
-            InetSocketAddress routedAddress = null;
+            InetAddress inetAddress = null;
             if (extension.sizeof() > 0)
             {
                 final TcpRouteExFW routeEx = extension.get(routeExRO::wrap);
-                final InetAddress inetAddress = inetAddress(routeEx.address());
-                routedAddress = new InetSocketAddress(inetAddress, (int)sourceRef);
+                inetAddress = inetAddress(routeEx.address());
             }
+            InetSocketAddress routedAddress = new InetSocketAddress(inetAddress, (int)sourceRef);
             return sourceRef == route.sourceRef() &&
                     sourceName.equals(route.source().asString()) &&
-                         Objects.equals(address, routedAddress);
+                         compareAddresses(address, routedAddress) == 0;
         };
 
         final RouteFW route = router.resolve(filter, this::wrapRoute);
