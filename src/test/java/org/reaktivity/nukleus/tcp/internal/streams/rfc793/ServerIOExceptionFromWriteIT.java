@@ -74,7 +74,7 @@ public class ServerIOExceptionFromWriteIT
       "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
       action = "throw new IOException(\"Simulating an IOException from write\")"
     )
-    public void shouldAbortWhenImmediateWriteThrowsIOException() throws Exception
+    public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
