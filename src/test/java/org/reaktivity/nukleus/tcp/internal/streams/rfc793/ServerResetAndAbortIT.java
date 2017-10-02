@@ -97,7 +97,7 @@ public class ServerResetAndAbortIT
     @Test
     @Specification({
         "${route}/server/controller",
-        "${server}/server.sent.abort.and.reset/server"
+        "${server}/server.sent.reset.and.abort/server"
     })
     @BMRule(name = "shutdownInput",
     targetClass = "^java.nio.channels.SocketChannel",
@@ -210,6 +210,48 @@ public class ServerResetAndAbortIT
         }
     }
 
+    @Ignore("BEGIN vs RESET read order not yet guaranteed to match write order")
+    @Test
+    @Specification({
+        "${route}/server/controller",
+        "${server}/server.sent.reset.then.end/server"
+    })
+    @BMRule(name = "shutdownInput",
+    targetClass = "^java.nio.channels.SocketChannel",
+    targetMethod = "shutdownInput()",
+    helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
+    condition =
+      "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+      action = "countDown()"
+    )
+    public void shouldShutdownInputWhenServerSendsResetAndEnd() throws Exception
+    {
+        CountDownLatch shutdownInputCalled = new CountDownLatch(1);
+        CountDownHelper.initialize(shutdownInputCalled);
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_SERVER");
 
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
+            channel.configureBlocking(false);
+
+            channel.write(ByteBuffer.wrap("some data".getBytes()));
+
+            try
+            {
+                k3po.awaitBarrier("READ_ABORTED");
+                shutdownInputCalled.await();
+            }
+            catch(IOException e)
+            {
+                throw e;
+            }
+        }
+        finally
+        {
+            k3po.finish();
+        }
+    }
 }

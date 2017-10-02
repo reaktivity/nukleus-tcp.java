@@ -219,5 +219,46 @@ public class ClientResetAndAbortIT
         }
     }
 
+    @Test
+    @Specification({
+        "${route}/client/controller",
+        "${client}/client.sent.reset.and.end/client"
+    })
+    @BMRule(name = "shutdownInput",
+    targetClass = "^java.nio.channels.SocketChannel",
+    targetMethod = "shutdownInput()",
+    helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
+    condition =
+      "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+      action = "countDown()"
+    )
+    public void shouldShutdownInputWhenClientSendsResetAndEnd() throws Exception
+    {
+        CountDownLatch shutdownInputCalled = new CountDownLatch(1);
+        CountDownHelper.initialize(shutdownInputCalled);
 
+        try (ServerSocketChannel server = ServerSocketChannel.open())
+        {
+            server.setOption(SO_REUSEADDR, true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_CLIENT");
+
+            try (SocketChannel channel = server.accept())
+            {
+                channel.configureBlocking(false);
+
+                channel.write(ByteBuffer.wrap("some data".getBytes()));
+
+                k3po.awaitBarrier("READ_ABORTED");
+
+                shutdownInputCalled.await();
+            }
+            finally
+            {
+                k3po.finish();
+            }
+        }
+    }
 }

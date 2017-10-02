@@ -68,7 +68,7 @@ public class ClientIOExceptionFromReadIT
     @Test
     @Specification({
         "${route}/client/controller",
-        "${client}/client.received.abort.and.reset/client"
+        "${client}/client.received.reset.and.abort/client"
     })
     public void shouldReportIOExceptionFromReadAsAbortAndReset() throws Exception
     {
@@ -97,7 +97,7 @@ public class ClientIOExceptionFromReadIT
         "${route}/client/controller",
         "${client}/client.received.abort.sent.end/client"
     })
-    public void shouldNotAbortWhenProcessingEndAfterIOExceptionFromRead() throws Exception
+    public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
@@ -119,30 +119,4 @@ public class ClientIOExceptionFromReadIT
         }
     }
 
-    @Test
-    @Specification({
-        "${route}/client/controller",
-        "${client}/client.sent.reset.and.end/client"
-    })
-    public void shouldAbortWhenProcessingEndAfterIOExceptionFromRead() throws Exception
-    {
-        try (ServerSocketChannel server = ServerSocketChannel.open())
-        {
-            server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
-
-            k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
-
-            try (SocketChannel channel = server.accept())
-            {
-                k3po.awaitBarrier("CONNECTED");
-
-                channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-                channel.close();
-
-                k3po.finish();
-            }
-        }
-    }
 }

@@ -17,7 +17,6 @@ package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.stream.IntStream.generate;
 import static org.junit.rules.RuleChain.outerRule;
 
 import java.net.InetSocketAddress;
@@ -25,8 +24,6 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
 import org.jboss.byteman.contrib.bmunit.BMRule;
-import org.jboss.byteman.contrib.bmunit.BMRules;
-//import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -36,7 +33,6 @@ import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
-import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ProcessDataHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
@@ -80,75 +76,6 @@ public class ClientIOExceptionFromWriteIT
     )
     public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
     {
-        try (ServerSocketChannel server = ServerSocketChannel.open())
-        {
-            server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
-
-            k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
-
-            try (SocketChannel channel = server.accept())
-            {
-                k3po.finish();
-            }
-        }
-    }
-
-    @Test
-    @Specification({
-        "${route}/client/controller",
-        "${client}/client.sent.data.received.abort.and.reset/client"
-    })
-    @BMRule(name = "processData",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "write(java.nio.ByteBuffer)",
-    condition =
-      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
-      action = "throw new IOException(\"Simulating an IOException from write\")"
-    )
-    public void shouldAbortWhenImmediateWriteThrowsIOException() throws Exception
-    {
-        try (ServerSocketChannel server = ServerSocketChannel.open())
-        {
-            server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
-
-            k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
-
-            try (SocketChannel channel = server.accept())
-            {
-                k3po.finish();
-            }
-        }
-    }
-
-    @Test
-    @Specification({
-        "${route}/client/controller",
-        "${client}/client.sent.data.received.reset.and.abort/client"
-    })
-    @BMRules(rules = {
-        @BMRule(name = "processData",
-        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$ProcessDataHelper",
-        targetClass = "^java.nio.channels.SocketChannel",
-        targetMethod = "write(java.nio.ByteBuffer)",
-        condition =
-          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
-        action = "return doWrite($0, $1);"
-        ),
-        @BMRule(name = "handleWrite",
-        targetClass = "^java.nio.channels.SocketChannel",
-        targetMethod = "write(java.nio.ByteBuffer)",
-        condition =
-          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.handleWrite\", true, true)",
-          action = "throw new IOException(\"Simulating an IOException from write\")"
-        )
-    })
-    public void shouldResetWhenDeferredWriteThrowsIOException() throws Exception
-    {
-        ProcessDataHelper.fragmentWrites(generate(() -> 0));
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);

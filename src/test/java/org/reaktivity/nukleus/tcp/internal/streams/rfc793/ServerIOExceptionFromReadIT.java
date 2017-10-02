@@ -62,7 +62,7 @@ public class ServerIOExceptionFromReadIT
     @Test
     @Specification({
         "${route}/server/controller",
-        "${server}/server.received.abort.and.reset/server"
+        "${server}/server.received.reset.and.abort/server"
     })
     public void shouldReportIOExceptionFromReadAsAbortAndReset() throws Exception
     {
@@ -82,49 +82,4 @@ public class ServerIOExceptionFromReadIT
         }
     }
 
-    @Test
-    @Specification({
-        "${route}/server/controller",
-        "${server}/server.received.abort.sent.end/server"
-    })
-    public void shouldNotAbortWhenProcessingEndAfterIOExceptionFromRead() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("ROUTED_SERVER");
-
-        try (SocketChannel channel = SocketChannel.open())
-        {
-            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-
-            k3po.awaitBarrier("CONNECTED");
-
-            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-            channel.close();
-
-            k3po.finish();
-        }
-    }
-
-    @Test
-    @Specification({
-        "${route}/server/controller",
-        "${server}/server.sent.reset.then.end/server"
-    })
-    public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("ROUTED_SERVER");
-
-        try (SocketChannel channel = SocketChannel.open())
-        {
-            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-
-            k3po.awaitBarrier("CONNECTED");
-
-            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-            channel.close();
-
-            k3po.finish();
-        }
-    }
 }
