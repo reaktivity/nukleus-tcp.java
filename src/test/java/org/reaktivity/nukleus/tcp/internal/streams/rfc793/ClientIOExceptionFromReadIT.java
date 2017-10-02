@@ -35,7 +35,6 @@ import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-
 /**
  * Tests the handling of IOException thrown from SocketChannel.read (see issue #9). This condition  is forced
  * in this test by causing the remote end to send a TCP reset (RST) by setting SO_LINGER to 0 then closing the socket,
