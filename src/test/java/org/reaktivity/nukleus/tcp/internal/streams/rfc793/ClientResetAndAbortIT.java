@@ -68,6 +68,7 @@ public class ClientResetAndAbortIT
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE)
             .around(reaktor).around(counters).around(k3po).around(timeout);
+
     @Test
     @Specification({
         "${route}/client/controller",

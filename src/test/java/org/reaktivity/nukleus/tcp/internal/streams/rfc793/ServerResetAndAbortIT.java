@@ -178,7 +178,7 @@ public class ServerResetAndAbortIT
     @Test
     @Specification({
         "${route}/server/controller",
-        "${server}/server.sent.reset.then.end/server"
+        "${server}/server.sent.reset.and.end/server"
     })
     @BMRule(name = "shutdownInput",
     targetClass = "^java.nio.channels.SocketChannel",

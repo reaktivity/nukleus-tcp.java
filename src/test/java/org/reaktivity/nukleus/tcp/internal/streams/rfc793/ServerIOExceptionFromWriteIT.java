@@ -33,8 +33,8 @@ import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
-import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ProcessDataHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ProcessDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
