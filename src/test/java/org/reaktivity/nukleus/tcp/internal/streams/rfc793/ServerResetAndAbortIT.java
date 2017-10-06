@@ -188,7 +188,7 @@ public class ServerResetAndAbortIT
       "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
       action = "countDown()"
     )
-    public void shouldShutdownInputWhenServerSendsResetAndEnd() throws Exception
+    public void shouldShutdownOutputAndInputWhenServerSendsResetAndEnd() throws Exception
     {
         CountDownLatch shutdownInputCalled = new CountDownLatch(1);
         CountDownHelper.initialize(shutdownInputCalled);
@@ -199,23 +199,15 @@ public class ServerResetAndAbortIT
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            channel.configureBlocking(false);
-
-            channel.write(ByteBuffer.wrap("some data".getBytes()));
-
-            try
-            {
-                k3po.awaitBarrier("READ_ABORTED");
-                shutdownInputCalled.await();
-            }
-            catch(IOException e)
-            {
-                throw e;
-            }
+            ByteBuffer buf = ByteBuffer.allocate(20);
+            int len = channel.read(buf);
+            assertEquals(-1, len);
+            shutdownInputCalled.await();
         }
         finally
         {
             k3po.finish();
         }
     }
+
 }
