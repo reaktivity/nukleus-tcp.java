@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.tcp.internal.stream;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.addressesMatch;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
 
 import java.io.IOException;
@@ -27,10 +27,10 @@ import java.net.SocketAddress;
 import java.nio.channels.NetworkChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
@@ -39,6 +39,7 @@ import javax.annotation.Resource;
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
+import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
@@ -46,6 +47,7 @@ import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
+import org.reaktivity.nukleus.tcp.internal.util.IpUtil;
 
 /**
  * The {@code Poller} nukleus accepts new socket connections and informs the {@code Router} nukleus.
@@ -56,6 +58,7 @@ public final class Acceptor
     private final TcpRouteExFW routeExRO = new TcpRouteExFW();
     private final UnrouteFW unrouteRO = new UnrouteFW();
 
+    private final int backlog;
     private final Map<SocketAddress, String> sourcesByLocalAddress;
     private final Function<SocketAddress, PollerKey> registerHandler;
     private final ToIntFunction<PollerKey> acceptHandler;
@@ -63,9 +66,11 @@ public final class Acceptor
     private Poller poller;
     private ServerStreamFactory serverStreamFactory;
 
-    public Acceptor()
+    public Acceptor(
+        TcpConfiguration config)
     {
-        this.sourcesByLocalAddress = new HashMap<>();
+        this.backlog = config.maximumBacklog();
+        this.sourcesByLocalAddress = new TreeMap<>(IpUtil::compareAddresses);
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
     }
@@ -184,7 +189,7 @@ public final class Acceptor
             channel.configureBlocking(false);
 
             final InetSocketAddress address = localAddress(channel);
-            final String sourceName = sourcesByLocalAddress.getOrDefault(address, "any");
+            final String sourceName = sourcesByLocalAddress.get(address);
             final long sourceRef = address.getPort();
 
             serverStreamFactory.onAccepted(sourceName, sourceRef, channel, address);
@@ -229,7 +234,7 @@ public final class Acceptor
         {
             final ServerSocketChannel serverChannel = ServerSocketChannel.open();
             serverChannel.setOption(SO_REUSEADDR, true);
-            serverChannel.bind(localAddress);
+            serverChannel.bind(localAddress, backlog);
             serverChannel.configureBlocking(false);
 
             return poller.doRegister(serverChannel, OP_ACCEPT, acceptHandler);
@@ -249,7 +254,7 @@ public final class Acceptor
     {
         try
         {
-            return addressesMatch(channel.getLocalAddress(), address);
+            return compareAddresses(channel.getLocalAddress(), address) == 0;
         }
         catch (IOException ex)
         {
