@@ -19,6 +19,7 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.function.Consumer;
 
@@ -41,6 +42,29 @@ public final class IpUtil
     private IpUtil()
     {
         // no instances
+    }
+
+    public static int compareAddresses(SocketAddress address1, SocketAddress address2)
+    {
+        boolean same = false;
+        if (address1.equals(address2))
+        {
+            same = true;
+        }
+        else
+        {
+            if (address1 instanceof InetSocketAddress && address2 instanceof InetSocketAddress)
+            {
+                InetSocketAddress inet1 = (InetSocketAddress) address1;
+                InetSocketAddress inet2 = (InetSocketAddress) address2;
+                same = inet1.getPort() == inet2.getPort() &&
+                         ((inet1.getAddress() != null && inet1.getAddress().isAnyLocalAddress())
+                         ||
+                         (inet2.getAddress() != null && inet2.getAddress().isAnyLocalAddress()));
+            }
+
+        }
+        return same ? 0 : 1;
     }
 
     public static InetAddress inetAddress(

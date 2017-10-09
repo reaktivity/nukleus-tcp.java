@@ -41,7 +41,8 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ServerIT
 {
     private final K3poRule k3po = new K3poRule()
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+            .addScriptRoot("control", "org/reaktivity/specification/nukleus/tcp/control")
+            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
             .addScriptRoot("client", "org/reaktivity/specification/tcp/rfc793")
             .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
@@ -202,7 +203,6 @@ public class ServerIT
         assertEquals(0, counters.overflows());
     }
 
-
     @Test
     @Specification({
         "${route}/server/controller",
@@ -210,6 +210,38 @@ public class ServerIT
         "${client}/connection.established/client"
     })
     public void shouldEstablishConnection() throws Exception
+    {
+        k3po.finish();
+
+        assertEquals(1, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
+    @Test
+    @Specification({
+        "${control}/route/server/controller",
+        "${server}/connection.established/server",
+        "${client}/connection.established/client"
+    })
+    @ScriptProperty("address \"tcp://0.0.0.0:8080\"")
+    public void shouldEstablishConnectionToAddressAnyIPv4() throws Exception
+    {
+        k3po.finish();
+
+        assertEquals(1, counters.streams());
+        assertEquals(0, counters.routes());
+        assertEquals(0, counters.overflows());
+    }
+
+    @Test
+    @Specification({
+        "${control}/route/server/controller",
+        "${server}/connection.established/server",
+        "${client}/connection.established/client"
+    })
+    @ScriptProperty("address \"tcp://[::0]:8080\"")
+    public void shouldEstablishConnectionToAddressAnyIPv6() throws Exception
     {
         k3po.finish();
 

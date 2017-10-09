@@ -181,7 +181,8 @@ public final class WriteStream
 
         if (reduceWindow(writableBytes))
         {
-            ByteBuffer writeBuffer = getWriteBuffer(buffer, payload.offset(), writableBytes);
+            final ByteBuffer writeBuffer = getWriteBuffer(buffer, payload.offset(), writableBytes);
+            final int remainingBytes = writeBuffer.remaining();
 
             int bytesWritten = 0;
 
@@ -193,7 +194,7 @@ public final class WriteStream
             int originalSlot = slot;
             if (handleUnwrittenData(writeBuffer, bytesWritten))
             {
-                if (bytesWritten < writableBytes)
+                if (bytesWritten < remainingBytes)
                 {
                     key.register(OP_WRITE);
                 }
