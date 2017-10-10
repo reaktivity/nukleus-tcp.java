@@ -297,7 +297,7 @@
         <artifactId>maven-failsafe-plugin</artifactId>
         <version>2.19.1</version>
         <configuration>
-          <argLine>@{argLine}</argLine>
+          <argLine>@{argLine} -Djdk.attach.allowAttachSelf=true</argLine>
         </configuration>
         <executions>
           <execution>
