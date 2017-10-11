@@ -18,23 +18,28 @@ package org.reaktivity.nukleus.tcp.internal.control;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.MAXIMUM_BACKLOG_PROPERTY_NAME;
 
+import org.jboss.byteman.contrib.bmunit.BMRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
+@RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 public class ControlIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/tcp/control/unroute");
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
+        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/tcp/control/unroute.ext")
+        .addScriptRoot("control", "org/reaktivity/specification/nukleus/tcp/control/");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -44,12 +49,37 @@ public class ControlIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024);
+        .counterValuesBufferCapacity(1024)
+        .configure(MAXIMUM_BACKLOG_PROPERTY_NAME, 50)
+        .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
 
     @Rule
     public final TestRule chain = outerRule(k3po).around(timeout).around(reaktor).around(counters);
+
+    @Test
+    @Specification({
+        "${control}/route/server/controller"
+    })
+    public void shouldRouteServerWithoutExtension() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/server/controller"
+    })
+    @BMRule(name = "should route server with maxmimum backlog",
+            targetClass = "^java.nio.channels.ServerSocketChannel",
+            targetMethod = "bind(java.net.SocketAddress, int)",
+            condition = "$2 != 50",
+            action = "throw new java.io.IOException(\"Unexpected backlog: \" + $2)")
+    public void shouldRouteServerWithMaximumBacklog() throws Exception
+    {
+        k3po.finish();
+    }
 
     @Test
     @Specification({
@@ -68,6 +98,16 @@ public class ControlIT
     {
         k3po.finish();
         assertEquals(1, counters.routes());
+    }
+
+    @Test
+    @Specification({
+        "${control}/route/server/controller",
+        "${control}/unroute/server/controller"
+    })
+    public void shouldUnrouteServerWithoutExtension() throws Exception
+    {
+        k3po.finish();
     }
 
     @Test

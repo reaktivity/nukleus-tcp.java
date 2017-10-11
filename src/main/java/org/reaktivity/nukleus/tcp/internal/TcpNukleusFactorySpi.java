@@ -40,7 +40,8 @@ public final class TcpNukleusFactorySpi implements NukleusFactorySpi
         Configuration config,
         NukleusBuilder builder)
     {
-        Acceptor acceptor = new Acceptor();
+        TcpConfiguration tcpConfig = new TcpConfiguration(config);
+        Acceptor acceptor = new Acceptor(tcpConfig);
         Poller poller = new Poller();
         acceptor.setPoller(poller);
 

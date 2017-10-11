@@ -310,7 +310,7 @@ public class ClientStreamFactory implements StreamFactory
                 channel.finishConnect();
                 handleConnected(this);
             }
-            catch (Exception ex)
+            catch (IOException ex)
             {
                 handleConnectFailed(this);
             }
