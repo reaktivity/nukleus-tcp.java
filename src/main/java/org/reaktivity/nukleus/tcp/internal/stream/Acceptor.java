@@ -34,8 +34,6 @@ import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
-import javax.annotation.Resource;
-
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
@@ -75,7 +73,6 @@ public final class Acceptor
         this.acceptHandler = this::handleAccept;
     }
 
-    @Resource
     public void setPoller(
         Poller poller)
     {

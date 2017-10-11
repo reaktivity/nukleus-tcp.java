@@ -45,13 +45,13 @@
     <jacoco.coverage.ratio>0.55</jacoco.coverage.ratio>
     <jacoco.missed.count>35</jacoco.missed.count>
 
-    <byteman.version>3.0.6</byteman.version>
+    <byteman.version>3.0.10</byteman.version>
     <jmock.version>2.6.0</jmock.version>
     <junit.version>4.12</junit.version>
     <jmh.version>1.17.4</jmh.version>
     <jmh.profilers.version>0.1.3</jmh.profilers.version>
 
-    <k3po.version>3.0.0-alpha-83</k3po.version>
+    <k3po.version>3.0.0-alpha-84</k3po.version>
     <k3po.nukleus.ext.version>develop-SNAPSHOT</k3po.nukleus.ext.version>
 
     <nukleus.plugin.version>0.12</nukleus.plugin.version>
@@ -62,6 +62,12 @@
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>javax.annotation</groupId>
+      <artifactId>javax.annotation-api</artifactId>
+      <version>1.3.1</version>
+      <scope>provided</scope>
+    </dependency>
     <dependency>
       <groupId>org.reaktivity</groupId>
       <artifactId>nukleus</artifactId>
@@ -291,7 +297,7 @@
         <artifactId>maven-failsafe-plugin</artifactId>
         <version>2.19.1</version>
         <configuration>
-          <argLine>@{argLine}</argLine>
+          <argLine>@{argLine} -Djdk.attach.allowAttachSelf=true</argLine>
         </configuration>
         <executions>
           <execution>
@@ -358,7 +364,7 @@
       <plugin>
         <groupId>org.jboss.byteman</groupId>
         <artifactId>byteman-rulecheck-maven-plugin</artifactId>
-        <version>3.0.6</version>
+        <version>${byteman.version}</version>
         <dependencies>
           <dependency>
             <groupId>junit</groupId>
