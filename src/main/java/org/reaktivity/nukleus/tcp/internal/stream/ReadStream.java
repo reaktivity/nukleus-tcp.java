@@ -67,10 +67,7 @@ final class ReadStream
     int handleStream(
         PollerKey key)
     {
-        if  (readableBytes < readPadding)
-        {
-            return 1;
-        }
+        assert readableBytes > readPadding;
 
         final int limit = Math.min(readableBytes - readPadding, readBuffer.capacity());
 
@@ -166,7 +163,10 @@ final class ReadStream
             readPadding = window.padding();
             readableBytes += window.credit();
 
-            handleStream(key);
+            if (readableBytes > readPadding)
+            {
+                handleStream(key);
+            }
 
             if (readableBytes > readPadding)
             {
