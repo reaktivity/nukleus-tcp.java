@@ -43,6 +43,7 @@ final class ReadStream
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
     private int readableBytes;
+    private int readPadding;
     private boolean resetRequired;
 
     ReadStream(
@@ -66,9 +67,9 @@ final class ReadStream
     int handleStream(
         PollerKey key)
     {
-        assert readableBytes > 0;
+        assert readableBytes > readPadding;
 
-        final int limit = Math.min(readableBytes, readBuffer.capacity());
+        final int limit = Math.min(readableBytes - readPadding, readBuffer.capacity());
 
         readBuffer.position(0);
         readBuffer.limit(limit);
@@ -95,9 +96,9 @@ final class ReadStream
             // atomic buffer is zero copy with read buffer
             writer.doTcpData(target, streamId, atomicBuffer, 0, bytesRead);
 
-            readableBytes -= bytesRead;
+            readableBytes -= bytesRead + readPadding;
 
-            if (readableBytes == 0)
+            if (readableBytes <= readPadding)
             {
                 key.clear(OP_READ);
             }
@@ -131,10 +132,12 @@ final class ReadStream
         switch (msgTypeId)
         {
         case WindowFW.TYPE_ID:
-            processWindow(buffer, index, length);
+            final WindowFW window = writer.windowRO.wrap(buffer, index, index + length);
+            processWindow(window);
             break;
         case ResetFW.TYPE_ID:
-            processReset(buffer, index, length);
+            final ResetFW reset = writer.resetRO.wrap(buffer, index, index + length);
+            processReset(reset);
             break;
         default:
             // ignore
@@ -153,21 +156,19 @@ final class ReadStream
     }
 
     private void processWindow(
-        DirectBuffer buffer,
-        int index,
-        int length)
+        WindowFW window)
     {
-        writer.windowRO.wrap(buffer, index, index + length);
-
         if (readableBytes != -1)
         {
-            final int update = writer.windowRO.update();
+            readPadding = window.padding();
+            readableBytes += window.credit();
 
-            readableBytes += update;
+            if (readableBytes > readPadding)
+            {
+                handleStream(key);
+            }
 
-            handleStream(key);
-
-            if (readableBytes > 0)
+            if (readableBytes > readPadding)
             {
                 key.register(OP_READ);
             }
@@ -175,12 +176,8 @@ final class ReadStream
     }
 
     private void processReset(
-        DirectBuffer buffer,
-        int index,
-        int length)
+        ResetFW reset)
     {
-        writer.resetRO.wrap(buffer, index, index + length);
-
         try
         {
             if (correlatedThrottle != null)
