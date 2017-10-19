@@ -75,6 +75,17 @@ public class ServerIT
 
     @Test
     @Specification({
+            "${route}/server/controller",
+            "${server}/client.and.server.sent.data.with.padding/server",
+            "${client}/client.and.server.sent.data.with.padding/client"
+    })
+    public void shouldSendAndReceiveDataWithPadding() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
         "${route}/server/controller",
         "${server}/client.close/server",
         "${client}/client.close/client"
