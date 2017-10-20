@@ -132,7 +132,7 @@ public class ClientStreamFactory implements StreamFactory
             return sourceRef == route.sourceRef();
         };
 
-        final RouteFW route = router.resolve(filter, this::wrapRoute);
+        final RouteFW route = router.resolve(begin.authorization(), filter, this::wrapRoute);
 
         if (route != null)
         {
