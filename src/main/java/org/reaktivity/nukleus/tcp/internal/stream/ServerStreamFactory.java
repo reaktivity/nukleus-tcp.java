@@ -143,7 +143,7 @@ public class ServerStreamFactory implements StreamFactory
                          compareAddresses(address, routedAddress) == 0;
         };
 
-        final RouteFW route = router.resolve(filter, this::wrapRoute);
+        final RouteFW route = router.resolve(0L, filter, this::wrapRoute);
 
         if (route != null)
         {
