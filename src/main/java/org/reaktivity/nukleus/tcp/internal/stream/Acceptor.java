@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.tcp.internal.stream;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
+import static java.net.StandardSocketOptions.TCP_NODELAY;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
@@ -184,6 +185,7 @@ public final class Acceptor
 
             final SocketChannel channel = serverChannel.accept();
             channel.configureBlocking(false);
+            channel.setOption(TCP_NODELAY, true);
 
             final InetSocketAddress address = localAddress(channel);
             final String sourceName = sourcesByLocalAddress.get(address);
