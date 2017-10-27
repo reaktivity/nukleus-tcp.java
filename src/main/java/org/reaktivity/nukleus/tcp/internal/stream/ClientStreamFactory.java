@@ -172,6 +172,7 @@ public class ClientStreamFactory implements StreamFactory
         {
             final SocketChannel channel = SocketChannel.open();
             channel.configureBlocking(false);
+            channel.setOption(TCP_NODELAY, true);
             return channel;
         }
         catch (IOException ex)
@@ -237,7 +238,6 @@ public class ClientStreamFactory implements StreamFactory
 
         try
         {
-            channel.setOption(TCP_NODELAY, true);
             final InetSocketAddress localAddress = (InetSocketAddress) channel.getLocalAddress();
             final InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
             final MessageConsumer target = router.supplyTarget(targetName);
