@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
+import static java.net.StandardSocketOptions.TCP_NODELAY;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
@@ -236,6 +237,7 @@ public class ClientStreamFactory implements StreamFactory
 
         try
         {
+            channel.setOption(TCP_NODELAY, true);
             final InetSocketAddress localAddress = (InetSocketAddress) channel.getLocalAddress();
             final InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
             final MessageConsumer target = router.supplyTarget(targetName);
