@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
+import static java.net.StandardSocketOptions.TCP_NODELAY;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
@@ -171,6 +172,7 @@ public class ClientStreamFactory implements StreamFactory
         {
             final SocketChannel channel = SocketChannel.open();
             channel.configureBlocking(false);
+            channel.setOption(TCP_NODELAY, true);
             return channel;
         }
         catch (IOException ex)
