@@ -126,7 +126,7 @@ public final class TcpController implements Controller
     {
         if (address == null)
         {
-            return (buffer, offset, limit) -> routeExRW.wrap(buffer, offset, limit).build().sizeof();
+            return (buffer, offset, limit) -> 0;
         }
 
         return (buffer, offset, limit) ->
