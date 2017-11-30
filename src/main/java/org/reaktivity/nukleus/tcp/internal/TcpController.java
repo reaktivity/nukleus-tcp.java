@@ -17,7 +17,6 @@ package org.reaktivity.nukleus.tcp.internal;
 
 import static java.nio.ByteBuffer.allocateDirect;
 import static java.nio.ByteOrder.nativeOrder;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
 
 import java.net.InetAddress;
 import java.util.concurrent.CompletableFuture;
@@ -26,12 +25,9 @@ import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Controller;
 import org.reaktivity.nukleus.ControllerSpi;
-import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
-
 
 public final class TcpController implements Controller
 {
@@ -40,8 +36,6 @@ public final class TcpController implements Controller
     // TODO: thread-safe flyweights or command queue from public methods
     private final RouteFW.Builder routeRW = new RouteFW.Builder();
     private final UnrouteFW.Builder unrouteRW = new UnrouteFW.Builder();
-
-    private final TcpRouteExFW.Builder routeExRW = new TcpRouteExFW.Builder();
 
     private final ControllerSpi controllerSpi;
     private final AtomicBuffer atomicBuffer;
@@ -121,21 +115,6 @@ public final class TcpController implements Controller
         return controllerSpi.doCount(name);
     }
 
-    private Flyweight.Builder.Visitor visitRouteEx(
-        InetAddress address)
-    {
-        if (address == null)
-        {
-            return (buffer, offset, limit) -> 0;
-        }
-
-        return (buffer, offset, limit) ->
-            routeExRW.wrap(buffer, offset, limit)
-                     .address(a -> inetAddress(address, a::ipv4Address, a::ipv6Address))
-                     .build()
-                     .sizeof();
-    }
-
     private CompletableFuture<Long> route(
         Role role,
         String source,
@@ -153,7 +132,6 @@ public final class TcpController implements Controller
                                  .sourceRef(sourceRef)
                                  .target(target)
                                  .targetRef(targetRef)
-                                 .extension(b -> b.set(visitRouteEx(address)))
                                  .build();
 
         return controllerSpi.doRoute(routeRO.typeId(), routeRO.buffer(), routeRO.offset(), routeRO.sizeof());
@@ -176,7 +154,6 @@ public final class TcpController implements Controller
                                  .sourceRef(sourceRef)
                                  .target(target)
                                  .targetRef(targetRef)
-                                 .extension(b -> b.set(visitRouteEx(address)))
                                  .build();
 
         return controllerSpi.doUnroute(unrouteRO.typeId(), unrouteRO.buffer(), unrouteRO.offset(), unrouteRO.sizeof());

@@ -19,7 +19,6 @@ import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.net.StandardSocketOptions.TCP_NODELAY;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -41,10 +40,8 @@ import org.agrona.LangUtil;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
-import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
 import org.reaktivity.nukleus.tcp.internal.util.IpUtil;
 
@@ -54,7 +51,6 @@ import org.reaktivity.nukleus.tcp.internal.util.IpUtil;
 public final class Acceptor
 {
     private final RouteFW routeRO = new RouteFW();
-    private final TcpRouteExFW routeExRO = new TcpRouteExFW();
     private final UnrouteFW unrouteRO = new UnrouteFW();
 
     private final int backlog;
@@ -92,34 +88,16 @@ public final class Acceptor
                 final long correlationId = route.correlationId();
                 final String source = route.source().asString();
                 final long sourceRef = route.sourceRef();
-                final OctetsFW extension = route.extension();
-
-                final TcpRouteExFW routeEx = extension.get(routeExRO::wrap);
-                final InetAddress address = inetAddress(routeEx.address());
-                InetSocketAddress localAddress = new InetSocketAddress(address, (int)sourceRef);
-                result = doRegister(correlationId, source, sourceRef, localAddress);
+                result = doRegister(correlationId, source, sourceRef);
             }
             break;
         case UnrouteFW.TYPE_ID:
             {
                 final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
                 assert unroute.role().get() == Role.SERVER;
-                final long correlationId = unroute.correlationId();
                 final String source = unroute.source().asString();
                 final long sourceRef = unroute.sourceRef();
-                final OctetsFW extension = unroute.extension();
-
-                final TcpRouteExFW unrouteEx = extension.get(routeExRO::wrap);
-                final InetAddress address = inetAddress(unrouteEx.address());
-                if (sourceRef > 0L && sourceRef <= 65535L)
-                {
-                    InetSocketAddress localAddress = new InetSocketAddress(address, (int)sourceRef);
-                    result = doUnregister(correlationId, source, localAddress);
-                }
-                else
-                {
-                    result = false;
-                }
+                result = doUnregister(source, sourceRef);
             }
             break;
 
@@ -136,16 +114,17 @@ public final class Acceptor
     private boolean doRegister(
         long correlationId,
         String sourceName,
-        long sourceRef,
-        SocketAddress address)
+        long sourceRef)
     {
         try
         {
-            findOrRegisterKey(address);
+            final InetAddress address = InetAddress.getByName(sourceName);
+            final InetSocketAddress localAddress = new InetSocketAddress(address, (int)sourceRef);
+            findOrRegisterKey(localAddress);
 
             // TODO: detect collision on different source name for same key
             // TODO: maintain register count
-            sourcesByLocalAddress.putIfAbsent(address, sourceName);
+            sourcesByLocalAddress.putIfAbsent(localAddress, sourceName);
         }
         catch (Exception ex)
         {
@@ -155,23 +134,26 @@ public final class Acceptor
     }
 
     private boolean doUnregister(
-        long correlationId,
         String sourceName,
-        SocketAddress address)
+        long sourceRef)
     {
-        boolean result;
-        if (Objects.equals(sourceName, sourcesByLocalAddress.get(address)))
+        boolean result = false;
+        try
         {
-            final PollerKey key = findRegisteredKey(address);
+            InetAddress address = InetAddress.getByName(sourceName);
+            final InetSocketAddress localAddress = new InetSocketAddress(address, (int)sourceRef);
+            if (Objects.equals(sourceName, sourcesByLocalAddress.get(localAddress)))
+            {
+                final PollerKey key = findRegisteredKey(localAddress);
 
-            // TODO: maintain count for auto close when unregistered for last time
-            CloseHelper.quietClose(key.channel());
-            result = true;
-
+                // TODO: maintain count for auto close when unregistered for last time
+                CloseHelper.quietClose(key.channel());
+                result = true;
+            }
         }
-        else
+        catch (final Exception ignore)
         {
-            result = false;
+            // NOOP
         }
         return result;
     }

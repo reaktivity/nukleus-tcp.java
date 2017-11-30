@@ -53,7 +53,6 @@ import org.reaktivity.nukleus.tcp.internal.util.function.LongObjectBiConsumer;
 public class ClientStreamFactory implements StreamFactory
 {
     private final RouteFW routeRO = new RouteFW();
-    private final TcpRouteExFW routeExRO = new TcpRouteExFW();
     private final BeginFW beginRO = new BeginFW();
 
     private final BufferPool bufferPool;
