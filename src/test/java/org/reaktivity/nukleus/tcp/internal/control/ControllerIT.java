@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.tcp.internal.control;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 
-import java.net.InetAddress;
 import java.util.Random;
 
 import org.junit.Rule;
@@ -34,8 +33,8 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ControllerIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
-        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/tcp/control/unroute.ext");
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/tcp/control/unroute");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -56,12 +55,11 @@ public class ControllerIT
     public void shouldRouteServer() throws Exception
     {
         long targetRef = new Random().nextLong();
-        InetAddress address = InetAddress.getByName("127.0.0.1");
 
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .routeServer("any", 8080, "target", targetRef, address)
+               .routeServer("0.0.0.0", 8080, "target", targetRef)
                .get();
 
         k3po.finish();
@@ -69,15 +67,45 @@ public class ControllerIT
 
     @Test
     @Specification({
-        "${route}/client/nukleus"
+        "${route}/client.ip/nukleus"
     })
-    public void shouldRouteClient() throws Exception
+    public void shouldRouteClientIp() throws Exception
     {
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .routeClient("source", 0L, "localhost", 8080, null)
+               .routeClient("source", 0L, "127.0.0.1", 8080)
                .get();
+
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/client.host/nukleus"
+    })
+    public void shouldRouteClientHost() throws Exception
+    {
+        k3po.start();
+
+        reaktor.controller(TcpController.class)
+                .routeClient("source", 0L, "localhost", 8080)
+                .get();
+
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/client.subnet/nukleus"
+    })
+    public void shouldRouteClientSubnet() throws Exception
+    {
+        k3po.start();
+
+        reaktor.controller(TcpController.class)
+                .routeClient("source", 0L, "127.0.0.1/24", 8080)
+                .get();
 
         k3po.finish();
     }
@@ -89,12 +117,11 @@ public class ControllerIT
     public void shouldUnrouteServer() throws Exception
     {
         long targetRef = new Random().nextLong();
-        InetAddress address = InetAddress.getByName("127.0.0.1");
 
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .unrouteServer("any", 8080, "target", targetRef, address)
+               .unrouteServer("0.0.0.0", 8080, "target", targetRef)
                .get();
 
         k3po.finish();
@@ -102,7 +129,7 @@ public class ControllerIT
 
     @Test
     @Specification({
-        "${unroute}/client/nukleus"
+        "${unroute}/client.host/nukleus"
     })
     public void shouldUnrouteClient() throws Exception
     {
@@ -111,7 +138,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .unrouteClient("source", sourceRef, "localhost", 8080, null)
+               .unrouteClient("source", sourceRef, "localhost", 8080)
                .get();
 
         k3po.finish();

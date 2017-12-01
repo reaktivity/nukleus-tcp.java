@@ -26,7 +26,6 @@ import java.util.function.Consumer;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
-import org.reaktivity.nukleus.tcp.internal.types.TcpAddressFW;
 
 public final class IpUtil
 {
@@ -65,25 +64,6 @@ public final class IpUtil
 
         }
         return same ? 0 : 1;
-    }
-
-    public static InetAddress inetAddress(
-        TcpAddressFW address)
-    {
-        if (address.sizeof() == 0)
-        {
-            return null;
-        }
-
-        switch (address.kind())
-        {
-        case TcpAddressFW.KIND_IPV4_ADDRESS:
-            return address.ipv4Address().get(IpUtil::ipv4Address);
-        case TcpAddressFW.KIND_IPV6_ADDRESS:
-            return address.ipv6Address().get(IpUtil::ipv6Address);
-        default:
-            throw new IllegalStateException("Unrecognized kind: " + address.kind());
-        }
     }
 
     public static void socketAddress(

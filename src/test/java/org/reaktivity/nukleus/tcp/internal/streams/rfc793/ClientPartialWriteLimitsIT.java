@@ -59,7 +59,7 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ClientPartialWriteLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
         .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
         .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
@@ -85,7 +85,7 @@ public class ClientPartialWriteLimitsIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data.multiple.frames/client",
         "${server}/client.sent.data.multiple.frames/server"
     })
@@ -105,7 +105,7 @@ public class ClientPartialWriteLimitsIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data.multiple.streams.second.was.reset/client"
     })
     public void shouldResetStreamsExceedingPartialWriteStreamsLimit() throws Exception

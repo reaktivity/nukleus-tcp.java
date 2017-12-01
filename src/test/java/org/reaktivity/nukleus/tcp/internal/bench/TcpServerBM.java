@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.tcp.internal.bench;
 
-import static java.net.InetAddress.getByName;
 import static java.nio.ByteBuffer.allocateDirect;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -83,13 +82,13 @@ public class TcpServerBM
     public void reinit() throws Exception
     {
         reaktor.start();
-        controller.routeServer("any", 8080, "tcp", 0L, getByName("127.0.0.1")).get();
+        controller.routeServer("127.0.0.1", 8080, "tcp", 0L).get();
     }
 
     @TearDown(Level.Trial)
     public void reset() throws Exception
     {
-        controller.unrouteServer("any", 8080, "tcp", 0L, getByName("127.0.0.1")).get();
+        controller.unrouteServer("127.0.0.1", 8080, "tcp", 0L).get();
         reaktor.close();
     }
 

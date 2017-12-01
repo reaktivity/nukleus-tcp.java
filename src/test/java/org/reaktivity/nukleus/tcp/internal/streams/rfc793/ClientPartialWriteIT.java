@@ -56,7 +56,7 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ClientPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
         .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
         .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
@@ -76,7 +76,7 @@ public class ClientPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data/client",
         "${server}/client.sent.data/server"
     })
@@ -89,7 +89,7 @@ public class ClientPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data/client",
         "${server}/client.sent.data/server"
     })
@@ -101,7 +101,7 @@ public class ClientPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data/client",
         "${server}/client.sent.data/server"
     })
@@ -114,7 +114,7 @@ public class ClientPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data.multiple.frames/client",
         "${server}/client.sent.data.multiple.frames/server"
     })
@@ -132,7 +132,7 @@ public class ClientPartialWriteIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data.then.end/client"
     })
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception

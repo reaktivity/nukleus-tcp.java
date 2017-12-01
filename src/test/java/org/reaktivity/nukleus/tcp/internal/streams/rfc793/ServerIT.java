@@ -42,7 +42,7 @@ public class ServerIT
 {
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("control", "org/reaktivity/specification/nukleus/tcp/control")
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
+            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
             .addScriptRoot("client", "org/reaktivity/specification/tcp/rfc793")
             .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
