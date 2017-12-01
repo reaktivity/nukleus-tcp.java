@@ -19,7 +19,6 @@ import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -43,16 +42,14 @@ import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
-import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
+//import org.reaktivity.nukleus.tcp.internal.types.StringFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 
 public class ServerStreamFactory implements StreamFactory
 {
     private final RouteFW routeRO = new RouteFW();
-    private final TcpRouteExFW routeExRO = new TcpRouteExFW();
     private final BeginFW beginRO = new org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW();
 
     private final RouteManager router;
@@ -130,13 +127,7 @@ public class ServerStreamFactory implements StreamFactory
         final MessagePredicate filter = (t, b, o, l) ->
         {
             final RouteFW route = routeRO.wrap(b, o, l);
-            final OctetsFW extension = routeRO.extension();
             InetAddress inetAddress = null;
-            if (extension.sizeof() > 0)
-            {
-                final TcpRouteExFW routeEx = extension.get(routeExRO::wrap);
-                inetAddress = inetAddress(routeEx.address());
-            }
             InetSocketAddress routedAddress = new InetSocketAddress(inetAddress, (int)sourceRef);
             return sourceRef == route.sourceRef() &&
                     sourceName.equals(route.source().asString()) &&

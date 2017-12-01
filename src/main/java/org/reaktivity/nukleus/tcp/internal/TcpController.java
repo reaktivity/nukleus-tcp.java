@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.tcp.internal;
 import static java.nio.ByteBuffer.allocateDirect;
 import static java.nio.ByteOrder.nativeOrder;
 
-import java.net.InetAddress;
 import java.util.concurrent.CompletableFuture;
 
 import org.agrona.concurrent.AtomicBuffer;
@@ -74,40 +73,36 @@ public final class TcpController implements Controller
         String source,
         long sourceRef,
         String target,
-        long targetRef,
-        InetAddress address)
+        long targetRef)
     {
-        return route(Role.SERVER, source, sourceRef, target, targetRef, address);
+        return route(Role.SERVER, source, sourceRef, target, targetRef);
     }
 
     public CompletableFuture<Long> routeClient(
         String source,
         long sourceRef,
         String target,
-        long targetRef,
-        InetAddress address)
+        long targetRef)
     {
-        return route(Role.CLIENT, source, sourceRef, target, targetRef, address);
+        return route(Role.CLIENT, source, sourceRef, target, targetRef);
     }
 
     public CompletableFuture<Void> unrouteServer(
         String source,
         long sourceRef,
         String target,
-        long targetRef,
-        InetAddress address)
+        long targetRef)
     {
-        return unroute(Role.SERVER, source, sourceRef, target, targetRef, address);
+        return unroute(Role.SERVER, source, sourceRef, target, targetRef);
     }
 
     public CompletableFuture<Void> unrouteClient(
         String source,
         long sourceRef,
         String target,
-        long targetRef,
-        InetAddress address)
+        long targetRef)
     {
-        return unroute(Role.CLIENT, source, sourceRef, target, targetRef, address);
+        return unroute(Role.CLIENT, source, sourceRef, target, targetRef);
     }
 
     public long count(String name)
@@ -120,8 +115,7 @@ public final class TcpController implements Controller
         String source,
         long sourceRef,
         String target,
-        long targetRef,
-        InetAddress address)
+        long targetRef)
     {
         long correlationId = controllerSpi.nextCorrelationId();
 
@@ -142,8 +136,7 @@ public final class TcpController implements Controller
         String source,
         long sourceRef,
         String target,
-        long targetRef,
-        InetAddress address)
+        long targetRef)
     {
         long correlationId = controllerSpi.nextCorrelationId();
 

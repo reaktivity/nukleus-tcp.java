@@ -46,7 +46,7 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ClientIOExceptionFromWriteIT
 {
     private final K3poRule k3po = new K3poRule()
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
+            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
             .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
             .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
@@ -67,7 +67,7 @@ public class ClientIOExceptionFromWriteIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data.received.reset.and.abort/client"
     })
     @BMRule(name = "processData",
@@ -96,7 +96,7 @@ public class ClientIOExceptionFromWriteIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data.received.reset.and.abort/client"
     })
     @BMRules(rules = {

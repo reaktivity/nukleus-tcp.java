@@ -20,14 +20,19 @@ import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.util.Objects.requireNonNull;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.inetAddress;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.LongSupplier;
+import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 
 import org.agrona.CloseHelper;
@@ -44,15 +49,19 @@ import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
+import org.reaktivity.nukleus.tcp.internal.types.TcpAddressFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.TcpRouteExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
+import org.reaktivity.nukleus.tcp.internal.types.stream.TcpBeginExFW;
+import org.reaktivity.nukleus.tcp.internal.util.SubnetUtils;
+import org.reaktivity.nukleus.tcp.internal.util.SubnetUtils.SubnetInfo;
 import org.reaktivity.nukleus.tcp.internal.util.function.LongObjectBiConsumer;
 
 public class ClientStreamFactory implements StreamFactory
 {
     private final RouteFW routeRO = new RouteFW();
+    private final TcpBeginExFW tcpBeginExRO = new TcpBeginExFW();
     private final BeginFW beginRO = new BeginFW();
 
     private final BufferPool bufferPool;
@@ -64,6 +73,7 @@ public class ClientStreamFactory implements StreamFactory
     private final MutableDirectBuffer readBuffer;
     private final ByteBuffer writeByteBuffer;
     private final MessageWriter writer;
+    private final Map<String, Predicate<? super InetAddress>> lazyTargetTpSubsetUtils;
 
     public ClientStreamFactory(
             Configuration configuration,
@@ -88,6 +98,7 @@ public class ClientStreamFactory implements StreamFactory
 
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
+        this.lazyTargetTpSubsetUtils = new HashMap<>();
     }
 
     @Override
@@ -137,31 +148,125 @@ public class ClientStreamFactory implements StreamFactory
         if (route != null)
         {
             final SocketChannel channel = newSocketChannel();
-            final OctetsFW extension = routeRO.extension();
+            final OctetsFW extension = begin.extension();
             String targetName = route.target().asString();
             long targetRef = route.targetRef();
             InetSocketAddress remoteAddress = null;
             if (extension.sizeof() > 0)
             {
-                final TcpRouteExFW routeEx = extension.get(routeExRO::wrap);
-                final InetAddress inetAddress = inetAddress(routeEx.address());
-                remoteAddress = new InetSocketAddress(inetAddress, (int)sourceRef);
+                remoteAddress = newAcceptStreamWithExt(extension, targetName, targetRef);
             }
             else
             {
                 remoteAddress = new InetSocketAddress(targetName, (int)targetRef);
             }
-            final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                    bufferPool, writeByteBuffer, writer);
-            result = stream::handleStream;
+            if (remoteAddress != null)
+            {
+                final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
+                        bufferPool, writeByteBuffer, writer);
+                result = stream::handleStream;
 
-            doConnect(stream, channel, remoteAddress, sourceName, correlationId, throttle, streamId, stream::setCorrelatedInput);
+                doConnect(
+                    stream,
+                    channel,
+                    remoteAddress,
+                    sourceName,
+                    correlationId,
+                    throttle,
+                    streamId,
+                    stream::setCorrelatedInput);
+            }
+            else
+            {
+                writer.doReset(throttle, streamId);
+            }
         }
         else
         {
             writer.doReset(throttle, streamId);
+        }
+
+        return result;
+
+ }
+
+    private InetSocketAddress newAcceptStreamWithExt(
+            final OctetsFW extension,
+            String targetName,
+            long targetRef)
+    {
+        InetSocketAddress result = null;
+        InetAddress address = null;
+
+        try
+        {
+            final TcpBeginExFW beginEx = extension.get(tcpBeginExRO::wrap);
+            TcpAddressFW remoteAddressExt = beginEx.remoteAddress();
+            Predicate<? super InetAddress> subnetFilter = getSubnetMatcher(targetName);
+
+            int remotePort = beginEx.remotePort();
+
+            if (targetRef == 0 || targetRef == remotePort)
+            {
+
+                switch(remoteAddressExt.kind())
+                {
+                    case TcpAddressFW.KIND_HOST:
+                        String requestedAddressName = remoteAddressExt.host().asString();
+                        Optional<InetAddress> optional = Arrays
+                                .stream(InetAddress.getAllByName(requestedAddressName))
+                                .filter(subnetFilter)
+                                .findFirst();
+                        address = optional.isPresent() ? optional.get() : null;
+                        break;
+                    case TcpAddressFW.KIND_IPV4_ADDRESS:
+                        OctetsFW ipRO = remoteAddressExt.ipv4Address();
+                        byte[] addr = new byte[ipRO.sizeof()];
+                        ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
+                        InetAddress candidate = InetAddress.getByAddress(addr);
+                        address =  subnetFilter.test(candidate) ? candidate: null;
+                        break;
+                    case TcpAddressFW.KIND_IPV6_ADDRESS:
+                        ipRO = remoteAddressExt.ipv6Address();
+                        addr = new byte[ipRO.sizeof()];
+                        ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
+                        candidate = InetAddress.getByAddress(addr);
+                        address =  subnetFilter.test(candidate) ? candidate: null;
+                        break;
+                    default:
+                        throw new RuntimeException("Unexpected address kind");
+                }
+                if (address != null)
+                {
+                    result = new InetSocketAddress(address, remotePort);
+                }
+            }
+        }
+        catch (UnknownHostException ignore)
+        {
+           // NOOP
+        }
+        return result;
     }
 
+    private Predicate<? super InetAddress> getSubnetMatcher(String targetName) throws UnknownHostException
+    {
+        Predicate<? super InetAddress> result;
+        if (targetName.contains("/"))
+        {
+            final SubnetInfo subnet = new SubnetUtils(targetName).getInfo();
+            result = lazyTargetTpSubsetUtils.computeIfAbsent(targetName, t ->
+                 candidate -> subnet.isInRange(candidate.getHostAddress())
+            );
+        }
+        else
+        {
+            InetAddress toMatch = InetAddress.getByName(targetName);
+            result = lazyTargetTpSubsetUtils.computeIfAbsent(targetName, tN ->
+                 candidate ->
+                     toMatch.equals(candidate)
+            );
+        }
         return result;
     }
 

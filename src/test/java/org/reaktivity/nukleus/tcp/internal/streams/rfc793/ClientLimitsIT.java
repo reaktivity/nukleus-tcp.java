@@ -40,7 +40,7 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ClientLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
         .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
@@ -63,7 +63,7 @@ public class ClientLimitsIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data.received.reset/client"
         // No sup
     })
