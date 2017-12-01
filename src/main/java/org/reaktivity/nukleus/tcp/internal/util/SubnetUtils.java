@@ -65,16 +65,6 @@ public class SubnetUtils
     }
 
     /**
-     * Constructor that takes two dotted decimal addresses.
-     * @param address An IP address, e.g. "192.168.0.1"
-     * @param mask A dotted decimal netmask e.g. "255.255.0.0"
-     */
-    public SubnetUtils(String address, String mask)
-    {
-        calculate(toCidrNotation(address, mask));
-    }
-
-    /**
      * Convenience container for subnet summary information.
      *
      */
@@ -82,18 +72,9 @@ public class SubnetUtils
     {
         private SubnetInfo() {}
 
-        private int netmask()
-        {
-            return netmask;
-        }
         private int network()
         {
             return network;
-        }
-
-        private int address()
-        {
-            return address;
         }
 
         private int broadcast()
@@ -121,60 +102,6 @@ public class SubnetUtils
             return ((address - low()) <= (high() - low()));
         }
 
-        public String getBroadcastAddress()
-        {
-            return format(toArray(broadcast()));
-        }
-
-        public String getNetworkAddress()
-        {
-            return format(toArray(network()));
-        }
-
-        public String getNetmask()
-        {
-            return format(toArray(netmask()));
-        }
-
-        public String getAddress()
-        {
-            return format(toArray(address()));
-        }
-
-        public String getLowAddress()
-        {
-            return format(toArray(low()));
-        }
-
-        public String getHighAddress()
-        {
-            return format(toArray(high()));
-        }
-
-        public int getAddressCount()
-        {
-            return (broadcast() - low());
-        }
-
-        public int asInteger(String address)
-        {
-            return toInteger(address);
-        }
-
-        public String getCidrSignature()
-        {
-            return toCidrNotation(format(toArray(address())), format(toArray(netmask())));
-        }
-
-        public String[] getAllAddresses()
-        {
-            String[] addresses = new String[getAddressCount()];
-            for (int add = low(), j = 0; add <= high(); ++add, ++j)
-            {
-                addresses[j] = format(toArray(add));
-            }
-            return addresses;
-        }
     }
 
     /**
@@ -248,36 +175,6 @@ public class SubnetUtils
     }
 
     /*
-     * Convert a packed integer address into a 4-element array
-     */
-    private int[] toArray(int val)
-    {
-        int ret[] = new int[4];
-        for (int j = 3; j >= 0; --j)
-        {
-            ret[j] |= ((val >>> 8*(3-j)) & (0xff));
-        }
-        return ret;
-    }
-
-    /*
-     * Convert a 4-element array into dotted decimal format
-     */
-    private String format(int[] octets)
-    {
-        StringBuilder str = new StringBuilder();
-        for (int i =0; i < octets.length; ++i)
-        {
-            str.append(octets[i]);
-            if (i != octets.length - 1)
-            {
-                str.append(".");
-            }
-        }
-        return str.toString();
-    }
-
-    /*
      * Convenience function to check integer boundaries
      */
     private int rangeCheck(int value, int begin, int end)
@@ -290,26 +187,4 @@ public class SubnetUtils
         throw new IllegalArgumentException("Value out of range: [" + value + "]");
     }
 
-    /*
-     * Count the number of 1-bits in a 32-bit integer using a divide-and-conquer strategy
-     * see Hacker's Delight section 5.1
-     */
-    int pop(int x)
-    {
-        x = x - ((x >>> 1) & 0x55555555);
-        x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
-        x = (x + (x >>> 4)) & 0x0F0F0F0F;
-        x = x + (x >>> 8);
-        x = x + (x >>> 16);
-        return x & 0x0000003F;
-    }
-
-    /* Convert two dotted decimal addresses to a single xxx.xxx.xxx.xxx/yy format
-     * by counting the 1-bit population in the mask address. (It may be better to count
-     * NBITS-#trailing zeroes for this case)
-     */
-    private String toCidrNotation(String addr, String mask)
-    {
-        return addr + "/" + pop(toInteger(mask));
-    }
 }
