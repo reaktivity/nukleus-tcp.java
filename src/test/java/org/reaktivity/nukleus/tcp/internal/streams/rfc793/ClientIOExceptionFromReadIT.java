@@ -44,7 +44,7 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ClientIOExceptionFromReadIT
 {
     private final K3poRule k3po = new K3poRule()
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
+            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
             .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
             .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
@@ -66,7 +66,7 @@ public class ClientIOExceptionFromReadIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.received.reset.and.abort/client"
     })
     public void shouldReportIOExceptionFromReadAsAbortAndReset() throws Exception
@@ -93,7 +93,7 @@ public class ClientIOExceptionFromReadIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.received.abort.sent.end/client"
     })
     public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception

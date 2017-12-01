@@ -48,7 +48,7 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ClientResetAndAbortIT
 {
     private final K3poRule k3po = new K3poRule()
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route.ext")
+            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
             .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
             .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
@@ -71,7 +71,7 @@ public class ClientResetAndAbortIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.abort/client"
     })
     public void shouldShutdownOutputWhenClientSendsAbort() throws Exception
@@ -99,7 +99,7 @@ public class ClientResetAndAbortIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.abort.and.reset/client"
     })
     @BMRule(name = "shutdownInput",
@@ -139,7 +139,7 @@ public class ClientResetAndAbortIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.reset/client"
     })
     @BMRule(name = "shutdownInput",
@@ -182,7 +182,7 @@ public class ClientResetAndAbortIT
 
     @Test
     @Specification({
-        "${route}/client/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.reset.and.end/client"
     })
     @BMRule(name = "shutdownInput",
