@@ -37,9 +37,8 @@ import java.util.regex.Pattern;
 
 /**
  * A class that performs some subnet calculations given a network address and a subnet mask.
+ *
  * @see http://www.faqs.org/rfcs/rfc1519.html
- * @author <rwinston@apache.org>
- * @since 2.0
  */
 public class SubnetUtils
 {
@@ -57,6 +56,7 @@ public class SubnetUtils
 
     /**
      * Constructor that takes a CIDR-notation string, e.g. "192.168.0.1/16"
+     *
      * @param cidrNotation A CIDR-notation string, e.g. "192.168.0.1/16"
      */
     public SubnetUtils(String cidrNotation)
@@ -66,7 +66,6 @@ public class SubnetUtils
 
     /**
      * Convenience container for subnet summary information.
-     *
      */
     public final class SubnetInfo
     {
@@ -106,7 +105,6 @@ public class SubnetUtils
 
     /**
      * Return a {@link SubnetInfo} instance that contains subnet-specific statistics
-     * @return
      */
     public final SubnetInfo getInfo()
     {
@@ -186,5 +184,4 @@ public class SubnetUtils
 
         throw new IllegalArgumentException("Value out of range: [" + value + "]");
     }
-
 }
