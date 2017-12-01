@@ -42,7 +42,6 @@ import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
-//import org.reaktivity.nukleus.tcp.internal.types.StringFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;

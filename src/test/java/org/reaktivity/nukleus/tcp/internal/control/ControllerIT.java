@@ -89,8 +89,8 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-        .routeClient("source", 0L, "localhost", 8080)
-        .get();
+                .routeClient("source", 0L, "localhost", 8080)
+                .get();
 
         k3po.finish();
     }
@@ -104,8 +104,8 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-        .routeClient("source", 0L, "127.0.0.1/24", 8080)
-        .get();
+                .routeClient("source", 0L, "127.0.0.1/24", 8080)
+                .get();
 
         k3po.finish();
     }
