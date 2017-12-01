@@ -35,14 +35,8 @@ package org.reaktivity.nukleus.tcp.internal.util;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * A class that performs some subnet calculations given a network address and a subnet mask.
- *
- * @see http://www.faqs.org/rfcs/rfc1519.html
- */
 public class SubnetUtils
 {
-
     private static final String IP_ADDRESS = "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})";
     private static final String SLASH_FORMAT = IP_ADDRESS + "/(\\d{1,3})";
     private static final Pattern ADDRESS_PATTERN = Pattern.compile(IP_ADDRESS);
@@ -54,19 +48,11 @@ public class SubnetUtils
     private int network = 0;
     private int broadcast = 0;
 
-    /**
-     * Constructor that takes a CIDR-notation string, e.g. "192.168.0.1/16"
-     *
-     * @param cidrNotation A CIDR-notation string, e.g. "192.168.0.1/16"
-     */
     public SubnetUtils(String cidrNotation)
     {
         calculate(cidrNotation);
     }
 
-    /**
-     * Convenience container for subnet summary information.
-     */
     public final class SubnetInfo
     {
         private SubnetInfo() {}
@@ -103,9 +89,6 @@ public class SubnetUtils
 
     }
 
-    /**
-     * Return a {@link SubnetInfo} instance that contains subnet-specific statistics
-     */
     public final SubnetInfo getInfo()
     {
         return new SubnetInfo();
