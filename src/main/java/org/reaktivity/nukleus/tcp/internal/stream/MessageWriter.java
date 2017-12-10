@@ -101,6 +101,8 @@ final class MessageWriter
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
+                .groupId(0)
+                .claimed(0)
                 .payload(payload, offset, length)
                 .build();
 
@@ -123,12 +125,14 @@ final class MessageWriter
         final MessageConsumer throttle,
         final long throttleId,
         final int credit,
-        final int padding)
+        final int padding,
+        final int groupId)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(throttleId)
                 .credit(credit)
                 .padding(padding)
+                .groupId(0)
                 .build();
 
         throttle.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
