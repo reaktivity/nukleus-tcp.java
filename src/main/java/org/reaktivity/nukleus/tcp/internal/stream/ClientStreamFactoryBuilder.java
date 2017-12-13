@@ -16,6 +16,8 @@
 package org.reaktivity.nukleus.tcp.internal.stream;
 
 import java.util.function.Function;
+import java.util.function.IntUnaryOperator;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -38,6 +40,9 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier supplyStreamId;
 
     private MutableDirectBuffer writeBuffer;
+
+    private LongFunction<IntUnaryOperator> groupBudgetClaimer;
+    private LongFunction<IntUnaryOperator> groupBudgetReleaser;
 
     public ClientStreamFactoryBuilder(Configuration config, Poller poller)
     {
@@ -84,6 +89,20 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
+    public StreamFactoryBuilder setGroupBudgetClaimer(LongFunction<IntUnaryOperator> groupBudgetClaimer)
+    {
+        this.groupBudgetClaimer = groupBudgetClaimer;
+        return this;
+    }
+
+    @Override
+    public StreamFactoryBuilder setGroupBudgetReleaser(LongFunction<IntUnaryOperator> groupBudgetReleaser)
+    {
+        this.groupBudgetReleaser = groupBudgetReleaser;
+        return this;
+    }
+
+    @Override
     public ClientStreamFactoryBuilder setWriteBuffer(
         MutableDirectBuffer writeBuffer)
     {
@@ -97,6 +116,6 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
         final BufferPool bufferPool = supplyBufferPool.get();
 
         return new ClientStreamFactory(config, router, poller, writeBuffer, bufferPool,
-                incrementOverflow, supplyStreamId);
+                incrementOverflow, supplyStreamId, groupBudgetClaimer, groupBudgetReleaser);
     }
 }

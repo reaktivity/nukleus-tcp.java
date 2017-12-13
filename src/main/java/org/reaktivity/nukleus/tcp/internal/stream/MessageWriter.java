@@ -95,14 +95,15 @@ final class MessageWriter
     public void doTcpData(
         MessageConsumer stream,
         long streamId,
+        long groupId,
         DirectBuffer payload,
         int offset,
         int length)
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
-                .groupId(0)
-                .claimed(0)
+                .groupId(groupId)
+                .padding(0)
                 .payload(payload, offset, length)
                 .build();
 

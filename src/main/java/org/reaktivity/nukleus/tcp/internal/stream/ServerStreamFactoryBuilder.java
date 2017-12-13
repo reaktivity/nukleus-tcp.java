@@ -16,6 +16,8 @@
 package org.reaktivity.nukleus.tcp.internal.stream;
 
 import java.util.function.Function;
+import java.util.function.IntUnaryOperator;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -41,6 +43,9 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     private Supplier<BufferPool> supplyBufferPool;
     private LongSupplier supplyCorrelationId;
     private MutableDirectBuffer writeBuffer;
+    private LongFunction<IntUnaryOperator> groupBudgetClaimer;
+    private LongFunction<IntUnaryOperator> groupBudgetReleaser;
+
     public ServerStreamFactoryBuilder(Configuration config, Acceptor acceptor, Poller poller)
     {
         this.config = config;
@@ -89,6 +94,20 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
+    public StreamFactoryBuilder setGroupBudgetClaimer(LongFunction<IntUnaryOperator> groupBudgetClaimer)
+    {
+        this.groupBudgetClaimer = groupBudgetClaimer;
+        return this;
+    }
+
+    @Override
+    public StreamFactoryBuilder setGroupBudgetReleaser(LongFunction<IntUnaryOperator> groupBudgetReleaser)
+    {
+        this.groupBudgetReleaser = groupBudgetReleaser;
+        return this;
+    }
+
+    @Override
     public ServerStreamFactoryBuilder setWriteBuffer(
         MutableDirectBuffer writeBuffer)
     {
@@ -102,7 +121,8 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
         final BufferPool bufferPool = supplyBufferPool.get();
 
         ServerStreamFactory factory = new ServerStreamFactory(config, router, writeBuffer,
-                bufferPool, incrementOverflow, supplyStreamId, supplyCorrelationId, correlations, poller);
+                bufferPool, incrementOverflow, supplyStreamId, supplyCorrelationId, correlations, poller,
+                groupBudgetClaimer, groupBudgetReleaser);
         acceptor.setServerStreamFactory(factory);
         return factory;
 
