@@ -25,6 +25,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.function.IntUnaryOperator;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
@@ -54,6 +56,8 @@ public class ServerStreamFactory implements StreamFactory
     private final RouteManager router;
     private final LongSupplier supplyStreamId;
     private final LongSupplier supplyCorrelationId;
+    private final LongFunction<IntUnaryOperator> groupBudgetClaimer;
+    private final LongFunction<IntUnaryOperator> groupBudgetReleaser;
     private final Long2ObjectHashMap<Correlation> correlations;
     private final Poller poller;
 
@@ -73,7 +77,9 @@ public class ServerStreamFactory implements StreamFactory
             LongSupplier supplyStreamId,
             LongSupplier supplyCorrelationId,
             Long2ObjectHashMap<Correlation> correlations,
-            Poller poller)
+            Poller poller,
+            LongFunction<IntUnaryOperator> groupBudgetClaimer,
+            LongFunction<IntUnaryOperator> groupBudgetReleaser)
     {
         this.router = requireNonNull(router);
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
@@ -81,6 +87,8 @@ public class ServerStreamFactory implements StreamFactory
         this.bufferPool = bufferPool;
         this.incrementOverflow = incrementOverflow;
         this.supplyStreamId = requireNonNull(supplyStreamId);
+        this.groupBudgetClaimer = requireNonNull(groupBudgetClaimer);
+        this.groupBudgetReleaser = requireNonNull(groupBudgetReleaser);
         this.supplyCorrelationId = supplyCorrelationId;
         this.correlations = requireNonNull(correlations);
         int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
