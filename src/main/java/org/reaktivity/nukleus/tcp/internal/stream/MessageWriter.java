@@ -95,12 +95,16 @@ final class MessageWriter
     public void doTcpData(
         MessageConsumer stream,
         long streamId,
+        long groupId,
+        int padding,
         DirectBuffer payload,
         int offset,
         int length)
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
+                .groupId(groupId)
+                .padding(padding)
                 .payload(payload, offset, length)
                 .build();
 
@@ -123,12 +127,14 @@ final class MessageWriter
         final MessageConsumer throttle,
         final long throttleId,
         final int credit,
-        final int padding)
+        final int padding,
+        final int groupId)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(throttleId)
                 .credit(credit)
                 .padding(padding)
+                .groupId(groupId)
                 .build();
 
         throttle.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
