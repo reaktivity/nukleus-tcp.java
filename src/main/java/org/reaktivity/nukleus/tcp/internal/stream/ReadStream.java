@@ -95,7 +95,7 @@ final class ReadStream
         else if (bytesRead != 0)
         {
             // atomic buffer is zero copy with read buffer
-            writer.doTcpData(target, streamId, readGroupId, atomicBuffer, 0, bytesRead);
+            writer.doTcpData(target, streamId, readGroupId, readPadding, atomicBuffer, 0, bytesRead);
 
             readableBytes -= bytesRead + readPadding;
 
