@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.function.IntUnaryOperator;
+import java.util.function.LongFunction;
 
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
@@ -39,6 +41,8 @@ final class ReadStream
     private final ByteBuffer readBuffer;
     private final MutableDirectBuffer atomicBuffer;
     private final MessageWriter writer;
+    private final LongFunction<IntUnaryOperator> groupBudgetClaimer;
+    private final LongFunction<IntUnaryOperator> groupBudgetReleaser;
 
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
@@ -54,7 +58,8 @@ final class ReadStream
         SocketChannel channel,
         ByteBuffer readByteBuffer,
         MutableDirectBuffer readBuffer,
-        MessageWriter writer)
+        MessageWriter writer, LongFunction<IntUnaryOperator> groupBudgetClaimer,
+        LongFunction<IntUnaryOperator> groupBudgetReleaser)
     {
         this.target = target;
         this.streamId = streamId;
@@ -63,6 +68,8 @@ final class ReadStream
         this.readBuffer = readByteBuffer;
         this.atomicBuffer = readBuffer;
         this.writer = writer;
+        this.groupBudgetClaimer = groupBudgetClaimer;
+        this.groupBudgetReleaser = groupBudgetReleaser;
     }
 
     int handleStream(
@@ -70,7 +77,8 @@ final class ReadStream
     {
         assert readableBytes > readPadding;
 
-        final int limit = Math.min(readableBytes - readPadding, readBuffer.capacity());
+        int limit = Math.min(readableBytes - readPadding, readBuffer.capacity());
+        limit = groupBudgetClaimer.apply(readGroupId).applyAsInt(limit);
 
         readBuffer.position(0);
         readBuffer.limit(limit);
@@ -84,6 +92,10 @@ final class ReadStream
         {
             // TCP reset
             handleIOExceptionFromRead();
+        }
+        finally
+        {
+            groupBudgetReleaser.apply(streamId).applyAsInt(limit - bytesRead);
         }
         if (bytesRead == -1)
         {
