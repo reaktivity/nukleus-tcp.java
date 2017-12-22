@@ -171,7 +171,7 @@ public class ClientStreamFactory implements StreamFactory
             if (remoteAddress != null)
             {
                 final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                        bufferPool, writeByteBuffer, writer);
+                        bufferPool, writeByteBuffer, writer, groupBudgetReleaser);
                 result = stream::handleStream;
 
                 doConnect(

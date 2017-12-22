@@ -197,7 +197,7 @@ public class ServerStreamFactory implements StreamFactory
             final SocketChannel channel = correlation.channel();
 
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                    bufferPool, writeByteBuffer, writer);
+                    bufferPool, writeByteBuffer, writer, groupBudgetReleaser);
             stream.setCorrelatedInput(correlation.correlatedStreamId(), correlation.correlatedStream());
             stream.doConnected();
             result = stream::handleStream;

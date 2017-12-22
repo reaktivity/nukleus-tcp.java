@@ -21,6 +21,8 @@ import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.function.IntUnaryOperator;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
@@ -54,6 +56,7 @@ public final class WriteStream
     private final MessageWriter writer;
     private final LongSupplier incrementOverflow;
     private final ToIntFunction<PollerKey> writeHandler;
+    private final LongFunction<IntUnaryOperator> groupBudgetReleaser;
 
     private int slot = BufferPool.NO_SLOT;
     private int slotOffset; // index of the first byte of unwritten data
@@ -67,6 +70,7 @@ public final class WriteStream
     private MessageConsumer correlatedInput;
 
     private long correlatedStreamId;
+    private long groupId;
 
     WriteStream(
         MessageConsumer sourceThrottle,
@@ -76,7 +80,7 @@ public final class WriteStream
         LongSupplier incrementOverflow,
         BufferPool bufferPool,
         ByteBuffer writeBuffer,
-        MessageWriter writer)
+        MessageWriter writer, LongFunction<IntUnaryOperator> groupBudgetReleaser)
     {
         this.streamId = streamId;
         this.sourceThrottle = sourceThrottle;
@@ -87,6 +91,7 @@ public final class WriteStream
         this.writeBuffer = writeBuffer;
         this.writer = writer;
         this.writeHandler = this::handleWrite;
+        this.groupBudgetReleaser = groupBudgetReleaser;
     }
 
     void handleStream(
@@ -178,6 +183,7 @@ public final class WriteStream
 
         final OctetsFW payload = writer.dataRO.payload();
         final int writableBytes = writer.dataRO.length();
+        groupId = writer.dataRO.groupId();
 
         if (reduceWindow(writableBytes))
         {
@@ -189,6 +195,10 @@ public final class WriteStream
             for (int i = WRITE_SPIN_COUNT; bytesWritten == 0 && i > 0; i--)
             {
                 bytesWritten = channel.write(writeBuffer);
+                if (bytesWritten > 0)
+                {
+                    groupBudgetReleaser.apply(groupId).applyAsInt(bytesWritten);
+                }
             }
 
             int originalSlot = slot;
@@ -347,6 +357,10 @@ public final class WriteStream
         try
         {
             bytesWritten = channel.write(writeBuffer);
+            if (bytesWritten > 0)
+            {
+                groupBudgetReleaser.apply(groupId).applyAsInt(bytesWritten);
+            }
         }
         catch (IOException ex)
         {
