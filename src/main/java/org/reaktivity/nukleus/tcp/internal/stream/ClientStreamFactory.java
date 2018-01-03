@@ -152,8 +152,8 @@ public class ClientStreamFactory implements StreamFactory
             final RouteFW route = routeRO.wrap(b, o, l);
             final String targetName = route.target().asString();
             final long targetRef = route.targetRef();
-            return (hasExtension) ? resolveRemoteAddressExt(extension, targetName, targetRef) != null :
-                                    sourceRef == route.sourceRef();
+            return sourceRef == route.sourceRef() &&
+                   (!hasExtension || resolveRemoteAddressExt(extension, targetName, targetRef) != null);
         };
 
         final RouteFW route = router.resolve(begin.authorization(), filter, this::wrapRoute);
