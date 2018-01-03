@@ -144,11 +144,16 @@ public class ClientStreamFactory implements StreamFactory
         final String sourceName = begin.source().asString();
         final long sourceRef = begin.sourceRef();
         final long correlationId = begin.correlationId();
+        final OctetsFW extension = begin.extension();
+        final boolean hasExtension = extension.sizeof() > 0;
 
         MessagePredicate filter = (t, b, o, l) ->
         {
             final RouteFW route = routeRO.wrap(b, o, l);
-            return sourceRef == route.sourceRef();
+            final String targetName = route.target().asString();
+            final long targetRef = route.targetRef();
+            return (hasExtension) ? resolveRemoteAddressExt(extension, targetName, targetRef) != null :
+                                    sourceRef == route.sourceRef();
         };
 
         final RouteFW route = router.resolve(begin.authorization(), filter, this::wrapRoute);
@@ -156,38 +161,25 @@ public class ClientStreamFactory implements StreamFactory
         if (route != null)
         {
             final SocketChannel channel = newSocketChannel();
-            final OctetsFW extension = begin.extension();
             String targetName = route.target().asString();
             long targetRef = route.targetRef();
-            InetSocketAddress remoteAddress = null;
-            if (extension.sizeof() > 0)
-            {
-                remoteAddress = newAcceptStreamWithExt(extension, targetName, targetRef);
-            }
-            else
-            {
-                remoteAddress = new InetSocketAddress(targetName, (int)targetRef);
-            }
-            if (remoteAddress != null)
-            {
-                final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                        bufferPool, writeByteBuffer, writer);
-                result = stream::handleStream;
 
-                doConnect(
-                    stream,
-                    channel,
-                    remoteAddress,
-                    sourceName,
-                    correlationId,
-                    throttle,
-                    streamId,
-                    stream::setCorrelatedInput);
-            }
-            else
-            {
-                writer.doReset(throttle, streamId);
-            }
+            InetSocketAddress remoteAddress = hasExtension ? resolveRemoteAddressExt(extension, targetName, targetRef) :
+                                                             new InetSocketAddress(targetName, (int)targetRef);
+            assert remoteAddress != null;
+            final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
+                    bufferPool, writeByteBuffer, writer);
+            result = stream::handleStream;
+
+            doConnect(
+                stream,
+                channel,
+                remoteAddress,
+                sourceName,
+                correlationId,
+                throttle,
+                streamId,
+                stream::setCorrelatedInput);
         }
         else
         {
@@ -198,8 +190,8 @@ public class ClientStreamFactory implements StreamFactory
 
  }
 
-    private InetSocketAddress newAcceptStreamWithExt(
-            final OctetsFW extension,
+    private InetSocketAddress resolveRemoteAddressExt(
+            OctetsFW extension,
             String targetName,
             long targetRef)
     {
@@ -210,7 +202,7 @@ public class ClientStreamFactory implements StreamFactory
         {
             final TcpBeginExFW beginEx = extension.get(tcpBeginExRO::wrap);
             TcpAddressFW remoteAddressExt = beginEx.remoteAddress();
-            Predicate<? super InetAddress> subnetFilter = getSubnetMatcher(targetName);
+            Predicate<? super InetAddress> subnetFilter = extensionMatcher(targetName);
 
             int remotePort = beginEx.remotePort();
 
@@ -257,7 +249,7 @@ public class ClientStreamFactory implements StreamFactory
         return result;
     }
 
-    private Predicate<? super InetAddress> getSubnetMatcher(String targetName) throws UnknownHostException
+    private Predicate<? super InetAddress> extensionMatcher(String targetName) throws UnknownHostException
     {
         Predicate<? super InetAddress> result;
         if (targetName.contains("/"))
