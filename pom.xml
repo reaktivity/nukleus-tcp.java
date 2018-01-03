@@ -56,7 +56,7 @@
     <nukleus.plugin.version>0.20</nukleus.plugin.version>
     <nukleus.version>0.13</nukleus.version>
 
-    <nukleus.tcp.spec.version>0.25</nukleus.tcp.spec.version>
+    <nukleus.tcp.spec.version>0.26</nukleus.tcp.spec.version>
     <reaktor.version>0.33</reaktor.version>
   </properties>
 
