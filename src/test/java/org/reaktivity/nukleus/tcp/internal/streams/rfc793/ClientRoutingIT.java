@@ -61,7 +61,7 @@ public class ClientRoutingIT
         "${client}/client.connect.with.host.extension/client",
         "${server}/client.connect.with.host.extension/server"
     })
-    public void clientConnectWithHostExtension() throws Exception
+    public void clientConnectHostExtWhenRoutedViaHost() throws Exception
     {
         k3po.finish();
     }
@@ -72,7 +72,29 @@ public class ClientRoutingIT
         "${client}/client.connect.with.ip.extension/client",
         "${server}/client.connect.with.ip.extension/server"
     })
-    public void shouldConnectClientWithIpExtension() throws Exception
+    public void shouldConnectIpExtWhenRoutedViaSubnet() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/client.host.and.subnet/controller",
+        "${client}/client.connect.with.ip.extension/client",
+        "${server}/client.connect.with.ip.extension/server"
+    })
+    public void shouldConnectIpExtWhenRoutedViaSubnetMultipleRoutes() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/client.subnet/controller",
+        "${client}/client.connect.with.host.extension/client",
+        "${server}/client.connect.with.host.extension/server"
+    })
+    public void shouldConnectHostExtWhenRoutedViaSubnet() throws Exception
     {
         k3po.finish();
     }

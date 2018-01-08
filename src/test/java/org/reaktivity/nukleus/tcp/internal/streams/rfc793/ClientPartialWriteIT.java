@@ -60,7 +60,7 @@ public class ClientPartialWriteIT
         .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
         .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
         .nukleus("tcp"::equals)
