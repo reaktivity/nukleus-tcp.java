@@ -82,6 +82,24 @@ public class ControlIT
 
     @Test
     @Specification({
+        "${route}/server/error.invalid.port.0/controller"
+    })
+    public void shouldRefuseRouteServerPortZero() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/server/error.invalid.port.negative/controller"
+    })
+    public void shouldRefuseRouteServerNegativePort() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
         "${route}/client.ip/controller"
     })
     public void shouldRouteClientIp() throws Exception
