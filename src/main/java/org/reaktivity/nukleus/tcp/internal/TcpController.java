@@ -75,6 +75,10 @@ public final class TcpController implements Controller
         String target,
         long targetRef)
     {
+        if (sourceRef <= 0)
+        {
+            throw new IllegalArgumentException("Port to bind (sourceRef) must be positive");
+        }
         return route(Role.SERVER, source, sourceRef, target, targetRef);
     }
 
