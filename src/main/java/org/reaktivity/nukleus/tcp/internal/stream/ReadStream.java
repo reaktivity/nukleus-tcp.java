@@ -80,6 +80,10 @@ final class ReadStream
         int limit = Math.min(readableBytes - readPadding, readBuffer.capacity());
         limit = groupBudgetClaimer.apply(readGroupId).applyAsInt(limit);
 
+        if (readGroupId != 0 && limit > 0)
+        {
+            System.out.printf("TCP claimed=%d readPadding=%d\n", limit, readPadding);
+        }
         readBuffer.position(0);
         readBuffer.limit(limit);
 
@@ -95,7 +99,11 @@ final class ReadStream
         }
         finally
         {
-            groupBudgetReleaser.apply(streamId).applyAsInt(limit - bytesRead);
+            int release = limit - (bytesRead == -1 ? 0 : bytesRead);
+            if (release > 0)
+            {
+                groupBudgetReleaser.apply(readGroupId).applyAsInt(release);
+            }
         }
         if (bytesRead == -1)
         {
@@ -108,6 +116,7 @@ final class ReadStream
         {
             // atomic buffer is zero copy with read buffer
             writer.doTcpData(target, streamId, readGroupId, readPadding, atomicBuffer, 0, bytesRead);
+            System.out.printf("TCP <- DATA(%d) streamId=%d readGroupId=%d\n", bytesRead, streamId, readGroupId);
 
             readableBytes -= bytesRead + readPadding;
 
@@ -176,6 +185,10 @@ final class ReadStream
             readPadding = window.padding();
             readableBytes += window.credit();
             readGroupId = window.groupId();
+//            System.out.printf("TCP ReadStream received WINDOW(credit=%d, padding=%d, groupId=%d)\n",
+//                    window.credit(), window.padding(), window.groupId());
+//            groupBudgetReleaser.apply(readGroupId).applyAsInt(window.credit());
+
 
             if (readableBytes > readPadding)
             {
