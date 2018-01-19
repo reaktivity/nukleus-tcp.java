@@ -48,6 +48,7 @@ public final class TcpNukleusFactorySpi implements NukleusFactorySpi
         return builder.streamFactory(RouteKind.CLIENT, new ClientStreamFactoryBuilder(config, poller))
                       .streamFactory(RouteKind.SERVER, new ServerStreamFactoryBuilder(config, acceptor, poller))
                       .routeHandler(RouteKind.SERVER, acceptor::handleRoute)
+                      .allowZeroRouteRef(RouteKind.SERVER::equals)
                       .inject(poller)
                       .build();
 
