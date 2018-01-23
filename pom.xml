@@ -51,15 +51,6 @@
     <jmh.version>1.17.4</jmh.version>
     <jmh.profilers.version>0.1.3</jmh.profilers.version>
 
-<<<<<<< HEAD
-    <k3po.version>3.0.0-alpha-86</k3po.version>
-    <k3po.nukleus.ext.version>develop-SNAPSHOT</k3po.nukleus.ext.version>
-    <nukleus.plugin.version>develop-SNAPSHOT</nukleus.plugin.version>
-    <nukleus.version>0.14</nukleus.version>
-
-    <nukleus.tcp.spec.version>develop-SNAPSHOT</nukleus.tcp.spec.version>
-    <reaktor.version>develop-SNAPSHOT</reaktor.version>
-=======
     <k3po.version>3.0.0-alpha-88</k3po.version>
     <k3po.nukleus.ext.version>develop-SNAPSHOT</k3po.nukleus.ext.version>
     <nukleus.plugin.version>develop-SNAPSHOT</nukleus.plugin.version>
@@ -67,7 +58,6 @@
 
     <nukleus.tcp.spec.version>develop-SNAPSHOT</nukleus.tcp.spec.version>
     <reaktor.version>develop-SNAPSHOT</reaktor.version>
->>>>>>> 1ae8a7cf4449ca5ec7143747a955c168283f69f1
   </properties>
 
   <dependencies>
