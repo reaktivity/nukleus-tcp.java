@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.function.LongConsumer;
+import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
@@ -39,6 +41,8 @@ final class ReadStream
     private final ByteBuffer readBuffer;
     private final MutableDirectBuffer atomicBuffer;
     private final MessageWriter writer;
+    private final LongSupplier frameCounter;
+    private final LongConsumer bytesAccumulator;
 
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
@@ -54,7 +58,9 @@ final class ReadStream
         SocketChannel channel,
         ByteBuffer readByteBuffer,
         MutableDirectBuffer readBuffer,
-        MessageWriter writer)
+        MessageWriter writer,
+        LongSupplier frameCounter,
+        LongConsumer bytesAccumulator)
     {
         this.target = target;
         this.streamId = streamId;
@@ -63,6 +69,8 @@ final class ReadStream
         this.readBuffer = readByteBuffer;
         this.atomicBuffer = readBuffer;
         this.writer = writer;
+        this.frameCounter = frameCounter;
+        this.bytesAccumulator = bytesAccumulator;
     }
 
     int handleStream(
@@ -94,6 +102,8 @@ final class ReadStream
         }
         else if (bytesRead != 0)
         {
+            frameCounter.getAsLong();
+            bytesAccumulator.accept(bytesRead);
             // atomic buffer is zero copy with read buffer
             writer.doTcpData(target, streamId, readGroupId, readPadding, atomicBuffer, 0, bytesRead);
 

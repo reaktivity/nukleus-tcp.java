@@ -31,7 +31,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
+import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
@@ -79,6 +81,11 @@ public class ClientStreamFactory implements StreamFactory
     private final MessageWriter writer;
     private final Map<String, Predicate<? super InetAddress>> lazyTargetTpSubsetUtils;
 
+    private final Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
+    private final Function<RouteFW, LongSupplier> supplyReadFrameCounter;
+    private final Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
+    private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
+
     public ClientStreamFactory(
             Configuration configuration,
             RouteManager router,
@@ -88,7 +95,11 @@ public class ClientStreamFactory implements StreamFactory
             LongSupplier incrementOverflow,
             LongSupplier supplyStreamId,
             LongFunction<IntUnaryOperator> groupBudgetClaimer,
-            LongFunction<IntUnaryOperator> groupBudgetReleaser)
+            LongFunction<IntUnaryOperator> groupBudgetReleaser,
+            Function<RouteFW, LongSupplier> supplyReadFrameCounter,
+            Function<RouteFW, LongConsumer> supplyReadBytesAccumulator,
+            Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
+            Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
     {
         this.router = requireNonNull(router);
         this.poller = poller;
@@ -107,6 +118,11 @@ public class ClientStreamFactory implements StreamFactory
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
         this.lazyTargetTpSubsetUtils = new HashMap<>();
+
+        this.supplyWriteFrameCounter = supplyWriteFrameCounter;
+        this.supplyReadFrameCounter = supplyReadFrameCounter;
+        this.supplyWriteBytesAccumulator = supplyWriteBytesAccumulator;
+        this.supplyReadBytesAccumulator = supplyReadBytesAccumulator;
     }
 
     @Override
@@ -167,8 +183,12 @@ public class ClientStreamFactory implements StreamFactory
             InetSocketAddress remoteAddress = hasExtension ? resolveRemoteAddressExt(extension, targetName, targetRef) :
                                                              new InetSocketAddress(targetName, (int)targetRef);
             assert remoteAddress != null;
+            final LongSupplier writeFrameCounter = supplyWriteFrameCounter.apply(route);
+            final LongConsumer writeBytesAccumulator = supplyWriteBytesAccumulator.apply(route);
+            final LongSupplier readFrameCounter = supplyReadFrameCounter.apply(route);
+            final LongConsumer readBytesAccumulator = supplyReadBytesAccumulator.apply(route);
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                    bufferPool, writeByteBuffer, writer);
+                    bufferPool, writeByteBuffer, writer, writeFrameCounter, writeBytesAccumulator);
             result = stream::handleStream;
 
             doConnect(
@@ -179,7 +199,9 @@ public class ClientStreamFactory implements StreamFactory
                 correlationId,
                 throttle,
                 streamId,
-                stream::setCorrelatedInput);
+                stream::setCorrelatedInput,
+                readFrameCounter,
+                readBytesAccumulator);
         }
         else
         {
@@ -302,10 +324,12 @@ public class ClientStreamFactory implements StreamFactory
         long correlationId,
         MessageConsumer outputThrottle,
         long outputStreamId,
-        LongObjectBiConsumer<MessageConsumer> setCorrelatedInput)
+        LongObjectBiConsumer<MessageConsumer> setCorrelatedInput,
+        LongSupplier readFrameCounter,
+        LongConsumer readBytesAccumulator)
     {
         final Request request = new Request(channel, stream, acceptReplyName, correlationId,
-                outputThrottle, outputStreamId, setCorrelatedInput);
+                outputThrottle, outputStreamId, setCorrelatedInput, readFrameCounter, readBytesAccumulator);
 
         try
         {
@@ -350,8 +374,10 @@ public class ClientStreamFactory implements StreamFactory
 
             final PollerKey key = poller.doRegister(channel, 0, null);
 
+            final LongSupplier readFrameCounter = request.readFrameCounter;
+            final LongConsumer readBytesAccumulator = request.readBytesAccumulator;
             final ReadStream stream = new ReadStream(target, targetId, key, channel,
-                    readByteBuffer, readBuffer, writer);
+                    readByteBuffer, readBuffer, writer, readFrameCounter, readBytesAccumulator);
             stream.setCorrelatedThrottle(correlatedStreamId, correlatedThrottle);
 
             router.setThrottle(targetName, targetId, stream::handleThrottle);
@@ -383,6 +409,8 @@ public class ClientStreamFactory implements StreamFactory
         private final MessageConsumer outputThrottle;
         private final long outputStreamdId;
         private final LongObjectBiConsumer<MessageConsumer> setCorrelatedInput;
+        private final LongSupplier readFrameCounter;
+        private final LongConsumer readBytesAccumulator;
 
         private Request(SocketChannel channel,
                         WriteStream stream,
@@ -390,7 +418,9 @@ public class ClientStreamFactory implements StreamFactory
                         long correlationId,
                         MessageConsumer outputThrottle,
                         long outputStreamId,
-                        LongObjectBiConsumer<MessageConsumer> setCorrelatedInput)
+                        LongObjectBiConsumer<MessageConsumer> setCorrelatedInput,
+                        LongSupplier readFrameCounter,
+                        LongConsumer readBytesAccumulator)
         {
             this.channel = channel;
             this.stream = stream;
@@ -399,6 +429,8 @@ public class ClientStreamFactory implements StreamFactory
             this.outputThrottle = outputThrottle;
             this.outputStreamdId = outputStreamId;
             this.setCorrelatedInput = setCorrelatedInput;
+            this.readFrameCounter = readFrameCounter;
+            this.readBytesAccumulator = readBytesAccumulator;
         }
 
         @Override
@@ -427,6 +459,7 @@ public class ClientStreamFactory implements StreamFactory
 
             return 1;
         }
+
     }
 
 

@@ -21,6 +21,7 @@ import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
@@ -55,6 +56,9 @@ public final class WriteStream
     private final LongSupplier incrementOverflow;
     private final ToIntFunction<PollerKey> writeHandler;
 
+    private final LongSupplier frameCounter;
+    private final LongConsumer bytesAccumulator;
+
     private int slot = BufferPool.NO_SLOT;
     private int slotOffset; // index of the first byte of unwritten data
     private int slotPosition; // index of the byte following the last byte of unwritten data
@@ -76,7 +80,9 @@ public final class WriteStream
         LongSupplier incrementOverflow,
         BufferPool bufferPool,
         ByteBuffer writeBuffer,
-        MessageWriter writer)
+        MessageWriter writer,
+        LongSupplier frameCounter,
+        LongConsumer bytesAccumulator)
     {
         this.streamId = streamId;
         this.sourceThrottle = sourceThrottle;
@@ -87,6 +93,8 @@ public final class WriteStream
         this.writeBuffer = writeBuffer;
         this.writer = writer;
         this.writeHandler = this::handleWrite;
+        this.frameCounter = frameCounter;
+        this.bytesAccumulator = bytesAccumulator;
     }
 
     void handleStream(
@@ -178,6 +186,9 @@ public final class WriteStream
 
         final OctetsFW payload = writer.dataRO.payload();
         final int writableBytes = writer.dataRO.length();
+
+        frameCounter.getAsLong();
+        bytesAccumulator.accept(writableBytes);
 
         if (reduceWindow(writableBytes))
         {

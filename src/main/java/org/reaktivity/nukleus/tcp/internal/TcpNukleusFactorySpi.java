@@ -19,6 +19,7 @@ import org.reaktivity.nukleus.Configuration;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.NukleusBuilder;
 import org.reaktivity.nukleus.NukleusFactorySpi;
+import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.route.RouteKind;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.stream.Acceptor;
@@ -45,10 +46,18 @@ public final class TcpNukleusFactorySpi implements NukleusFactorySpi
         Poller poller = new Poller();
         acceptor.setPoller(poller);
 
-        return builder.streamFactory(RouteKind.CLIENT, new ClientStreamFactoryBuilder(config, poller))
-                      .streamFactory(RouteKind.SERVER, new ServerStreamFactoryBuilder(config, acceptor, poller))
-                      .routeHandler(RouteKind.SERVER, acceptor::handleRoute)
+        ServerStreamFactoryBuilder serverStreamFactoryBuilder = new ServerStreamFactoryBuilder(config, acceptor, poller);
+        ClientStreamFactoryBuilder clientStreamFactoryBuilder = new ClientStreamFactoryBuilder(config, poller);
+
+        final MessagePredicate routeHandler = (m, b, i, l) ->
+            acceptor.handleRoute(m, b, i, l) &&
+            serverStreamFactoryBuilder.handleRoute(m, b, i, l);
+
+        return builder.streamFactory(RouteKind.CLIENT, clientStreamFactoryBuilder)
+                      .streamFactory(RouteKind.SERVER, serverStreamFactoryBuilder)
+                      .routeHandler(RouteKind.SERVER, routeHandler)
                       .allowZeroRouteRef(RouteKind.SERVER::equals)
+                      .routeHandler(RouteKind.CLIENT, clientStreamFactoryBuilder::handleRoute)
                       .inject(poller)
                       .build();
 
