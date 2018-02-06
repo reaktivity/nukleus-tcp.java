@@ -142,7 +142,7 @@ public final class TcpController implements Controller
 
     public long framesWritten(long routeId)
     {
-        return controllerSpi.doCount(format("%d.bytes.written", routeId));
+        return controllerSpi.doCount(format("%d.frames.written", routeId));
     }
 
     private CompletableFuture<Long> route(
