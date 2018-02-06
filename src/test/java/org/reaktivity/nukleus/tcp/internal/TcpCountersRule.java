@@ -41,9 +41,9 @@ public class TcpCountersRule implements TestRule
             public void evaluate() throws Throwable
             {
                 TcpController controller = controller();
-                assertEquals(0, controller.count("streams"));
-                assertEquals(0, controller.count("routes"));
-                assertEquals(0, controller.count("overflows"));
+                assertEquals(0, controller.streams());
+                assertEquals(0, controller.routes());
+                assertEquals(0, controller.overflows());
                 base.evaluate();
             }
 
@@ -52,17 +52,17 @@ public class TcpCountersRule implements TestRule
 
     public long routes()
     {
-        return controller().count("routes");
+        return controller().routes();
     }
 
     public long streams()
     {
-        return controller().count("streams");
+        return controller().streams();
     }
 
     public long overflows()
     {
-        return controller().count("overflows");
+        return controller().overflows();
     }
 
     private TcpController controller()

@@ -46,21 +46,21 @@ public class TcpFrameAndBytesCountersRule implements TestRule
 
     public long bytesRead(long routeId)
     {
-        return controller.count(routeId + ".bytes.read");
+        return controller.bytesRead(routeId);
     }
 
-    public long bytesWrote(long routeId)
+    public long bytesWritten(long routeId)
     {
-        return controller.count(routeId + ".bytes.wrote");
+        return controller.bytesWritten(routeId);
     }
 
     public long framesRead(long routeId)
     {
-        return controller.count(routeId + ".frames.read");
+        return controller.framesRead(routeId);
     }
 
-    public long framesWrote(long routeId)
+    public long framesWritten(long routeId)
     {
-        return controller.count(routeId + ".frames.wrote");
+        return controller.framesWritten(routeId);
     }
 }
