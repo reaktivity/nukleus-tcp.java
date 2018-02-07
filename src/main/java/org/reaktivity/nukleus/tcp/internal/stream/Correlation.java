@@ -19,6 +19,8 @@ import static java.util.Objects.requireNonNull;
 
 import java.nio.channels.SocketChannel;
 import java.util.Objects;
+import java.util.function.LongConsumer;
+import java.util.function.LongSupplier;
 
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.tcp.internal.util.function.LongObjectBiConsumer;
@@ -30,19 +32,25 @@ public class Correlation
     private final LongObjectBiConsumer<MessageConsumer> setCorrelatedThrottle;
     private MessageConsumer correlatedStream;
     private long correlatedStreamId;
+    private final LongSupplier readFrameCounter;
+    private final LongConsumer readBytesAccumulator;
 
     public Correlation(
         String sourceName,
         SocketChannel channel,
         LongObjectBiConsumer<MessageConsumer> setCorrelatedThrottle,
         MessageConsumer target,
-        long targetId)
+        long targetId,
+        LongSupplier readFrameCounter,
+        LongConsumer readBytesAccumulator)
     {
         this.sourceName = requireNonNull(sourceName, "sourceName");
         this.channel = requireNonNull(channel, "channel");
         this.setCorrelatedThrottle = setCorrelatedThrottle;
         this.correlatedStream = target;
         this.correlatedStreamId = targetId;
+        this.readFrameCounter = readFrameCounter;
+        this.readBytesAccumulator = readBytesAccumulator;
     }
 
     public String source()
@@ -97,5 +105,15 @@ public class Correlation
     public String toString()
     {
         return String.format("[source=\"%s\", channel=%s]", sourceName, channel);
+    }
+
+    public LongSupplier readFrameCounter()
+    {
+        return readFrameCounter;
+    }
+
+    public LongConsumer readBytesAccumulator()
+    {
+        return readBytesAccumulator;
     }
 }
