@@ -41,10 +41,10 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 
     private final UnrouteFW unrouteRO = new UnrouteFW();
 
-    private final Long2ObjectHashMap<LongSupplier> perRouteWriteFrameCounter;
-    private final Long2ObjectHashMap<LongSupplier> perRouteReadFrameCounter;
-    private final Long2ObjectHashMap<LongConsumer> perRouteWriteBytesAccumulator;
-    private final Long2ObjectHashMap<LongConsumer> perRouteReadBytesAccumulator;
+    private final Long2ObjectHashMap<LongSupplier> framesWrittenByteRouteId;
+    private final Long2ObjectHashMap<LongSupplier> framesReadByteRouteId;
+    private final Long2ObjectHashMap<LongConsumer> bytesWrittenByteRouteId;
+    private final Long2ObjectHashMap<LongConsumer> bytesReadByteRouteId;
 
     private LongSupplier incrementOverflow;
     private RouteManager router;
@@ -68,10 +68,10 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
         this.config = config;
         this.poller = poller;
 
-        this.perRouteWriteFrameCounter = new Long2ObjectHashMap<>();
-        this.perRouteReadFrameCounter = new Long2ObjectHashMap<>();
-        this.perRouteWriteBytesAccumulator = new Long2ObjectHashMap<>();
-        this.perRouteReadBytesAccumulator = new Long2ObjectHashMap<>();
+        this.framesWrittenByteRouteId = new Long2ObjectHashMap<>();
+        this.framesReadByteRouteId = new Long2ObjectHashMap<>();
+        this.bytesWrittenByteRouteId = new Long2ObjectHashMap<>();
+        this.bytesReadByteRouteId = new Long2ObjectHashMap<>();
     }
 
     @Override
@@ -151,10 +151,10 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
             {
                 final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
                 final long routeId = unroute.correlationId();
-                perRouteWriteBytesAccumulator.remove(routeId);
-                perRouteReadBytesAccumulator.remove(routeId);
-                perRouteWriteFrameCounter.remove(routeId);
-                perRouteReadFrameCounter.remove(routeId);
+                bytesWrittenByteRouteId.remove(routeId);
+                bytesReadByteRouteId.remove(routeId);
+                framesWrittenByteRouteId.remove(routeId);
+                framesReadByteRouteId.remove(routeId);
             }
             break;
         }
@@ -174,14 +174,14 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
             this.supplyWriteFrameCounter = r ->
             {
                 final long routeId = r.correlationId();
-                return perRouteWriteFrameCounter.computeIfAbsent(
+                return framesWrittenByteRouteId.computeIfAbsent(
                         routeId,
                         t -> supplyCounter.apply(String.format("%d.frames.written", t)));
             };
             this.supplyReadFrameCounter = r ->
             {
                 final long routeId = r.correlationId();
-                return perRouteReadFrameCounter.computeIfAbsent(
+                return framesReadByteRouteId.computeIfAbsent(
                         routeId,
                         t -> supplyCounter.apply(String.format("%d.frames.read", t)));
             };
@@ -192,14 +192,14 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
             this.supplyWriteBytesAccumulator = r ->
             {
                 final long routeId = r.correlationId();
-                return perRouteWriteBytesAccumulator.computeIfAbsent(
+                return bytesWrittenByteRouteId.computeIfAbsent(
                         routeId,
                         t -> supplyAccumulator.apply(String.format("%d.bytes.written", t)));
             };
             this.supplyReadBytesAccumulator = r ->
             {
                 final long routeId = r.correlationId();
-                return perRouteReadBytesAccumulator.computeIfAbsent(
+                return bytesReadByteRouteId.computeIfAbsent(
                         routeId,
                         t -> supplyAccumulator.apply(String.format("%d.bytes.read", t)));
             };
