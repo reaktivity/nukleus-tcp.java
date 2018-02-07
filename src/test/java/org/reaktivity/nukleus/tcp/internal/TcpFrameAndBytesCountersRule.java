@@ -15,18 +15,17 @@
  */
 package org.reaktivity.nukleus.tcp.internal;
 
-import static org.junit.Assert.assertEquals;
-
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-public class TcpCountersRule implements TestRule
+public class TcpFrameAndBytesCountersRule implements TestRule
 {
     private final ReaktorRule reaktor;
+    private TcpController controller;
 
-    public TcpCountersRule(ReaktorRule reaktor)
+    public TcpFrameAndBytesCountersRule(ReaktorRule reaktor)
     {
         this.reaktor = reaktor;
     }
@@ -36,38 +35,32 @@ public class TcpCountersRule implements TestRule
     {
         return new Statement()
         {
-
             @Override
             public void evaluate() throws Throwable
             {
-                TcpController controller = controller();
-                assertEquals(0, controller.streams());
-                assertEquals(0, controller.routes());
-                assertEquals(0, controller.overflows());
+                controller = reaktor.controller(TcpController.class);
                 base.evaluate();
             }
-
         };
     }
 
-    public long routes()
+    public long bytesRead(long routeId)
     {
-        return controller().routes();
+        return controller.bytesRead(routeId);
     }
 
-    public long streams()
+    public long bytesWritten(long routeId)
     {
-        return controller().streams();
+        return controller.bytesWritten(routeId);
     }
 
-    public long overflows()
+    public long framesRead(long routeId)
     {
-        return controller().overflows();
+        return controller.framesRead(routeId);
     }
 
-    private TcpController controller()
+    public long framesWritten(long routeId)
     {
-        return reaktor.controller(TcpController.class);
+        return controller.framesWritten(routeId);
     }
-
 }
