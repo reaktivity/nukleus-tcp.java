@@ -56,6 +56,8 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     private MutableDirectBuffer writeBuffer;
     private LongFunction<IntUnaryOperator> groupBudgetClaimer;
     private LongFunction<IntUnaryOperator> groupBudgetReleaser;
+    private Function<String, LongSupplier> supplyCounter;
+    private Function<String, LongConsumer> supplyAccumulator;
 
     private Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
     private Function<RouteFW, LongSupplier> supplyReadFrameCounter;
@@ -135,24 +137,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactoryBuilder setCounterSupplier(
         Function<String, LongSupplier> supplyCounter)
     {
-        incrementOverflow = supplyCounter.apply("overflows");
-        if (supplyWriteFrameCounter == null)
-        {
-            this.supplyWriteFrameCounter = r ->
-            {
-                final long routeId = r.correlationId();
-                return perRouteWriteFrameCounter.computeIfAbsent(
-                        routeId,
-                        t -> supplyCounter.apply(String.format("%d.frames.written", t)));
-            };
-            this.supplyReadFrameCounter = r ->
-            {
-                final long routeId = r.correlationId();
-                return perRouteReadFrameCounter.computeIfAbsent(
-                        routeId,
-                        t -> supplyCounter.apply(String.format("%d.frames.read", t)));
-            };
-        }
+        this.supplyCounter = supplyCounter;
         return this;
     }
 
@@ -160,23 +145,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactoryBuilder setAccumulatorSupplier(
             Function<String, LongConsumer> supplyAccumulator)
     {
-        if (supplyWriteBytesAccumulator == null)
-        {
-            this.supplyWriteBytesAccumulator = r ->
-            {
-                final long routeId = r.correlationId();
-                return perRouteWriteBytesAccumulator.computeIfAbsent(
-                        routeId,
-                        t -> supplyAccumulator.apply(String.format("%d.bytes.written", t)));
-            };
-            this.supplyReadBytesAccumulator = r ->
-            {
-                final long routeId = r.correlationId();
-                return perRouteReadBytesAccumulator.computeIfAbsent(
-                        routeId,
-                        t -> supplyAccumulator.apply(String.format("%d.bytes.read", t)));
-            };
-        }
+        this.supplyAccumulator = supplyAccumulator;
         return this;
     }
 
@@ -202,6 +171,46 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactory build()
     {
         final BufferPool bufferPool = supplyBufferPool.get();
+
+        if (incrementOverflow == null)
+        {
+            incrementOverflow = supplyCounter.apply("overflows");
+        }
+        if (supplyWriteFrameCounter == null)
+        {
+            this.supplyWriteFrameCounter = r ->
+            {
+                final long routeId = r.correlationId();
+                return perRouteWriteFrameCounter.computeIfAbsent(
+                        routeId,
+                        t -> supplyCounter.apply(String.format("%d.frames.written", t)));
+            };
+            this.supplyReadFrameCounter = r ->
+            {
+                final long routeId = r.correlationId();
+                return perRouteReadFrameCounter.computeIfAbsent(
+                        routeId,
+                        t -> supplyCounter.apply(String.format("%d.frames.read", t)));
+            };
+        }
+
+        if (supplyWriteBytesAccumulator == null)
+        {
+            this.supplyWriteBytesAccumulator = r ->
+            {
+                final long routeId = r.correlationId();
+                return perRouteWriteBytesAccumulator.computeIfAbsent(
+                        routeId,
+                        t -> supplyAccumulator.apply(String.format("%d.bytes.written", t)));
+            };
+            this.supplyReadBytesAccumulator = r ->
+            {
+                final long routeId = r.correlationId();
+                return perRouteReadBytesAccumulator.computeIfAbsent(
+                        routeId,
+                        t -> supplyAccumulator.apply(String.format("%d.bytes.read", t)));
+            };
+        }
 
         ServerStreamFactory factory = new ServerStreamFactory(
             config,
