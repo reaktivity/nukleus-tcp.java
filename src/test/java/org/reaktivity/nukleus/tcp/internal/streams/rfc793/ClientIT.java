@@ -77,17 +77,6 @@ public class ClientIT
 
     @Test
     @Specification({
-            "${route}client.host/controller",
-            "${client}/client.and.server.sent.data.with.padding/client",
-            "${server}/client.and.server.sent.data.with.padding/server"
-    })
-    public void shouldSendAndReceiveDataWithPadding() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
         "${route}client.host/controller",
         "${client}/client.close/client",
         "${server}/client.close/server"
@@ -106,7 +95,6 @@ public class ClientIT
     public void shouldReceiveClientSentData() throws Exception
     {
        k3po.finish();
-       assertEquals(1, counters.streams());
        assertEquals(1, counters.routes());
        assertEquals(0, counters.overflows());
     }
@@ -131,7 +119,6 @@ public class ClientIT
     public void shouldReceiveClientSentDataMultipleStreams() throws Exception
     {
         k3po.finish();
-        assertEquals(2, counters.streams());
         assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -167,8 +154,6 @@ public class ClientIT
                 k3po.finish();
             }
         }
-
-        assertEquals(1, counters.streams());
     }
 
     @Test
@@ -243,7 +228,6 @@ public class ClientIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -259,7 +243,6 @@ public class ClientIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -285,7 +268,6 @@ public class ClientIT
     {
         k3po.finish();
 
-        assertEquals(2, counters.streams());
         assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }

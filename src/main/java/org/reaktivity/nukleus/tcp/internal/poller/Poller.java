@@ -78,7 +78,7 @@ public final class Poller extends TransportPoller implements Nukleus
     public PollerKey doRegister(
         SelectableChannel channel,
         int interestOps,
-        ToIntFunction<PollerKey> handler)
+        ToIntFunction<PollerKey> handler) throws ClosedChannelException
     {
         PollerKey pollerKey = null;
 

@@ -16,9 +16,11 @@
 package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.rules.RuleChain.outerRule;
 
-import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -30,15 +32,13 @@ import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpFrameAndBytesCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-/**
- * Tests the TCP nukleus when acting as a client.
- */
-public class ClientFrameAndByteCountersIT
+public class ServerCountersIT
 {
     private final K3poRule k3po = new K3poRule()
+            .addScriptRoot("control", "org/reaktivity/specification/nukleus/tcp/control")
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
-            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
+            .addScriptRoot("client", "org/reaktivity/specification/tcp/rfc793")
+            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -58,17 +58,19 @@ public class ClientFrameAndByteCountersIT
 
     @Test
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.and.server.sent.data.multiple.frames/client",
-        "${server}/client.and.server.sent.data.multiple.frames/server"
+        "${route}/server/controller",
+        "${server}/client.and.server.sent.data.multiple.frames/server",
+        "${client}/client.and.server.sent.data.multiple.frames/client"
     })
     public void shouldSendAndReceiveData() throws Exception
     {
         k3po.finish();
+
         final long routeId = 0;
-        Assert.assertEquals(26, counters.bytesRead(routeId));
-        Assert.assertEquals(26, counters.bytesWritten(routeId));
-        Assert.assertEquals(1, counters.framesRead(routeId));
-        Assert.assertEquals(2, counters.framesWritten(routeId));
+        assertEquals(26L, counters.bytesRead(routeId));
+        assertEquals(26L, counters.bytesWritten(routeId));
+        assertEquals(2L, counters.framesRead(routeId));
+        assertThat(counters.framesWritten(routeId), greaterThanOrEqualTo(1L));
     }
+
 }

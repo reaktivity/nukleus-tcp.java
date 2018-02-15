@@ -23,6 +23,9 @@ import static java.util.stream.IntStream.of;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ALL;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.PENDING_REGIONS_CAPACITY_PROPERTY_NAME;
+import static org.reaktivity.reaktor.internal.ReaktorConfiguration.MEMORY_BLOCK_CAPACITY_PROPERTY;
+import static org.reaktivity.reaktor.internal.ReaktorConfiguration.MEMORY_CAPACITY_PROPERTY;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -41,11 +44,10 @@ import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
-import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.HandleWriteHelper;
-import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ProcessDataHelper;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnNotifyWritableHelper;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnTransferHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
-import org.reaktivity.reaktor.internal.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 import org.reaktivity.specification.nukleus.NukleusRule;
 
@@ -71,10 +73,10 @@ public class ServerPartialWriteLimitsIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        // Initial window size for output to network:
-        .configure(ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY, 16)
-        // Overall buffer pool size same as slot size so maximum concurrent streams with partial writes = 1
-        .configure(ReaktorConfiguration.BUFFER_POOL_CAPACITY_PROPERTY, 16);
+        // assumes k3po channel memory is 32768 each
+        .configure(MEMORY_BLOCK_CAPACITY_PROPERTY, 16384)
+        .configure(MEMORY_CAPACITY_PROPERTY, 32768 * 4)
+        .configure(PENDING_REGIONS_CAPACITY_PROPERTY_NAME, 32768);
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
 
@@ -93,16 +95,15 @@ public class ServerPartialWriteLimitsIT
         "${server}/server.sent.data.multiple.frames/server",
         "${client}/server.sent.data.multiple.frames/client"
     })
-    public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritableWithoutOverflowingSlot() throws Exception
+    public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
     {
-        AtomicInteger dataFramesReceived = new AtomicInteger();
-        ProcessDataHelper.fragmentWrites(generate(() -> dataFramesReceived.incrementAndGet() == 1 ? 5
-                : dataFramesReceived.get() == 2 ? 6 : ALL));
-        HandleWriteHelper.fragmentWrites(generate(() -> dataFramesReceived.get() >= 2 ? ALL : 0));
+        AtomicInteger transfersReceived = new AtomicInteger();
+        OnTransferHelper.fragmentWrites(generate(() -> transfersReceived.incrementAndGet() == 1 ? 5
+                : transfersReceived.get() == 2 ? 6 : ALL));
+        OnNotifyWritableHelper.fragmentWrites(generate(() -> transfersReceived.get() >= 2 ? ALL : 0));
 
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -114,9 +115,9 @@ public class ServerPartialWriteLimitsIT
     })
     public void shouldResetStreamsExceedingPartialWriteStreamsLimit() throws Exception
     {
-        ProcessDataHelper.fragmentWrites(concat(of(1), generate(() -> 0))); // avoid spin write for first stream write
+        OnTransferHelper.fragmentWrites(concat(of(1), generate(() -> 0))); // avoid spin write for first stream write
         AtomicBoolean resetReceived = new AtomicBoolean(false);
-        HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? ALL : 0));
+        OnNotifyWritableHelper.fragmentWrites(generate(() -> resetReceived.get() ? ALL : 0));
 
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
@@ -161,7 +162,6 @@ public class ServerPartialWriteLimitsIT
             k3po.finish();
         }
 
-        assertEquals(2, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(1, counters.overflows());
     }

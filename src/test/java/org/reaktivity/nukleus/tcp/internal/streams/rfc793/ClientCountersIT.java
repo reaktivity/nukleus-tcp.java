@@ -15,15 +15,11 @@
  */
 package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
-import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.rules.RuleChain.outerRule;
-
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -33,15 +29,18 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
-import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
-import org.reaktivity.reaktor.internal.ReaktorConfiguration;
+import org.reaktivity.nukleus.tcp.internal.TcpFrameAndBytesCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-public class ClientLimitsIT
+/**
+ * Tests the TCP nukleus when acting as a client.
+ */
+public class ClientCountersIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
+            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+            .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
+            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -52,11 +51,9 @@ public class ClientLimitsIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        // Initial window size for output to network:
-        .configure(ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY, 16)
         .clean();
 
-    private final TcpCountersRule counters = new TcpCountersRule(reaktor);
+    private final TcpFrameAndBytesCountersRule counters = new TcpFrameAndBytesCountersRule(reaktor);
 
     @Rule
     public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
@@ -64,30 +61,17 @@ public class ClientLimitsIT
     @Test
     @Specification({
         "${route}/client.host/controller",
-        "${client}/client.sent.data.received.reset/client"
-        // No sup
+        "${client}/client.and.server.sent.data.multiple.frames/client",
+        "${server}/client.and.server.sent.data.multiple.frames/server"
     })
-    public void shouldResetWhenWindowExceeded() throws Exception
+    public void shouldSendAndReceiveData() throws Exception
     {
-        try (ServerSocketChannel server = ServerSocketChannel.open())
-        {
-            server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+        k3po.finish();
 
-            k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
-
-            try (SocketChannel channel = server.accept())
-            {
-                int len;
-                ByteBuffer buf = ByteBuffer.allocate(256);
-
-                len = channel.read(buf);
-
-                assertEquals(-1, len);
-
-                k3po.finish();
-            }
-        }
+        final long routeId = 0;
+        assertEquals(26L, counters.bytesRead(routeId));
+        assertEquals(26L, counters.bytesWritten(routeId));
+        assertEquals(2L, counters.framesRead(routeId));
+        assertThat(counters.framesWritten(routeId), greaterThanOrEqualTo(1L));
     }
 }

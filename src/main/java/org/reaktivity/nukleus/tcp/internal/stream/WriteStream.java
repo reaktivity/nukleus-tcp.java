@@ -16,7 +16,9 @@
 package org.reaktivity.nukleus.tcp.internal.stream;
 
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.agrona.LangUtil.rethrowUnchecked;
+import static org.reaktivity.nukleus.tcp.internal.types.stream.Flag.FIN;
+import static org.reaktivity.nukleus.tcp.internal.types.stream.Flag.RST;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -26,16 +28,13 @@ import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
 import org.agrona.DirectBuffer;
-import org.agrona.LangUtil;
-import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
-import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
-import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
+import org.reaktivity.nukleus.tcp.internal.types.ListFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
-import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
-import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
+import org.reaktivity.nukleus.tcp.internal.types.stream.RegionFW;
+import org.reaktivity.nukleus.tcp.internal.types.stream.TransferFW;
 
 public final class WriteStream
 {
@@ -44,57 +43,49 @@ public final class WriteStream
     // (see https://netty.io/4.0/api/io/netty/channel/ChannelConfig.html#setWriteSpinCount(int))
     public static final int WRITE_SPIN_COUNT = 16;
 
-    private static final int EOS_REQUESTED = -1;
-
-    private final long streamId;
-    private final MessageConsumer sourceThrottle;
+    private final long throttleId;
+    private final MessageConsumer throttle;
     private final SocketChannel channel;
     private final Poller poller;
-    private final BufferPool bufferPool;
 
-    private final MessageWriter writer;
-    private final LongSupplier incrementOverflow;
+    private final ByteBuffer writeBuffer;
+    private final StreamHelper helper;
     private final ToIntFunction<PollerKey> writeHandler;
 
-    private final LongSupplier frameCounter;
-    private final LongConsumer bytesAccumulator;
-
-    private int slot = BufferPool.NO_SLOT;
-    private int slotOffset; // index of the first byte of unwritten data
-    private int slotPosition; // index of the byte following the last byte of unwritten data
+    private final LongSupplier countOverflows;
+    private final LongSupplier countFrames;
+    private final LongConsumer countBytes;
 
     private PollerKey key;
-    private int readableBytes;
-
-    private ByteBuffer writeBuffer;
-
     private MessageConsumer correlatedInput;
-
     private long correlatedStreamId;
 
+    private int flags;
+    private long backlogAddress;
+    private int writeOffset;
+
     WriteStream(
-        MessageConsumer sourceThrottle,
-        long streamId,
+        MessageConsumer throttle,
+        long throttleId,
         SocketChannel channel,
         Poller poller,
-        LongSupplier incrementOverflow,
-        BufferPool bufferPool,
         ByteBuffer writeBuffer,
-        MessageWriter writer,
-        LongSupplier frameCounter,
-        LongConsumer bytesAccumulator)
+        StreamHelper writer,
+        LongSupplier countOverflows,
+        LongSupplier countFrames,
+        LongConsumer countBytes)
     {
-        this.streamId = streamId;
-        this.sourceThrottle = sourceThrottle;
+        this.throttleId = throttleId;
+        this.throttle = throttle;
         this.channel = channel;
         this.poller = poller;
-        this.incrementOverflow = incrementOverflow;
-        this.bufferPool = bufferPool;
         this.writeBuffer = writeBuffer;
-        this.writer = writer;
-        this.writeHandler = this::handleWrite;
-        this.frameCounter = frameCounter;
-        this.bytesAccumulator = bytesAccumulator;
+        this.helper = writer;
+        this.countOverflows = countOverflows;
+        this.countFrames = countFrames;
+        this.countBytes = countBytes;
+        this.writeHandler = this::onNotifyWritable;
+        this.backlogAddress = -1L;
     }
 
     void handleStream(
@@ -105,24 +96,13 @@ public final class WriteStream
     {
         switch (msgTypeId)
         {
-        case AbortFW.TYPE_ID:
-            processAbort(buffer, index, index + length);
-            break;
         case BeginFW.TYPE_ID:
-            processBegin(buffer, index, index + length);
+            final BeginFW begin = helper.beginRO.wrap(buffer, index, index + length);
+            onBegin(begin);
             break;
-        case DataFW.TYPE_ID:
-            try
-            {
-                processData(buffer, index, index + length);
-            }
-            catch (IOException ex)
-            {
-                handleIOExceptionFromWrite();
-            }
-            break;
-        case EndFW.TYPE_ID:
-            processEnd(buffer, index, index + length);
+        case TransferFW.TYPE_ID:
+            final TransferFW transfer = helper.transferRO.wrap(buffer, index, index + length);
+            onTransfer(transfer);
             break;
         default:
             // ignore
@@ -130,275 +110,192 @@ public final class WriteStream
         }
     }
 
-    void doConnected()
+    void onConnected()
     {
-        this.key = this.poller.doRegister(channel, OP_WRITE, writeHandler);
-        offerWindow(bufferPool.slotCapacity());
+        try
+        {
+            this.key = this.poller.doRegister(channel, OP_WRITE, writeHandler);
+        }
+        catch (IOException ex)
+        {
+            helper.doAck(throttle, throttleId, FIN.flag());
+        }
     }
 
-    void doConnectFailed()
+    void onConnectFailed()
     {
-        writer.doReset(sourceThrottle, streamId);
+        helper.doAck(throttle, throttleId, RST.flag());
     }
 
-    void setCorrelatedInput(long correlatedStreamId, MessageConsumer correlatedInput)
+    void setCorrelatedInput(
+        long correlatedStreamId,
+        MessageConsumer correlatedInput)
     {
         this.correlatedInput = correlatedInput;
         this.correlatedStreamId = correlatedStreamId;
     }
 
-    private void handleIOExceptionFromWrite()
+    private void onBegin(
+        BeginFW begin)
     {
-        // IOEXception from write implies channel input and output will no longer function
-        if (correlatedInput != null)
+        // nop, wait for either onConnected() or onConnectFailed()
+    }
+
+    private void onTransfer(
+        TransferFW transfer)
+    {
+        countFrames.getAsLong();
+
+        final int flags = transfer.flags();
+        ListFW<RegionFW> regions = helper.appendBacklogRegions(backlogAddress, transfer.regions());
+
+        if (RST.check(flags))
         {
-            writer.doTcpAbort(correlatedInput, correlatedStreamId);
+            doShutdownOutput();
+
+            helper.doAck(throttle, throttleId, flags, regions);
+            backlogAddress = helper.releaseWriteMemory(backlogAddress);
         }
-        doFail();
-    }
-
-    private void processAbort(
-        DirectBuffer buffer,
-        int offset,
-        int limit)
-    {
-        if (slot != NO_SLOT) // partial writes pending
+        else
         {
-            bufferPool.release(slot);
-        }
-        doCleanup();
-    }
-
-    private void processBegin(
-        DirectBuffer buffer,
-        int offset,
-        int limit)
-    {
-        // No-op - doConnected() should be called instead once the connection has been established
-    }
-
-    private void processData(
-        DirectBuffer buffer,
-        int offset,
-        int limit) throws IOException
-    {
-        writer.dataRO.wrap(buffer, offset, limit);
-
-        final OctetsFW payload = writer.dataRO.payload();
-        final int writableBytes = writer.dataRO.length();
-
-        frameCounter.getAsLong();
-        bytesAccumulator.accept(writableBytes);
-
-        if (reduceWindow(writableBytes))
-        {
-            final ByteBuffer writeBuffer = getWriteBuffer(buffer, payload.offset(), writableBytes);
-            final int remainingBytes = writeBuffer.remaining();
-
-            int bytesWritten = 0;
-
-            for (int i = WRITE_SPIN_COUNT; bytesWritten == 0 && i > 0; i--)
+            try
             {
-                bytesWritten = channel.write(writeBuffer);
-            }
+                final DirectBuffer buffer = helper.toDirectBuffer(regions, writeOffset);
+                final int remainingBytes = buffer.capacity();
+                final int writableBytes = Math.min(remainingBytes, writeBuffer.capacity());
 
-            int originalSlot = slot;
-            if (handleUnwrittenData(writeBuffer, bytesWritten))
-            {
+                int bytesWritten = 0;
+
+                if (writableBytes > 0)
+                {
+                    writeBuffer.clear();
+                    buffer.getBytes(0, writeBuffer, writableBytes);
+                    writeBuffer.flip();
+
+                    for (int i = WRITE_SPIN_COUNT; bytesWritten == 0 && i > 0; i--)
+                    {
+                        bytesWritten = channel.write(writeBuffer);
+                    }
+
+                    countBytes.accept(bytesWritten);
+                }
+
                 if (bytesWritten < remainingBytes)
                 {
-                    key.register(OP_WRITE);
-                }
-                else if (originalSlot != NO_SLOT)
-                {
-                    // we just flushed out a pending write
-                    key.clear(OP_WRITE);
-                }
-            }
-        }
-        else
-        {
-            if (slot == NO_SLOT)
-            {
-                doFail();
-            }
-            else
-            {
-                // send reset but defer cleanup until pending writes are completed
-                writer.doReset(sourceThrottle, streamId);
-            }
-        }
-    }
+                    final long backlogAddress = helper.acquireWriteMemory(this.backlogAddress);
 
-    private void processEnd(
-        DirectBuffer buffer,
-        int offset,
-        int limit)
-    {
-        if (slot == NO_SLOT) // no partial writes pending
-        {
-            writer.endRO.wrap(buffer, offset, limit);
-            doCleanup();
-        }
-        else
-        {
-            // Signal end of stream requested and ensure further data streams will result in reset
-            readableBytes = EOS_REQUESTED;
-        }
-    }
+                    if (backlogAddress == -1L)
+                    {
+                        countOverflows.getAsLong();
+                        helper.doAck(throttle, throttleId, RST.flag(), regions);
 
-    private void doFail()
-    {
-        writer.doReset(sourceThrottle, streamId);
-        if (slot != NO_SLOT)
-        {
-            bufferPool.release(slot);
-        }
-        doCleanup();
-    }
+                        doShutdownOutput();
+                    }
+                    else
+                    {
+                        if (this.backlogAddress == -1L)
+                        {
+                            helper.appendBacklogRegions(backlogAddress, regions);
+                            this.backlogAddress = backlogAddress;
+                        }
 
-    private void doCleanup()
-    {
-        key.clear(OP_WRITE);
-        try
-        {
-            channel.shutdownOutput();
-        }
-        catch (IOException ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
-        }
-    }
+                        writeOffset += bytesWritten;
+                        this.flags |= flags;
 
-    private ByteBuffer getWriteBuffer(DirectBuffer data, int dataOffset, int dataLength)
-    {
-        ByteBuffer result;
-        if (slot == NO_SLOT)
-        {
-            writeBuffer.clear();
-            data.getBytes(dataOffset, writeBuffer, dataLength);
-            writeBuffer.flip();
-            result = writeBuffer;
-        }
-        else
-        {
-            // Append the data to the previous remaining data
-            ByteBuffer buffer = bufferPool.byteBuffer(slot);
-            buffer.position(slotPosition);
-            data.getBytes(dataOffset, buffer, dataLength);
-            slotPosition += dataLength;
-            buffer.position(slotOffset);
-            buffer.limit(slotPosition);
-            result = buffer;
-        }
-        return result;
-    }
-
-    private boolean handleUnwrittenData(ByteBuffer written, int bytesWritten)
-    {
-        boolean result = true;
-        if (slot == NO_SLOT)
-        {
-            if (written.hasRemaining())
-            {
-                // store the remaining data into a new slot
-                slot = bufferPool.acquire(streamId);
-                if (slot == NO_SLOT)
-                {
-                    incrementOverflow.getAsLong();
-                    doFail();
-                    result = false;
+                        key.register(OP_WRITE);
+                    }
                 }
                 else
                 {
-                    ByteBuffer buffer = bufferPool.byteBuffer(slot);
-                    slotOffset = buffer.position();
-                    buffer.position(slotOffset);
-                    buffer.put(written);
-                    slotPosition = buffer.position();
-                    if (bytesWritten > 0)
+                    if (FIN.check(flags))
                     {
-                        offerWindow(bytesWritten);
+                        doShutdownOutput();
                     }
+                    helper.doAck(throttle, throttleId, flags, regions);
+                    backlogAddress = helper.releaseWriteMemory(backlogAddress);
+                    writeOffset = 0;
                 }
             }
-            else if (bytesWritten > 0)
+            catch (IOException ex)
             {
-                offerWindow(bytesWritten);
+                onWriteFailed(ex, regions);
             }
         }
-        else
-        {
-            if (written.hasRemaining())
-            {
-                // Some data from the existing slot was written, adjust offset and remaining
-                slotOffset = written.position();
-            }
-            else
-            {
-                // Free the slot, but first send a window update for all data that had ever been saved in the slot
-                int slotStart = bufferPool.byteBuffer(slot).position();
-                offerWindow(slotPosition - slotStart);
-                bufferPool.release(slot);
-                slot = NO_SLOT;
-            }
-        }
-        return result;
     }
 
-    private int handleWrite(
+    private int onNotifyWritable(
         PollerKey key)
     {
+        final ListFW<RegionFW> regions = helper.wrapBacklogRegions(backlogAddress);
+
         key.clear(OP_WRITE);
-        ByteBuffer writeBuffer = bufferPool.byteBuffer(slot);
-        writeBuffer.position(slotOffset);
-        writeBuffer.limit(slotPosition);
 
         int bytesWritten = 0;
         try
         {
+            final DirectBuffer buffer = helper.toDirectBuffer(regions, writeOffset);
+            final int writableBytes = Math.min(buffer.capacity(), writeBuffer.capacity());
+
+            writeBuffer.clear();
+            buffer.getBytes(0, writeBuffer, writableBytes);
+            writeBuffer.flip();
             bytesWritten = channel.write(writeBuffer);
+
+            if (bytesWritten < writableBytes)
+            {
+                writeOffset += bytesWritten;
+                key.register(OP_WRITE);
+            }
+            else
+            {
+                if (FIN.check(flags))
+                {
+                    doShutdownOutput();
+                }
+
+                helper.doAck(throttle, throttleId, flags, regions);
+
+                backlogAddress = helper.releaseWriteMemory(backlogAddress);
+            }
         }
         catch (IOException ex)
         {
-            handleIOExceptionFromWrite();
-            return 0;
+            onWriteFailed(ex, regions);
         }
 
-        handleUnwrittenData(writeBuffer, bytesWritten);
-
-        if (slot == NO_SLOT)
-        {
-            if (readableBytes < 0) // deferred EOS and/or window was exceeded
-            {
-                doCleanup();
-            }
-        }
-        else
-        {
-            // incomplete write
-            key.register(OP_WRITE);
-        }
         return bytesWritten;
     }
 
-    private boolean reduceWindow(int update)
+    private void onWriteFailed(
+        IOException ex,
+        ListFW<RegionFW> regions)
     {
-        readableBytes -= update;
-        return readableBytes >= 0;
+        // IOException from write implies channel input and output will no longer function
+        if (correlatedInput != null)
+        {
+            helper.doTcpTransfer(correlatedInput, correlatedStreamId, RST.flag());
+        }
+
+        helper.doAck(throttle, throttleId, RST.flag(), regions);
+
+        backlogAddress = helper.releaseWriteMemory(backlogAddress);
+
+        doShutdownOutput();
     }
 
-    private void offerWindow(final int credit)
+    private void doShutdownOutput()
     {
-        // If readableBytes indicates EOS has been received we must not destroy that information
-        // (and in this case there is no need to write the window update)
-        // We can also get update < 0 if we received data GT window (protocol violation) while
-        // we have data waiting to be written (incomplete writes)
-        if (readableBytes > EOS_REQUESTED)
+        if (channel.isConnected())
         {
-            readableBytes += credit;
-            writer.doWindow(sourceThrottle, streamId, credit, 0, 0);
+            key.clear(OP_WRITE);
+            try
+            {
+                channel.shutdownOutput();
+            }
+            catch (IOException ex)
+            {
+                rethrowUnchecked(ex);
+            }
         }
     }
-
 }

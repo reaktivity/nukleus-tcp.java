@@ -16,56 +16,57 @@
 package org.reaktivity.nukleus.tcp.internal.stream;
 
 import java.util.function.Function;
-import java.util.function.IntUnaryOperator;
 import java.util.function.LongConsumer;
-import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
-import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.buffer.DirectBufferBuilder;
+import org.reaktivity.nukleus.buffer.MemoryManager;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
+import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
 
 public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 {
-    private final Configuration config;
-    private final Poller poller;
-
     private final UnrouteFW unrouteRO = new UnrouteFW();
+
+    private final TcpConfiguration configuration;
+    private final Poller poller;
 
     private final Long2ObjectHashMap<LongSupplier> framesWrittenByteRouteId;
     private final Long2ObjectHashMap<LongSupplier> framesReadByteRouteId;
     private final Long2ObjectHashMap<LongConsumer> bytesWrittenByteRouteId;
     private final Long2ObjectHashMap<LongConsumer> bytesReadByteRouteId;
 
-    private LongSupplier incrementOverflow;
+    private LongSupplier countOverflows;
     private RouteManager router;
-    private Supplier<BufferPool> supplyBufferPool;
+    private MemoryManager memory;
     private LongSupplier supplyStreamId;
 
     private MutableDirectBuffer writeBuffer;
 
-    private LongFunction<IntUnaryOperator> groupBudgetClaimer;
-    private LongFunction<IntUnaryOperator> groupBudgetReleaser;
-
+    private Supplier<DirectBufferBuilder> supplyDirectBufferBuilder;
     private Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
     private Function<RouteFW, LongSupplier> supplyReadFrameCounter;
-    private Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
-    private Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
+    private Function<RouteFW, LongConsumer> supplyWriteBytesCounter;
+    private Function<RouteFW, LongConsumer> supplyReadBytesCounter;
+
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
 
-    public ClientStreamFactoryBuilder(Configuration config, Poller poller)
+
+    public ClientStreamFactoryBuilder(
+        TcpConfiguration configration,
+        Poller poller)
     {
-        this.config = config;
+        this.configuration = configration;
         this.poller = poller;
 
         this.framesWrittenByteRouteId = new Long2ObjectHashMap<>();
@@ -75,10 +76,18 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public StreamFactoryBuilder setBufferPoolSupplier(
-        Supplier<BufferPool> supplyBufferPool)
+    public StreamFactoryBuilder setMemoryManager(
+        MemoryManager memory)
     {
-        this.supplyBufferPool = supplyBufferPool;
+        this.memory = memory;
+        return this;
+    }
+
+    @Override
+    public StreamFactoryBuilder setDirectBufferBuilderFactory(
+        Supplier<DirectBufferBuilder> supplyDirectBufferBuilder)
+    {
+        this.supplyDirectBufferBuilder = supplyDirectBufferBuilder;
         return this;
     }
 
@@ -102,20 +111,6 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
         LongSupplier supplyStreamId)
     {
         this.supplyStreamId = supplyStreamId;
-        return this;
-    }
-
-    @Override
-    public ClientStreamFactoryBuilder setGroupBudgetClaimer(LongFunction<IntUnaryOperator> groupBudgetClaimer)
-    {
-        this.groupBudgetClaimer = groupBudgetClaimer;
-        return this;
-    }
-
-    @Override
-    public ClientStreamFactoryBuilder setGroupBudgetReleaser(LongFunction<IntUnaryOperator> groupBudgetReleaser)
-    {
-        this.groupBudgetReleaser = groupBudgetReleaser;
         return this;
     }
 
@@ -164,9 +159,9 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     @Override
     public StreamFactory build()
     {
-        if (incrementOverflow == null)
+        if (countOverflows == null)
         {
-            incrementOverflow = supplyCounter.apply("overflows");
+            countOverflows = supplyCounter.apply("overflows");
         }
 
         if (supplyWriteFrameCounter == null)
@@ -187,16 +182,16 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
             };
         }
 
-        if (supplyWriteBytesAccumulator == null)
+        if (supplyWriteBytesCounter == null)
         {
-            this.supplyWriteBytesAccumulator = r ->
+            this.supplyWriteBytesCounter = r ->
             {
                 final long routeId = r.correlationId();
                 return bytesWrittenByteRouteId.computeIfAbsent(
                         routeId,
                         t -> supplyAccumulator.apply(String.format("%d.bytes.written", t)));
             };
-            this.supplyReadBytesAccumulator = r ->
+            this.supplyReadBytesCounter = r ->
             {
                 final long routeId = r.correlationId();
                 return bytesReadByteRouteId.computeIfAbsent(
@@ -205,21 +200,18 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
             };
         }
 
-        final BufferPool bufferPool = supplyBufferPool.get();
-
         return new ClientStreamFactory(
-            config,
+            configuration,
             router,
             poller,
+            memory,
             writeBuffer,
-            bufferPool,
-            incrementOverflow,
+            countOverflows,
             supplyStreamId,
-            groupBudgetClaimer,
-            groupBudgetReleaser,
+            supplyDirectBufferBuilder,
             supplyReadFrameCounter,
-            supplyReadBytesAccumulator,
+            supplyReadBytesCounter,
             supplyWriteFrameCounter,
-            supplyWriteBytesAccumulator);
+            supplyWriteBytesCounter);
     }
 }

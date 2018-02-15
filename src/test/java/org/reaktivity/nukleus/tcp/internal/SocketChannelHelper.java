@@ -32,55 +32,55 @@ public final class SocketChannelHelper
     public static final TestRule RULE = new Rule();
     public static final int ALL = -1;
 
-    public static class ProcessDataHelper extends Helper
+    public static class OnTransferHelper extends Helper
     {
 
-        private static PrimitiveIterator.OfInt processData;
+        private static PrimitiveIterator.OfInt onTransfer;
 
-        protected ProcessDataHelper(org.jboss.byteman.rule.Rule rule)
+        protected OnTransferHelper(org.jboss.byteman.rule.Rule rule)
         {
             super(rule);
         }
 
         public static void fragmentWrites(IntStream stream)
         {
-            ProcessDataHelper.processData = stream.iterator();
+            OnTransferHelper.onTransfer = stream.iterator();
         }
 
         public int doWrite(SocketChannel channel, ByteBuffer buffer) throws IOException
         {
-            return write(channel, buffer, processData);
+            return write(channel, buffer, onTransfer);
         }
 
         private static void reset()
         {
-            processData = IntStream.empty().iterator();
+            onTransfer = IntStream.empty().iterator();
         }
     }
 
-    public static class HandleWriteHelper extends Helper
+    public static class OnNotifyWritableHelper extends Helper
     {
 
-        private static PrimitiveIterator.OfInt handleWrite;
+        private static PrimitiveIterator.OfInt onNotifyWritable;
 
-        protected HandleWriteHelper(org.jboss.byteman.rule.Rule rule)
+        protected OnNotifyWritableHelper(org.jboss.byteman.rule.Rule rule)
         {
             super(rule);
         }
 
         public static void fragmentWrites(IntStream stream)
         {
-            HandleWriteHelper.handleWrite = stream.iterator();
+            OnNotifyWritableHelper.onNotifyWritable = stream.iterator();
         }
 
         public int doWrite(SocketChannel channel, ByteBuffer buffer) throws IOException
         {
-            return write(channel, buffer, handleWrite);
+            return write(channel, buffer, onNotifyWritable);
         }
 
         private static void reset()
         {
-            handleWrite = IntStream.empty().iterator();
+            onNotifyWritable = IntStream.empty().iterator();
         }
     }
 
@@ -133,11 +133,14 @@ public final class SocketChannelHelper
 
     private static void reset()
     {
-        ProcessDataHelper.reset();
-        HandleWriteHelper.reset();
+        OnTransferHelper.reset();
+        OnNotifyWritableHelper.reset();
     }
 
-    private static int write(SocketChannel channel, ByteBuffer b, PrimitiveIterator.OfInt iterator) throws IOException
+    private static int write(
+        SocketChannel channel,
+        ByteBuffer b,
+        PrimitiveIterator.OfInt iterator) throws IOException
     {
         int bytesToWrite = iterator.hasNext() ? iterator.nextInt() : ALL;
         bytesToWrite = bytesToWrite == ALL ? b.remaining() : bytesToWrite;

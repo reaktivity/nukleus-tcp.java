@@ -55,11 +55,6 @@ public class TcpCountersRule implements TestRule
         return controller().routes();
     }
 
-    public long streams()
-    {
-        return controller().streams();
-    }
-
     public long overflows()
     {
         return controller().overflows();

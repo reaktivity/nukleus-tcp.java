@@ -32,8 +32,8 @@ public class Correlation
     private final LongObjectBiConsumer<MessageConsumer> setCorrelatedThrottle;
     private MessageConsumer correlatedStream;
     private long correlatedStreamId;
-    private final LongSupplier readFrameCounter;
-    private final LongConsumer readBytesAccumulator;
+    private final LongSupplier countFrames;
+    private final LongConsumer countBytes;
 
     public Correlation(
         String sourceName,
@@ -41,16 +41,16 @@ public class Correlation
         LongObjectBiConsumer<MessageConsumer> setCorrelatedThrottle,
         MessageConsumer target,
         long targetId,
-        LongSupplier readFrameCounter,
-        LongConsumer readBytesAccumulator)
+        LongSupplier countFrames,
+        LongConsumer countBytes)
     {
         this.sourceName = requireNonNull(sourceName, "sourceName");
         this.channel = requireNonNull(channel, "channel");
         this.setCorrelatedThrottle = setCorrelatedThrottle;
         this.correlatedStream = target;
         this.correlatedStreamId = targetId;
-        this.readFrameCounter = readFrameCounter;
-        this.readBytesAccumulator = readBytesAccumulator;
+        this.countFrames = countFrames;
+        this.countBytes = countBytes;
     }
 
     public String source()
@@ -107,13 +107,13 @@ public class Correlation
         return String.format("[source=\"%s\", channel=%s]", sourceName, channel);
     }
 
-    public LongSupplier readFrameCounter()
+    public LongSupplier countFrames()
     {
-        return readFrameCounter;
+        return countFrames;
     }
 
-    public LongConsumer readBytesAccumulator()
+    public LongConsumer countBytes()
     {
-        return readBytesAccumulator;
+        return countBytes;
     }
 }

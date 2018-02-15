@@ -45,8 +45,8 @@ import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
-import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.HandleWriteHelper;
-import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ProcessDataHelper;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnNotifyWritableHelper;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnTransferHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
@@ -82,8 +82,8 @@ public class ClientPartialWriteIT
     })
     public void shouldSpinWrite() throws Exception
     {
-        ProcessDataHelper.fragmentWrites(generate(() -> 0).limit(WRITE_SPIN_COUNT - 1));
-        HandleWriteHelper.fragmentWrites(generate(() -> 0));
+        OnTransferHelper.fragmentWrites(generate(() -> 0).limit(WRITE_SPIN_COUNT - 1));
+        OnNotifyWritableHelper.fragmentWrites(generate(() -> 0));
         k3po.finish();
     }
 
@@ -95,7 +95,7 @@ public class ClientPartialWriteIT
     })
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
     {
-        ProcessDataHelper.fragmentWrites(IntStream.of(5));
+        OnTransferHelper.fragmentWrites(IntStream.of(5));
         k3po.finish();
     }
 
@@ -107,8 +107,8 @@ public class ClientPartialWriteIT
     })
     public void shouldHandleMultiplePartialWrites() throws Exception
     {
-        ProcessDataHelper.fragmentWrites(IntStream.of(2));
-        HandleWriteHelper.fragmentWrites(IntStream.of(3, 1));
+        OnTransferHelper.fragmentWrites(IntStream.of(2));
+        OnNotifyWritableHelper.fragmentWrites(IntStream.of(3, 1));
         k3po.finish();
     }
 
@@ -120,13 +120,13 @@ public class ClientPartialWriteIT
     })
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
     {
-        // processData will be called for each of the two data frames. Make the first
-        // do a partial write, then write nothing until handleWrite is called after the
-        // second processData call, when we write everything.
+        // onTransfer will be called for each of the two data frames. Make the first
+        // do a partial write, then write nothing until onNotifyWritable is called after the
+        // second onTransfer call, when we write everything.
         AtomicBoolean finishWrite = new AtomicBoolean(false);
 
-        ProcessDataHelper.fragmentWrites(concat(of(5), generate(() -> finishWrite.getAndSet(true) ? 0 : 0)));
-        HandleWriteHelper.fragmentWrites(generate(() -> finishWrite.get() ? ALL : 0));
+        OnTransferHelper.fragmentWrites(concat(of(5), generate(() -> finishWrite.getAndSet(true) ? 0 : 0)));
+        OnNotifyWritableHelper.fragmentWrites(generate(() -> finishWrite.get() ? ALL : 0));
         k3po.finish();
     }
 
@@ -138,8 +138,8 @@ public class ClientPartialWriteIT
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
     {
         AtomicBoolean endWritten = new AtomicBoolean(false);
-        ProcessDataHelper.fragmentWrites(concat(of(5), generate(() -> 0)));
-        HandleWriteHelper.fragmentWrites(generate(() -> endWritten.get() ? ALL : 0));
+        OnTransferHelper.fragmentWrites(concat(of(5), generate(() -> 0)));
+        OnNotifyWritableHelper.fragmentWrites(generate(() -> endWritten.get() ? ALL : 0));
 
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {

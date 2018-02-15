@@ -75,17 +75,6 @@ public class ServerIT
 
     @Test
     @Specification({
-            "${route}/server/controller",
-            "${server}/client.and.server.sent.data.with.padding/server",
-            "${client}/client.and.server.sent.data.with.padding/client"
-    })
-    public void shouldSendAndReceiveDataWithPadding() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
         "${route}/server/controller",
         "${server}/client.close/server",
         "${client}/client.close/client"
@@ -105,7 +94,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -121,7 +109,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -147,7 +134,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(2, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -209,7 +195,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(3, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -224,7 +209,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -240,7 +224,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -256,7 +239,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -286,7 +268,6 @@ public class ServerIT
             }
         }
 
-        assertEquals(0, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -312,7 +293,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -357,7 +337,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(2, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }

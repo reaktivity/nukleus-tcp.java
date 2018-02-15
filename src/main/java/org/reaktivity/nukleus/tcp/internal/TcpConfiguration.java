@@ -21,10 +21,18 @@ public class TcpConfiguration extends Configuration
 {
     public static final String MAXIMUM_BACKLOG_PROPERTY_NAME = "nukleus.tcp.maximum.backlog";
 
+    public static final String TRANSFER_CAPACITY_PROPERTY_NAME = "nukleus.tcp.transfer.capacity";
+
+    public static final String PENDING_REGIONS_CAPACITY_PROPERTY_NAME = "nukleus.tcp.pending.regions.capacity";
+
     /**
      * @see java.nio.channels.ServerSocketChannel#bind(java.net.SocketAddress, int)
      */
     private static final int MAXIMUM_BACKLOG_DEFAULT = 0;
+
+    private static final int TRANSFER_CAPACITY_DEFAULT = 1 << 15;
+
+    private static final int PENDING_REGIONS_CAPACITY_DEFAULT = 1 << 10;
 
     public TcpConfiguration(
         Configuration config)
@@ -37,4 +45,13 @@ public class TcpConfiguration extends Configuration
         return getInteger(MAXIMUM_BACKLOG_PROPERTY_NAME, MAXIMUM_BACKLOG_DEFAULT);
     }
 
+    public int transferCapacity()
+    {
+        return getInteger(TRANSFER_CAPACITY_PROPERTY_NAME, TRANSFER_CAPACITY_DEFAULT);
+    }
+
+    public int pendingRegionsCapacity()
+    {
+        return getInteger(PENDING_REGIONS_CAPACITY_PROPERTY_NAME, PENDING_REGIONS_CAPACITY_DEFAULT);
+    }
 }

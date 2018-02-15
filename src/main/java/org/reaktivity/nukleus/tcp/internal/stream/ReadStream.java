@@ -16,100 +16,118 @@
 package org.reaktivity.nukleus.tcp.internal.stream;
 
 import static java.nio.channels.SelectionKey.OP_READ;
+import static org.agrona.LangUtil.rethrowUnchecked;
+import static org.reaktivity.nukleus.tcp.internal.types.stream.Flag.FIN;
+import static org.reaktivity.nukleus.tcp.internal.types.stream.Flag.RST;
 
 import java.io.IOException;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
-import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
-import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
-import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
+import org.reaktivity.nukleus.tcp.internal.types.ListFW;
+import org.reaktivity.nukleus.tcp.internal.types.stream.AckFW;
+import org.reaktivity.nukleus.tcp.internal.types.stream.RegionFW;
 
 final class ReadStream
 {
     private final MessageConsumer target;
-    private final long streamId;
+    private final long targetId;
     private final PollerKey key;
     private final SocketChannel channel;
-    private final ByteBuffer readBuffer;
-    private final MutableDirectBuffer atomicBuffer;
-    private final MessageWriter writer;
-    private final LongSupplier frameCounter;
-    private final LongConsumer bytesAccumulator;
+    private final StreamHelper helper;
+    private final LongSupplier countFrames;
+    private final LongConsumer countBytes;
+    private final long memoryAddress;
+
+    private long memoryReaderIndex;
+    private long memoryWriterIndex;
 
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
-    private int readableBytes;
-    private int readPadding;
-    private long readGroupId;
     private boolean resetRequired;
 
     ReadStream(
         MessageConsumer target,
-        long streamId,
+        long targetId,
         PollerKey key,
         SocketChannel channel,
-        ByteBuffer readByteBuffer,
-        MutableDirectBuffer readBuffer,
-        MessageWriter writer,
-        LongSupplier frameCounter,
-        LongConsumer bytesAccumulator)
+        StreamHelper helper,
+        LongSupplier countFrames,
+        LongConsumer countBytes)
     {
         this.target = target;
-        this.streamId = streamId;
+        this.targetId = targetId;
         this.key = key;
         this.channel = channel;
-        this.readBuffer = readByteBuffer;
-        this.atomicBuffer = readBuffer;
-        this.writer = writer;
-        this.frameCounter = frameCounter;
-        this.bytesAccumulator = bytesAccumulator;
+        this.helper = helper;
+        this.countFrames = countFrames;
+        this.countBytes = countBytes;
+        this.memoryAddress = helper.acquireReadMemory();
     }
 
-    int handleStream(
+    int onNotifyReadable(
         PollerKey key)
     {
-        assert readableBytes > readPadding;
-
-        final int limit = Math.min(readableBytes - readPadding, readBuffer.capacity());
-
-        readBuffer.position(0);
-        readBuffer.limit(limit);
+        ByteBuffer readByteBuffer = helper.readByteBuffer((int)(memoryWriterIndex - memoryReaderIndex));
 
         int bytesRead = 0;
         try
         {
-            bytesRead = channel.read(readBuffer);
+            bytesRead = channel.read(readByteBuffer);
         }
-        catch(IOException ex)
+        catch (IOException ex)
         {
-            // TCP reset
-            handleIOExceptionFromRead();
+            onReadException(ex);
         }
+
         if (bytesRead == -1)
         {
-            // channel input closed
-            readableBytes = -1;
-            writer.doTcpEnd(target, streamId);
-            key.cancel(OP_READ);
+            onReadClosed();
         }
         else if (bytesRead != 0)
         {
-            frameCounter.getAsLong();
-            bytesAccumulator.accept(bytesRead);
-            // atomic buffer is zero copy with read buffer
-            writer.doTcpData(target, streamId, readGroupId, readPadding, atomicBuffer, 0, bytesRead);
+            final int memoryWriterOffset = helper.memoryOffset(memoryWriterIndex);
+            final int newMemoryWriterOffset = memoryWriterOffset + bytesRead;
+            final long newMemoryWriterIndex = memoryWriterIndex + bytesRead;
 
-            readableBytes -= bytesRead + readPadding;
+            final MutableDirectBuffer memoryBuffer = helper.wrapMemory(memoryAddress);
 
-            if (readableBytes <= readPadding)
+            Consumer<ListFW.Builder<RegionFW.Builder, RegionFW>> regions;
+            if (newMemoryWriterOffset == helper.memoryOffset(newMemoryWriterIndex))
+            {
+                int bytesRead0 = bytesRead;
+
+                memoryBuffer.putBytes(memoryWriterOffset, readByteBuffer, 0, bytesRead0);
+                regions = rs -> rs.item(r -> r.address(memoryAddress + memoryWriterOffset).length(bytesRead0).streamId(targetId));
+            }
+            else
+            {
+                int bytesRead0 = memoryBuffer.capacity() - memoryWriterOffset;
+                int bytesRead1 = newMemoryWriterOffset;
+
+                memoryBuffer.putBytes(memoryWriterOffset, readByteBuffer, 0, bytesRead0);
+                memoryBuffer.putBytes(0, readByteBuffer, bytesRead0, bytesRead1);
+                regions = rs -> rs.item(r -> r.address(memoryAddress + memoryWriterOffset).length(bytesRead0).streamId(targetId))
+                                  .item(r -> r.address(memoryAddress).length(bytesRead1).streamId(targetId));
+            }
+
+            helper.doTcpTransfer(target, targetId, 0x00, regions);
+
+            countFrames.getAsLong();
+            countBytes.accept(bytesRead);
+
+            memoryWriterIndex = newMemoryWriterIndex;
+
+            if (readByteBuffer.remaining() == 0)
             {
                 key.clear(OP_READ);
             }
@@ -118,15 +136,26 @@ final class ReadStream
         return 1;
     }
 
-    private void handleIOExceptionFromRead()
+    private void onReadClosed()
     {
-        // IOException from read implies channel input and output will no longer function
-        readableBytes = -1;
-        writer.doTcpAbort(target, streamId);
+        // channel input closed
+        memoryReaderIndex = -1;
+        helper.doTcpTransfer(target, targetId, FIN.flag());
         key.cancel(OP_READ);
+    }
+
+    private void onReadException(
+        IOException ex)
+    {
+        // TCP reset triggers IOException on read
+        // implies channel input and output will no longer function
+        memoryReaderIndex = -1;
+        helper.doTcpTransfer(target, targetId, RST.flag());
+        key.cancel(OP_READ);
+
         if (correlatedThrottle != null)
         {
-            writer.doReset(correlatedThrottle, correlatedStreamId);
+            helper.doAck(correlatedThrottle, correlatedStreamId, RST.flag());
         }
         else
         {
@@ -142,13 +171,9 @@ final class ReadStream
     {
         switch (msgTypeId)
         {
-        case WindowFW.TYPE_ID:
-            final WindowFW window = writer.windowRO.wrap(buffer, index, index + length);
-            processWindow(window);
-            break;
-        case ResetFW.TYPE_ID:
-            final ResetFW reset = writer.resetRO.wrap(buffer, index, index + length);
-            processReset(reset);
+        case AckFW.TYPE_ID:
+            final AckFW ack = helper.ackRO.wrap(buffer, index, index + length);
+            onAck(ack);
             break;
         default:
             // ignore
@@ -156,58 +181,79 @@ final class ReadStream
         }
     }
 
-    void setCorrelatedThrottle(long correlatedStreamId, MessageConsumer correlatedThrottle)
+    void setCorrelatedThrottle(
+        long correlatedStreamId,
+        MessageConsumer correlatedThrottle)
     {
         this.correlatedThrottle = correlatedThrottle;
         this.correlatedStreamId = correlatedStreamId;
         if (resetRequired)
         {
-            writer.doReset(correlatedThrottle, correlatedStreamId);
+            helper.doAck(correlatedThrottle, correlatedStreamId, RST.flag());
         }
     }
 
-    private void processWindow(
-        WindowFW window)
+    private void onAck(
+        AckFW ack)
     {
-        if (readableBytes != -1)
+        final int flags = ack.flags();
+
+        if (RST.check(flags))
         {
-            readPadding = window.padding();
-            readableBytes += window.credit();
-            readGroupId = window.groupId();
-
-            if (readableBytes > readPadding)
+            onAck(flags);
+        }
+        else
+        {
+            if (memoryReaderIndex != -1)
             {
-                handleStream(key);
+                MutableInteger acknowledgedBytes = new MutableInteger();
+                ack.regions().forEach(r -> acknowledgedBytes.value += r.length());
+                memoryReaderIndex += acknowledgedBytes.value;
+
+                if (helper.readByteBuffer((int) (memoryWriterIndex - memoryReaderIndex)).remaining() != 0)
+                {
+                    onNotifyReadable(key);
+                }
+
+                if (memoryReaderIndex != -1 &&
+                    helper.readByteBuffer((int) (memoryWriterIndex - memoryReaderIndex)).remaining() != 0)
+                {
+                    key.register(OP_READ);
+                }
             }
 
-            if (readableBytes > readPadding)
-            {
-                key.register(OP_READ);
-            }
+            onAck(flags);
         }
     }
 
-    private void processReset(
-        ResetFW reset)
+    private void onAck(
+        int flags)
     {
-        try
+        if (FIN.check(flags) || RST.check(flags))
         {
-            if (correlatedThrottle != null)
+            try
             {
-                // Begin on correlated WriteStream was already processed
-                channel.shutdownInput();
+                if (RST.check(flags) && correlatedThrottle == null)
+                {
+                    // force a hard reset (TCP RST)
+                    // "Orderly Versus Abortive Connection Release in Java"
+                    // https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html
+                    channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+                    channel.close();
+                }
+                else
+                {
+                    channel.shutdownInput();
+                }
             }
-            else
+            catch (IOException ex)
             {
-                // Force a hard reset (TCP RST), as documented in "Orderly Versus Abortive Connection Release in Java"
-                // (https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html)
-                channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-                channel.close();
+                rethrowUnchecked(ex);
             }
-        }
-        catch (IOException ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
+            finally
+            {
+                helper.releaseReadMemory(memoryAddress);
+            }
         }
     }
 }

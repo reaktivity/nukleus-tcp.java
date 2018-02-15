@@ -36,7 +36,7 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
-import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ProcessDataHelper;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnTransferHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
@@ -70,11 +70,11 @@ public class ClientIOExceptionFromWriteIT
         "${route}/client.host/controller",
         "${client}/client.sent.data.received.reset.and.abort/client"
     })
-    @BMRule(name = "processData",
+    @BMRule(name = "onTransfer",
     targetClass = "^java.nio.channels.SocketChannel",
     targetMethod = "write(java.nio.ByteBuffer)",
     condition =
-      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
+      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onTransfer\", true, true)",
       action = "throw new IOException(\"Simulating an IOException from write\")"
     )
     public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
@@ -100,25 +100,25 @@ public class ClientIOExceptionFromWriteIT
         "${client}/client.sent.data.received.reset.and.abort/client"
     })
     @BMRules(rules = {
-        @BMRule(name = "processData",
-        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$ProcessDataHelper",
+        @BMRule(name = "onTransfer",
+        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$OnTransferHelper",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
         condition =
-          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
+          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onTransfer\", true, true)",
         action = "return doWrite($0, $1);"
         ),
-        @BMRule(name = "handleWrite",
+        @BMRule(name = "onNotifyWritable",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
         condition =
-          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.handleWrite\", true, true)",
+          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onNotifyWritable\", true, true)",
           action = "throw new IOException(\"Simulating an IOException from write\")"
         )
     })
     public void shouldResetWhenDeferredWriteThrowsIOException() throws Exception
     {
-        ProcessDataHelper.fragmentWrites(generate(() -> 0));
+        OnTransferHelper.fragmentWrites(generate(() -> 0));
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
