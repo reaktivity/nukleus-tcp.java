@@ -31,7 +31,6 @@ import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.ListFW;
@@ -47,10 +46,14 @@ final class ReadStream
     private final StreamHelper helper;
     private final LongSupplier countFrames;
     private final LongConsumer countBytes;
-    private final long memoryAddress;
+    private final long writeAddress;
+    private final int writeCapacityMask;
 
-    private long memoryReaderIndex;
-    private long memoryWriterIndex;
+    private long ackIndex;
+    private long ackIndexHighMark;
+    private int ackIndexProgress;
+
+    private long writeIndex;
 
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
@@ -72,13 +75,14 @@ final class ReadStream
         this.helper = helper;
         this.countFrames = countFrames;
         this.countBytes = countBytes;
-        this.memoryAddress = helper.acquireReadMemory();
+        this.writeAddress = helper.acquireReadMemory();
+        this.writeCapacityMask = helper.readMemoryMask();
     }
 
     int onNotifyReadable(
         PollerKey key)
     {
-        ByteBuffer readByteBuffer = helper.readByteBuffer((int)(memoryWriterIndex - memoryReaderIndex));
+        ByteBuffer readByteBuffer = helper.readByteBuffer((int)(writeIndex - ackIndex));
 
         int bytesRead = 0;
         try
@@ -96,11 +100,11 @@ final class ReadStream
         }
         else if (bytesRead != 0)
         {
-            final int memoryWriterOffset = helper.memoryOffset(memoryWriterIndex);
+            final int memoryWriterOffset = helper.memoryOffset(writeIndex);
             final int newMemoryWriterOffset = memoryWriterOffset + bytesRead;
-            final long newMemoryWriterIndex = memoryWriterIndex + bytesRead;
+            final long newMemoryWriterIndex = writeIndex + bytesRead;
 
-            final MutableDirectBuffer memoryBuffer = helper.wrapMemory(memoryAddress);
+            final MutableDirectBuffer memoryBuffer = helper.wrapMemory(writeAddress);
 
             Consumer<ListFW.Builder<RegionFW.Builder, RegionFW>> regions;
             if (newMemoryWriterOffset == helper.memoryOffset(newMemoryWriterIndex))
@@ -108,7 +112,7 @@ final class ReadStream
                 int bytesRead0 = bytesRead;
 
                 memoryBuffer.putBytes(memoryWriterOffset, readByteBuffer, 0, bytesRead0);
-                regions = rs -> rs.item(r -> r.address(memoryAddress + memoryWriterOffset).length(bytesRead0).streamId(targetId));
+                regions = rs -> rs.item(r -> r.address(writeAddress + memoryWriterOffset).length(bytesRead0).streamId(targetId));
             }
             else
             {
@@ -117,8 +121,8 @@ final class ReadStream
 
                 memoryBuffer.putBytes(memoryWriterOffset, readByteBuffer, 0, bytesRead0);
                 memoryBuffer.putBytes(0, readByteBuffer, bytesRead0, bytesRead1);
-                regions = rs -> rs.item(r -> r.address(memoryAddress + memoryWriterOffset).length(bytesRead0).streamId(targetId))
-                                  .item(r -> r.address(memoryAddress).length(bytesRead1).streamId(targetId));
+                regions = rs -> rs.item(r -> r.address(writeAddress + memoryWriterOffset).length(bytesRead0).streamId(targetId))
+                                  .item(r -> r.address(writeAddress).length(bytesRead1).streamId(targetId));
             }
 
             helper.doTcpTransfer(target, targetId, 0x00, regions);
@@ -126,7 +130,7 @@ final class ReadStream
             countFrames.getAsLong();
             countBytes.accept(bytesRead);
 
-            memoryWriterIndex = newMemoryWriterIndex;
+            writeIndex = newMemoryWriterIndex;
 
             if (readByteBuffer.remaining() == 0)
             {
@@ -140,7 +144,7 @@ final class ReadStream
     private void onReadClosed()
     {
         // channel input closed
-        memoryReaderIndex = -1;
+        ackIndex = -1;
         helper.doTcpTransfer(target, targetId, FIN.flag());
         key.cancel(OP_READ);
     }
@@ -150,7 +154,7 @@ final class ReadStream
     {
         // TCP reset triggers IOException on read
         // implies channel input and output will no longer function
-        memoryReaderIndex = -1;
+        ackIndex = -1;
         helper.doTcpTransfer(target, targetId, RST.flag());
         key.cancel(OP_READ);
 
@@ -205,19 +209,17 @@ final class ReadStream
         }
         else
         {
-            if (memoryReaderIndex != -1)
+            if (ackIndex != -1)
             {
-                MutableInteger acknowledgedBytes = new MutableInteger();
-                ack.regions().forEach(r -> acknowledgedBytes.value += r.length());
-                memoryReaderIndex += acknowledgedBytes.value;
+                ack.regions().forEach(this::onAckRegion);
 
-                if (helper.readByteBuffer((int) (memoryWriterIndex - memoryReaderIndex)).remaining() != 0)
+                if (helper.readByteBuffer((int) (writeIndex - ackIndex)).remaining() != 0)
                 {
                     onNotifyReadable(key);
                 }
 
-                if (memoryReaderIndex != -1 &&
-                    helper.readByteBuffer((int) (memoryWriterIndex - memoryReaderIndex)).remaining() != 0)
+                if (ackIndex != -1 &&
+                    helper.readByteBuffer((int) (writeIndex - ackIndex)).remaining() != 0)
                 {
                     key.register(OP_READ);
                 }
@@ -260,8 +262,28 @@ final class ReadStream
             }
             finally
             {
-                helper.releaseReadMemory(memoryAddress);
+                helper.releaseReadMemory(writeAddress);
             }
+        }
+    }
+
+    private void onAckRegion(
+        RegionFW region)
+    {
+        final long address = region.address();
+        final int length = region.length();
+
+        final long addressIndex = (ackIndex & ~writeCapacityMask) | (address & writeCapacityMask);
+
+        ackIndexHighMark = Math.max(ackIndexHighMark, addressIndex + length);
+        ackIndexProgress += length;
+
+        final long ackIndexCandidate = ackIndex + ackIndexProgress;
+        if (ackIndexCandidate == ackIndexHighMark)
+        {
+            ackIndex = ackIndexCandidate;
+            ackIndexHighMark = ackIndexCandidate;
+            ackIndexProgress = 0;
         }
     }
 }

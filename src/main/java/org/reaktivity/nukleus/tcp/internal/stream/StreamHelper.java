@@ -166,6 +166,11 @@ final class StreamHelper
                              .streamId(region.streamId()));
     }
 
+    public int readMemoryMask()
+    {
+        return transferCapacity - 1;
+    }
+
     public long acquireWriteMemory(
         long address)
     {
@@ -182,7 +187,7 @@ final class StreamHelper
         return -1L;
     }
 
-public long acquireReadMemory()
+    public long acquireReadMemory()
     {
         return memory.acquire(transferCapacity);
     }
