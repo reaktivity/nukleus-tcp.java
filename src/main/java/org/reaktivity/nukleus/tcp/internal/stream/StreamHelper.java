@@ -134,13 +134,25 @@ final class StreamHelper
             MutableDirectBuffer backlog = backlogRW;
             backlog.wrap(memory.resolve(address), pendingRegionsCapacity);
             regionsRW.wrap(backlog, 0, backlog.capacity());
-
             regionsRO.wrap(backlog, 0, backlog.capacity())
                      .forEach(this::appendRegion);
-
             regions.forEach(this::appendRegion);
-
             regions = regionsRW.build();
+        }
+
+        return regions;
+    }
+
+    public ListFW<RegionFW> setBacklogRegions(
+        long address,
+        ListFW<RegionFW> regions)
+    {
+        if (address != -1)
+        {
+            MutableDirectBuffer backlog = backlogRW;
+            backlog.wrap(memory.resolve(address), pendingRegionsCapacity);
+            backlog.putBytes(0, regions.buffer(), regions.offset(), regions.sizeof());
+            regions = regionsRO.wrap(backlog, 0, backlog.capacity());
         }
 
         return regions;

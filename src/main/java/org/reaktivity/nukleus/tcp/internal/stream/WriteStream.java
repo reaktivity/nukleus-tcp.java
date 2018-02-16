@@ -112,14 +112,18 @@ public final class WriteStream
 
     void onConnected()
     {
+        int flags = 0;
+
         try
         {
             this.key = this.poller.doRegister(channel, OP_WRITE, writeHandler);
         }
         catch (IOException ex)
         {
-            helper.doAck(throttle, throttleId, FIN.flag());
+            flags = RST.set(flags);
         }
+
+        helper.doAck(throttle, throttleId, flags);
     }
 
     void onConnectFailed()
@@ -195,7 +199,7 @@ public final class WriteStream
                     {
                         if (this.backlogAddress == -1L)
                         {
-                            helper.appendBacklogRegions(backlogAddress, regions);
+                            helper.setBacklogRegions(backlogAddress, regions);
                             this.backlogAddress = backlogAddress;
                         }
 

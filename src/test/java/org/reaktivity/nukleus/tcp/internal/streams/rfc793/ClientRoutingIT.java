@@ -39,7 +39,7 @@ public class ClientRoutingIT
             .addScriptRoot("server", "org/reaktivity/specification/tcp/routing")
             .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/routing");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(10, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
         .nukleus("tcp"::equals)

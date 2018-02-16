@@ -21,6 +21,7 @@ import static org.reaktivity.nukleus.tcp.internal.types.stream.Flag.FIN;
 import static org.reaktivity.nukleus.tcp.internal.types.stream.Flag.RST;
 
 import java.io.IOException;
+import java.net.SocketException;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -235,11 +236,18 @@ final class ReadStream
             {
                 if (RST.check(flags) && correlatedThrottle == null)
                 {
-                    // force a hard reset (TCP RST)
-                    // "Orderly Versus Abortive Connection Release in Java"
-                    // https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html
-                    channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-                    channel.close();
+                    try
+                    {
+                        // attempt to force a hard reset (TCP RST)
+                        // "Orderly Versus Abortive Connection Release in Java"
+                        // https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html
+                        channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+                        channel.close();
+                    }
+                    catch (SocketException ex)
+                    {
+                        channel.shutdownInput();
+                    }
                 }
                 else
                 {

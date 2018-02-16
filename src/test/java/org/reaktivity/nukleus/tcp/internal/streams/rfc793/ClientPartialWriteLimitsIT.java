@@ -25,6 +25,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ALL;
 import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.PENDING_REGIONS_CAPACITY_PROPERTY_NAME;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.TRANSFER_CAPACITY_PROPERTY_NAME;
 import static org.reaktivity.reaktor.internal.ReaktorConfiguration.MEMORY_BLOCK_CAPACITY_PROPERTY;
 import static org.reaktivity.reaktor.internal.ReaktorConfiguration.MEMORY_CAPACITY_PROPERTY;
 
@@ -75,9 +76,10 @@ public class ClientPartialWriteLimitsIT
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
         // assumes k3po channel memory is 32768 each
-        .configure(MEMORY_BLOCK_CAPACITY_PROPERTY, 16384)
-        .configure(MEMORY_CAPACITY_PROPERTY, 32768 * 4)
-        .configure(PENDING_REGIONS_CAPACITY_PROPERTY_NAME, 32768);
+        .configure(TRANSFER_CAPACITY_PROPERTY_NAME, 1 << 13)
+        .configure(MEMORY_BLOCK_CAPACITY_PROPERTY, 1 << 14)
+        .configure(MEMORY_CAPACITY_PROPERTY, 1 << 17)
+        .configure(PENDING_REGIONS_CAPACITY_PROPERTY_NAME, 1 << 15);
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
 

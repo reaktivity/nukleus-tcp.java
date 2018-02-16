@@ -130,10 +130,8 @@ public class ClientStreamFactory implements StreamFactory
 
         if (sourceRef == 0L)
         {
-            final long sourceId = begin.streamId();
-            helper.doAck(throttle, sourceId, 0x02);
-            throw new IllegalArgumentException(String.format("Stream id %d is not a connect stream, sourceRef is zero",
-                    sourceId, sourceRef));
+            final long throttleId = begin.streamId();
+            helper.doAck(throttle, throttleId, RST.flag());
         }
         else
         {
@@ -342,7 +340,6 @@ public class ClientStreamFactory implements StreamFactory
         catch (IOException ex)
         {
             request.onConnectFailed();
-            rethrowUnchecked(ex);
         }
     }
 
