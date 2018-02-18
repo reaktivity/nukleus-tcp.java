@@ -46,14 +46,14 @@ final class ReadStream
     private final StreamHelper helper;
     private final LongSupplier countFrames;
     private final LongConsumer countBytes;
-    private final long writeAddress;
-    private final int writeCapacityMask;
+    private final long memoryAddress;
+    private final int readCapacityMask;
 
     private long ackIndex;
     private long ackIndexHighMark;
     private int ackIndexProgress;
 
-    private long writeIndex;
+    private long readIndex;
 
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
@@ -75,14 +75,14 @@ final class ReadStream
         this.helper = helper;
         this.countFrames = countFrames;
         this.countBytes = countBytes;
-        this.writeAddress = helper.acquireReadMemory();
-        this.writeCapacityMask = helper.readMemoryMask();
+        this.memoryAddress = helper.acquireReadMemory();
+        this.readCapacityMask = helper.readMemoryMask();
     }
 
     int onNotifyReadable(
         PollerKey key)
     {
-        ByteBuffer readByteBuffer = helper.readByteBuffer((int)(writeIndex - ackIndex));
+        ByteBuffer readByteBuffer = helper.readByteBuffer((int)(readIndex - ackIndex));
 
         int bytesRead = 0;
         try
@@ -100,28 +100,28 @@ final class ReadStream
         }
         else if (bytesRead != 0)
         {
-            final int memoryWriteOffset = helper.memoryOffset(writeIndex);
-            final int memoryWriteLimit = memoryWriteOffset + bytesRead;
+            final int memoryReadOffset = helper.memoryOffset(readIndex);
+            final int memoryReadLimit = memoryReadOffset + bytesRead;
 
-            final MutableDirectBuffer memoryBuffer = helper.wrapMemory(writeAddress);
+            final MutableDirectBuffer memoryBuffer = helper.wrapMemory(memoryAddress);
 
             Consumer<ListFW.Builder<RegionFW.Builder, RegionFW>> regions;
-            if (memoryWriteLimit == helper.memoryOffset(memoryWriteLimit))
+            if (memoryReadLimit <= memoryBuffer.capacity())
             {
                 int bytesRead0 = bytesRead;
 
-                memoryBuffer.putBytes(memoryWriteOffset, readByteBuffer, 0, bytesRead0);
-                regions = rs -> rs.item(r -> r.address(writeAddress + memoryWriteOffset).length(bytesRead0).streamId(targetId));
+                memoryBuffer.putBytes(memoryReadOffset, readByteBuffer, 0, bytesRead0);
+                regions = rs -> rs.item(r -> r.address(memoryAddress + memoryReadOffset).length(bytesRead0).streamId(targetId));
             }
             else
             {
-                int bytesRead0 = memoryBuffer.capacity() - memoryWriteOffset;
+                int bytesRead0 = memoryBuffer.capacity() - memoryReadOffset;
                 int bytesRead1 = bytesRead - bytesRead0;
 
-                memoryBuffer.putBytes(memoryWriteOffset, readByteBuffer, 0, bytesRead0);
+                memoryBuffer.putBytes(memoryReadOffset, readByteBuffer, 0, bytesRead0);
                 memoryBuffer.putBytes(0, readByteBuffer, bytesRead0, bytesRead1);
-                regions = rs -> rs.item(r -> r.address(writeAddress + memoryWriteOffset).length(bytesRead0).streamId(targetId))
-                                  .item(r -> r.address(writeAddress).length(bytesRead1).streamId(targetId));
+                regions = rs -> rs.item(r -> r.address(memoryAddress + memoryReadOffset).length(bytesRead0).streamId(targetId))
+                                  .item(r -> r.address(memoryAddress).length(bytesRead1).streamId(targetId));
             }
 
             helper.doTcpTransfer(target, targetId, 0x00, regions);
@@ -129,7 +129,7 @@ final class ReadStream
             countFrames.getAsLong();
             countBytes.accept(bytesRead);
 
-            writeIndex += bytesRead;
+            readIndex += bytesRead;
 
             if (readByteBuffer.remaining() == 0)
             {
@@ -212,13 +212,13 @@ final class ReadStream
             {
                 ack.regions().forEach(this::onAckRegion);
 
-                if (helper.readByteBuffer((int) (writeIndex - ackIndex)).remaining() != 0)
+                if (helper.readByteBuffer((int) (readIndex - ackIndex)).remaining() != 0)
                 {
                     onNotifyReadable(key);
                 }
 
                 if (ackIndex != -1 &&
-                    helper.readByteBuffer((int) (writeIndex - ackIndex)).remaining() != 0)
+                    helper.readByteBuffer((int) (readIndex - ackIndex)).remaining() != 0)
                 {
                     key.register(OP_READ);
                 }
@@ -261,7 +261,7 @@ final class ReadStream
             }
             finally
             {
-                helper.releaseReadMemory(writeAddress);
+                helper.releaseReadMemory(memoryAddress);
             }
         }
     }
@@ -272,7 +272,7 @@ final class ReadStream
         final long address = region.address();
         final int length = region.length();
 
-        final long addressIndex = (ackIndex & ~writeCapacityMask) | (address & writeCapacityMask);
+        final long addressIndex = (ackIndex & ~readCapacityMask) | (address & readCapacityMask);
 
         ackIndexHighMark = Math.max(ackIndexHighMark, addressIndex + length);
         ackIndexProgress += length;

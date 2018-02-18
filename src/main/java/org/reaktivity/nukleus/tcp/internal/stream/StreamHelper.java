@@ -302,9 +302,9 @@ final class StreamHelper
     }
 
     public ByteBuffer readByteBuffer(
-        int position)
+        int unacknowledged)
     {
-        final int memoryAvailable = Math.min(readByteBuffer.capacity() - position, transferCapacity);
+        final int memoryAvailable = Math.min(readByteBuffer.capacity(), transferCapacity - unacknowledged);
 
         readByteBuffer.position(0);
         readByteBuffer.limit(memoryAvailable);
