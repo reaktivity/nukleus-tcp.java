@@ -117,6 +117,11 @@ public final class WriteStream
         try
         {
             this.key = this.poller.doRegister(channel, OP_WRITE, writeHandler);
+
+            if (backlogAddress != -1L)
+            {
+                this.key.register(OP_WRITE);
+            }
         }
         catch (IOException ex)
         {
@@ -170,7 +175,7 @@ public final class WriteStream
 
                 int bytesWritten = 0;
 
-                if (writableBytes > 0)
+                if (writableBytes > 0 && key != null)
                 {
                     writeBuffer.clear();
                     buffer.getBytes(0, writeBuffer, writableBytes);
@@ -206,7 +211,10 @@ public final class WriteStream
                         writeOffset += bytesWritten;
                         this.flags |= flags;
 
-                        key.register(OP_WRITE);
+                        if (key != null)
+                        {
+                            key.register(OP_WRITE);
+                        }
                     }
                 }
                 else
