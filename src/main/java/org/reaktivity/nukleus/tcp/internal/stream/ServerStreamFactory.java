@@ -175,6 +175,7 @@ public class ServerStreamFactory implements StreamFactory
 
                 router.setThrottle(targetName, targetId, stream::handleThrottle);
                 key.handler(OP_READ, stream::onNotifyReadable);
+                key.register(OP_READ);
             }
             catch (IOException ex)
             {

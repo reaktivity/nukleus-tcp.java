@@ -374,6 +374,7 @@ public class ClientStreamFactory implements StreamFactory
             final ToIntFunction<PollerKey> handler = stream::onNotifyReadable;
 
             key.handler(OP_READ, handler);
+            key.register(OP_READ);
         }
         catch (IOException ex)
         {
