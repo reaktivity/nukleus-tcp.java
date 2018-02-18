@@ -100,28 +100,27 @@ final class ReadStream
         }
         else if (bytesRead != 0)
         {
-            final int memoryWriterOffset = helper.memoryOffset(writeIndex);
-            final int newMemoryWriterOffset = memoryWriterOffset + bytesRead;
-            final long newMemoryWriterIndex = writeIndex + bytesRead;
+            final int memoryWriteOffset = helper.memoryOffset(writeIndex);
+            final int memoryWriteLimit = memoryWriteOffset + bytesRead;
 
             final MutableDirectBuffer memoryBuffer = helper.wrapMemory(writeAddress);
 
             Consumer<ListFW.Builder<RegionFW.Builder, RegionFW>> regions;
-            if (newMemoryWriterOffset == helper.memoryOffset(newMemoryWriterIndex))
+            if (memoryWriteLimit == helper.memoryOffset(memoryWriteLimit))
             {
                 int bytesRead0 = bytesRead;
 
-                memoryBuffer.putBytes(memoryWriterOffset, readByteBuffer, 0, bytesRead0);
-                regions = rs -> rs.item(r -> r.address(writeAddress + memoryWriterOffset).length(bytesRead0).streamId(targetId));
+                memoryBuffer.putBytes(memoryWriteOffset, readByteBuffer, 0, bytesRead0);
+                regions = rs -> rs.item(r -> r.address(writeAddress + memoryWriteOffset).length(bytesRead0).streamId(targetId));
             }
             else
             {
-                int bytesRead0 = memoryBuffer.capacity() - memoryWriterOffset;
-                int bytesRead1 = newMemoryWriterOffset;
+                int bytesRead0 = memoryBuffer.capacity() - memoryWriteOffset;
+                int bytesRead1 = bytesRead - bytesRead0;
 
-                memoryBuffer.putBytes(memoryWriterOffset, readByteBuffer, 0, bytesRead0);
+                memoryBuffer.putBytes(memoryWriteOffset, readByteBuffer, 0, bytesRead0);
                 memoryBuffer.putBytes(0, readByteBuffer, bytesRead0, bytesRead1);
-                regions = rs -> rs.item(r -> r.address(writeAddress + memoryWriterOffset).length(bytesRead0).streamId(targetId))
+                regions = rs -> rs.item(r -> r.address(writeAddress + memoryWriteOffset).length(bytesRead0).streamId(targetId))
                                   .item(r -> r.address(writeAddress).length(bytesRead1).streamId(targetId));
             }
 
@@ -130,7 +129,7 @@ final class ReadStream
             countFrames.getAsLong();
             countBytes.accept(bytesRead);
 
-            writeIndex = newMemoryWriterIndex;
+            writeIndex += bytesRead;
 
             if (readByteBuffer.remaining() == 0)
             {
