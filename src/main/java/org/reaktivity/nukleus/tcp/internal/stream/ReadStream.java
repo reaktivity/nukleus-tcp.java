@@ -278,6 +278,7 @@ final class ReadStream
         ackIndexProgress += length;
 
         final long ackIndexCandidate = ackIndex + ackIndexProgress;
+        assert ackIndexCandidate <= ackIndexHighMark;
         if (ackIndexCandidate == ackIndexHighMark)
         {
             ackIndex = ackIndexCandidate;
