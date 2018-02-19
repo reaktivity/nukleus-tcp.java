@@ -46,8 +46,8 @@ final class ReadStream
     private final StreamHelper helper;
     private final LongSupplier countFrames;
     private final LongConsumer countBytes;
-    private final long memoryAddress;
-    private final int capacityMask;
+    private final long transferBaseAddress;
+    private final int transferCapacity;
 
     private long ackIndex;
     private long ackIndexHighMark;
@@ -75,8 +75,8 @@ final class ReadStream
         this.helper = helper;
         this.countFrames = countFrames;
         this.countBytes = countBytes;
-        this.memoryAddress = helper.acquireReadMemory();
-        this.capacityMask = helper.readMemoryMask();
+        this.transferBaseAddress = helper.acquireReadMemory();
+        this.transferCapacity = helper.readMemoryCapacity();
     }
 
     int onNotifyReadable(
@@ -103,7 +103,7 @@ final class ReadStream
             final int transferOffset = helper.memoryOffset(transferIndex);
             final int transferLimit = transferOffset + bytesRead;
 
-            final MutableDirectBuffer trasnferBuffer = helper.wrapMemory(memoryAddress);
+            final MutableDirectBuffer trasnferBuffer = helper.wrapMemory(transferBaseAddress);
 
             Consumer<ListFW.Builder<RegionFW.Builder, RegionFW>> regions;
             if (transferLimit <= trasnferBuffer.capacity())
@@ -111,7 +111,9 @@ final class ReadStream
                 int bytesRead0 = bytesRead;
 
                 trasnferBuffer.putBytes(transferOffset, readByteBuffer, 0, bytesRead0);
-                regions = rs -> rs.item(r -> r.address(memoryAddress + transferOffset).length(bytesRead0).streamId(targetId));
+                regions = rs -> rs.item(r -> r.address(transferBaseAddress + transferOffset)
+                                              .length(bytesRead0)
+                                              .streamId(targetId));
             }
             else
             {
@@ -120,8 +122,12 @@ final class ReadStream
 
                 trasnferBuffer.putBytes(transferOffset, readByteBuffer, 0, bytesRead0);
                 trasnferBuffer.putBytes(0, readByteBuffer, bytesRead0, bytesRead1);
-                regions = rs -> rs.item(r -> r.address(memoryAddress + transferOffset).length(bytesRead0).streamId(targetId))
-                                  .item(r -> r.address(memoryAddress).length(bytesRead1).streamId(targetId));
+                regions = rs -> rs.item(r -> r.address(transferBaseAddress + transferOffset)
+                                              .length(bytesRead0)
+                                              .streamId(targetId))
+                                  .item(r -> r.address(transferBaseAddress)
+                                              .length(bytesRead1)
+                                              .streamId(targetId));
             }
 
             helper.doTcpTransfer(target, targetId, 0x00, regions);
@@ -261,7 +267,7 @@ final class ReadStream
             }
             finally
             {
-                helper.releaseReadMemory(memoryAddress);
+                helper.releaseReadMemory(transferBaseAddress);
             }
         }
     }
@@ -272,9 +278,10 @@ final class ReadStream
         final long address = region.address();
         final int length = region.length();
 
+        final int capacityMask = transferCapacity - 1;
         final int ackOffset = (int) (ackIndex & capacityMask);
-        final long epochIndex = address >= ackOffset ? ackIndex : transferIndex;
-        final long regionIndex = (epochIndex & ~capacityMask) | (address & capacityMask);
+        final long epochIndex = (address >= ackOffset ? ackIndex : ackIndex + transferCapacity) & ~capacityMask;
+        final long regionIndex = epochIndex | (address & capacityMask);
         assert regionIndex >= ackIndex;
         assert regionIndex <= transferIndex;
 

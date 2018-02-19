@@ -166,9 +166,9 @@ final class StreamHelper
                              .streamId(region.streamId()));
     }
 
-    public int readMemoryMask()
+    public int readMemoryCapacity()
     {
-        return transferCapacity - 1;
+        return transferCapacity;
     }
 
     public long acquireWriteMemory(
