@@ -16,9 +16,11 @@
 package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.junit.Assert.assertThat;
 import static org.junit.rules.RuleChain.outerRule;
 
-import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -66,9 +68,9 @@ public class ClientFrameAndByteCountersIT
     {
         k3po.finish();
         final long routeId = 0;
-        Assert.assertEquals(26, counters.bytesRead(routeId));
-        Assert.assertEquals(26, counters.bytesWritten(routeId));
-        Assert.assertEquals(1, counters.framesRead(routeId));
-        Assert.assertEquals(2, counters.framesWritten(routeId));
+        assertThat(counters.bytesRead(routeId), equalTo(26L));
+        assertThat(counters.bytesWritten(routeId), equalTo(26L));
+        assertThat(counters.framesRead(routeId), greaterThanOrEqualTo(1L));
+        assertThat(counters.framesWritten(routeId), greaterThanOrEqualTo(1L));
     }
 }

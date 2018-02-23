@@ -259,7 +259,11 @@ public final class WriteStream
 
     private void doCleanup()
     {
-        key.clear(OP_WRITE);
+        if (key != null)
+        {
+            key.clear(OP_WRITE);
+        }
+
         try
         {
             channel.shutdownOutput();
