@@ -16,8 +16,8 @@
 package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.rules.RuleChain.outerRule;
 
@@ -67,9 +67,9 @@ public class ServerCountersIT
         k3po.finish();
 
         final long routeId = 0;
-        assertEquals(26L, counters.bytesRead(routeId));
-        assertEquals(26L, counters.bytesWritten(routeId));
-        assertEquals(2L, counters.framesRead(routeId));
+        assertThat(counters.bytesRead(routeId), equalTo(26L));
+        assertThat(counters.bytesWritten(routeId), equalTo(26L));
+        assertThat(counters.framesRead(routeId), greaterThanOrEqualTo(1L));
         assertThat(counters.framesWritten(routeId), greaterThanOrEqualTo(1L));
     }
 
