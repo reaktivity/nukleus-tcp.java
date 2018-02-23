@@ -44,6 +44,10 @@ final class StreamHelper
 {
     private static final DirectBuffer SOURCE_NAME_BUFFER = new UnsafeBuffer(TcpNukleusFactorySpi.NAME.getBytes(UTF_8));
 
+    private static final ListFW<RegionFW> EMPTY_REGIONS = new ListFW.Builder<>(new RegionFW.Builder(), new RegionFW())
+                                                            .wrap(new UnsafeBuffer(new byte[4]), 0, 4)
+                                                            .build();
+
     final BeginFW beginRO = new BeginFW();
     final TransferFW transferRO = new TransferFW();
     final AckFW ackRO = new AckFW();
@@ -117,12 +121,17 @@ final class StreamHelper
     public ListFW<RegionFW> wrapBacklogRegions(
         long address)
     {
-        assert (address != -1);
+        ListFW<RegionFW> backlogRegions = EMPTY_REGIONS;
 
-        MutableDirectBuffer backlog = backlogRW;
-        backlog.wrap(memory.resolve(address), pendingRegionsCapacity);
+        if (address != -1L)
+        {
+            MutableDirectBuffer backlog = backlogRW;
+            backlog.wrap(memory.resolve(address), pendingRegionsCapacity);
 
-        return regionsRO.wrap(backlog, 0, backlog.capacity());
+            backlogRegions = regionsRO.wrap(backlog, 0, backlog.capacity());
+        }
+
+        return backlogRegions;
     }
 
     public ListFW<RegionFW> appendBacklogRegions(
