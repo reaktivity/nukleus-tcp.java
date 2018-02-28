@@ -88,7 +88,7 @@ public final class Acceptor
                 final long correlationId = route.correlationId();
                 final String source = route.source().asString();
                 final long sourceRef = route.sourceRef();
-                result = doRegister(correlationId, source, sourceRef);
+                result = sourceRef <= 0 ? false : doRegister(correlationId, source, sourceRef);
             }
             break;
         case UnrouteFW.TYPE_ID:

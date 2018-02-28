@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal;
 
+import static java.lang.String.format;
 import static java.nio.ByteBuffer.allocateDirect;
 import static java.nio.ByteOrder.nativeOrder;
 
@@ -75,6 +76,10 @@ public final class TcpController implements Controller
         String target,
         long targetRef)
     {
+        if (sourceRef <= 0)
+        {
+            throw new IllegalArgumentException("Port to bind (sourceRef) must be positive");
+        }
         return route(Role.SERVER, source, sourceRef, target, targetRef);
     }
 
@@ -105,9 +110,39 @@ public final class TcpController implements Controller
         return unroute(Role.CLIENT, source, sourceRef, target, targetRef);
     }
 
-    public long count(String name)
+    public long routes()
     {
-        return controllerSpi.doCount(name);
+        return controllerSpi.doCount("routes");
+    }
+
+    public long streams()
+    {
+        return controllerSpi.doCount("streams");
+    }
+
+    public long overflows()
+    {
+        return controllerSpi.doCount("overflows");
+    }
+
+    public long bytesRead(long routeId)
+    {
+        return controllerSpi.doCount(format("%d.bytes.read", routeId));
+    }
+
+    public long bytesWritten(long routeId)
+    {
+        return controllerSpi.doCount(format("%d.bytes.written", routeId));
+    }
+
+    public long framesRead(long routeId)
+    {
+        return controllerSpi.doCount(format("%d.frames.read", routeId));
+    }
+
+    public long framesWritten(long routeId)
+    {
+        return controllerSpi.doCount(format("%d.frames.written", routeId));
     }
 
     private CompletableFuture<Long> route(

@@ -25,7 +25,9 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
+import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
@@ -68,6 +70,11 @@ public class ServerStreamFactory implements StreamFactory
     private final ByteBuffer writeByteBuffer;
     private final MessageWriter writer;
 
+    private final Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
+    private final Function<RouteFW, LongSupplier> supplyReadFrameCounter;
+    private final Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
+    private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
+
     public ServerStreamFactory(
             Configuration config,
             RouteManager router,
@@ -79,7 +86,11 @@ public class ServerStreamFactory implements StreamFactory
             Long2ObjectHashMap<Correlation> correlations,
             Poller poller,
             LongFunction<IntUnaryOperator> groupBudgetClaimer,
-            LongFunction<IntUnaryOperator> groupBudgetReleaser)
+            LongFunction<IntUnaryOperator> groupBudgetReleaser,
+            Function<RouteFW, LongSupplier> supplyReadFrameCounter,
+            Function<RouteFW, LongConsumer> supplyReadBytesAccumulator,
+            Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
+            Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
     {
         this.router = requireNonNull(router);
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
@@ -95,6 +106,11 @@ public class ServerStreamFactory implements StreamFactory
 
         // Data frame length must fit into a 2 byte unsigned integer
         readBufferSize = Math.min(readBufferSize, (1 << Short.SIZE) - 1);
+
+        this.supplyWriteFrameCounter = supplyWriteFrameCounter;
+        this.supplyReadFrameCounter = supplyReadFrameCounter;
+        this.supplyWriteBytesAccumulator = supplyWriteBytesAccumulator;
+        this.supplyReadBytesAccumulator = supplyReadBytesAccumulator;
 
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
@@ -159,10 +175,16 @@ public class ServerStreamFactory implements StreamFactory
 
                 final PollerKey key = poller.doRegister(channel, 0, null);
 
+                final LongSupplier writeFrameCounter = supplyWriteFrameCounter.apply(route);
+                final LongConsumer writeFrameAccumulator = supplyWriteBytesAccumulator.apply(route);
+                final LongSupplier readFrameCounter = supplyReadFrameCounter.apply(route);
+                final LongConsumer readFrameAccumulator = supplyReadBytesAccumulator.apply(route);
+
                 final ReadStream stream = new ReadStream(target, targetId, key, channel,
-                        readByteBuffer, readBuffer, writer, groupBudgetClaimer, groupBudgetReleaser);
+                        readByteBuffer, readBuffer, writer, writeFrameCounter, writeFrameAccumulator,
+                        groupBudgetClaimer, groupBudgetReleaser);
                 final Correlation correlation = new Correlation(sourceName, channel, stream::setCorrelatedThrottle,
-                        target, targetId);
+                        target, targetId, readFrameCounter, readFrameAccumulator);
                 correlations.put(correlationId, correlation);
 
                 router.setThrottle(targetName, targetId, stream::handleThrottle);
@@ -196,8 +218,11 @@ public class ServerStreamFactory implements StreamFactory
             correlation.setCorrelatedThrottle(throttle, streamId);
             final SocketChannel channel = correlation.channel();
 
+            final LongSupplier readFrameCounter = correlation.readFrameCounter();
+            final LongConsumer readBytesAccumulator = correlation.readBytesAccumulator();
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                    bufferPool, writeByteBuffer, writer, groupBudgetReleaser);
+                    bufferPool, writeByteBuffer, writer, readFrameCounter, readBytesAccumulator,
+                    groupBudgetReleaser);
             stream.setCorrelatedInput(correlation.correlatedStreamId(), correlation.correlatedStream());
             stream.doConnected();
             result = stream::handleStream;

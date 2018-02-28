@@ -23,6 +23,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.function.IntUnaryOperator;
 import java.util.function.LongFunction;
+import java.util.function.LongConsumer;
+import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
@@ -43,6 +45,8 @@ final class ReadStream
     private final MessageWriter writer;
     private final LongFunction<IntUnaryOperator> groupBudgetClaimer;
     private final LongFunction<IntUnaryOperator> groupBudgetReleaser;
+    private final LongSupplier frameCounter;
+    private final LongConsumer bytesAccumulator;
 
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
@@ -58,7 +62,10 @@ final class ReadStream
         SocketChannel channel,
         ByteBuffer readByteBuffer,
         MutableDirectBuffer readBuffer,
-        MessageWriter writer, LongFunction<IntUnaryOperator> groupBudgetClaimer,
+        MessageWriter writer,
+        LongSupplier frameCounter,
+        LongConsumer bytesAccumulator,
+        LongFunction<IntUnaryOperator> groupBudgetClaimer,
         LongFunction<IntUnaryOperator> groupBudgetReleaser)
     {
         this.target = target;
@@ -70,6 +77,8 @@ final class ReadStream
         this.writer = writer;
         this.groupBudgetClaimer = groupBudgetClaimer;
         this.groupBudgetReleaser = groupBudgetReleaser;
+        this.frameCounter = frameCounter;
+        this.bytesAccumulator = bytesAccumulator;
     }
 
     int handleStream(
@@ -114,6 +123,8 @@ final class ReadStream
         }
         else if (bytesRead != 0)
         {
+            frameCounter.getAsLong();
+            bytesAccumulator.accept(bytesRead);
             // atomic buffer is zero copy with read buffer
             writer.doTcpData(target, streamId, readGroupId, readPadding, atomicBuffer, 0, bytesRead);
             System.out.printf("TCP <- DATA(%d) streamId=%d readGroupId=%d\n", bytesRead, streamId, readGroupId);

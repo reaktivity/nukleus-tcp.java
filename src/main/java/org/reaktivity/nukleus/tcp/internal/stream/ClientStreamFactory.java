@@ -31,7 +31,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
+import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
@@ -79,6 +81,11 @@ public class ClientStreamFactory implements StreamFactory
     private final MessageWriter writer;
     private final Map<String, Predicate<? super InetAddress>> lazyTargetTpSubsetUtils;
 
+    private final Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
+    private final Function<RouteFW, LongSupplier> supplyReadFrameCounter;
+    private final Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
+    private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
+
     public ClientStreamFactory(
             Configuration configuration,
             RouteManager router,
@@ -88,7 +95,11 @@ public class ClientStreamFactory implements StreamFactory
             LongSupplier incrementOverflow,
             LongSupplier supplyStreamId,
             LongFunction<IntUnaryOperator> groupBudgetClaimer,
-            LongFunction<IntUnaryOperator> groupBudgetReleaser)
+            LongFunction<IntUnaryOperator> groupBudgetReleaser,
+            Function<RouteFW, LongSupplier> supplyReadFrameCounter,
+            Function<RouteFW, LongConsumer> supplyReadBytesAccumulator,
+            Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
+            Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
     {
         this.router = requireNonNull(router);
         this.poller = poller;
@@ -107,6 +118,11 @@ public class ClientStreamFactory implements StreamFactory
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
         this.lazyTargetTpSubsetUtils = new HashMap<>();
+
+        this.supplyWriteFrameCounter = supplyWriteFrameCounter;
+        this.supplyReadFrameCounter = supplyReadFrameCounter;
+        this.supplyWriteBytesAccumulator = supplyWriteBytesAccumulator;
+        this.supplyReadBytesAccumulator = supplyReadBytesAccumulator;
     }
 
     @Override
@@ -144,11 +160,16 @@ public class ClientStreamFactory implements StreamFactory
         final String sourceName = begin.source().asString();
         final long sourceRef = begin.sourceRef();
         final long correlationId = begin.correlationId();
+        final OctetsFW extension = begin.extension();
+        final boolean hasExtension = extension.sizeof() > 0;
 
         MessagePredicate filter = (t, b, o, l) ->
         {
             final RouteFW route = routeRO.wrap(b, o, l);
-            return sourceRef == route.sourceRef();
+            final String targetName = route.target().asString();
+            final long targetRef = route.targetRef();
+            return sourceRef == route.sourceRef() &&
+                   (!hasExtension || resolveRemoteAddressExt(extension, targetName, targetRef) != null);
         };
 
         final RouteFW route = router.resolve(begin.authorization(), filter, this::wrapRoute);
@@ -156,38 +177,31 @@ public class ClientStreamFactory implements StreamFactory
         if (route != null)
         {
             final SocketChannel channel = newSocketChannel();
-            final OctetsFW extension = begin.extension();
             String targetName = route.target().asString();
             long targetRef = route.targetRef();
-            InetSocketAddress remoteAddress = null;
-            if (extension.sizeof() > 0)
-            {
-                remoteAddress = newAcceptStreamWithExt(extension, targetName, targetRef);
-            }
-            else
-            {
-                remoteAddress = new InetSocketAddress(targetName, (int)targetRef);
-            }
-            if (remoteAddress != null)
-            {
-                final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                        bufferPool, writeByteBuffer, writer, groupBudgetReleaser);
-                result = stream::handleStream;
 
-                doConnect(
-                    stream,
-                    channel,
-                    remoteAddress,
-                    sourceName,
-                    correlationId,
-                    throttle,
-                    streamId,
-                    stream::setCorrelatedInput);
-            }
-            else
-            {
-                writer.doReset(throttle, streamId);
-            }
+            InetSocketAddress remoteAddress = hasExtension ? resolveRemoteAddressExt(extension, targetName, targetRef) :
+                                                             new InetSocketAddress(targetName, (int)targetRef);
+            assert remoteAddress != null;
+            final LongSupplier writeFrameCounter = supplyWriteFrameCounter.apply(route);
+            final LongConsumer writeBytesAccumulator = supplyWriteBytesAccumulator.apply(route);
+            final LongSupplier readFrameCounter = supplyReadFrameCounter.apply(route);
+            final LongConsumer readBytesAccumulator = supplyReadBytesAccumulator.apply(route);
+            final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
+                    bufferPool, writeByteBuffer, writer, writeFrameCounter, writeBytesAccumulator, groupBudgetReleaser);
+            result = stream::handleStream;
+
+            doConnect(
+                stream,
+                channel,
+                remoteAddress,
+                sourceName,
+                correlationId,
+                throttle,
+                streamId,
+                stream::setCorrelatedInput,
+                readFrameCounter,
+                readBytesAccumulator);
         }
         else
         {
@@ -198,8 +212,8 @@ public class ClientStreamFactory implements StreamFactory
 
  }
 
-    private InetSocketAddress newAcceptStreamWithExt(
-            final OctetsFW extension,
+    private InetSocketAddress resolveRemoteAddressExt(
+            OctetsFW extension,
             String targetName,
             long targetRef)
     {
@@ -210,7 +224,7 @@ public class ClientStreamFactory implements StreamFactory
         {
             final TcpBeginExFW beginEx = extension.get(tcpBeginExRO::wrap);
             TcpAddressFW remoteAddressExt = beginEx.remoteAddress();
-            Predicate<? super InetAddress> subnetFilter = getSubnetMatcher(targetName);
+            Predicate<? super InetAddress> subnetFilter = extensionMatcher(targetName);
 
             int remotePort = beginEx.remotePort();
 
@@ -257,7 +271,7 @@ public class ClientStreamFactory implements StreamFactory
         return result;
     }
 
-    private Predicate<? super InetAddress> getSubnetMatcher(String targetName) throws UnknownHostException
+    private Predicate<? super InetAddress> extensionMatcher(String targetName) throws UnknownHostException
     {
         Predicate<? super InetAddress> result;
         if (targetName.contains("/"))
@@ -310,10 +324,12 @@ public class ClientStreamFactory implements StreamFactory
         long correlationId,
         MessageConsumer outputThrottle,
         long outputStreamId,
-        LongObjectBiConsumer<MessageConsumer> setCorrelatedInput)
+        LongObjectBiConsumer<MessageConsumer> setCorrelatedInput,
+        LongSupplier readFrameCounter,
+        LongConsumer readBytesAccumulator)
     {
         final Request request = new Request(channel, stream, acceptReplyName, correlationId,
-                outputThrottle, outputStreamId, setCorrelatedInput);
+                outputThrottle, outputStreamId, setCorrelatedInput, readFrameCounter, readBytesAccumulator);
 
         try
         {
@@ -358,8 +374,11 @@ public class ClientStreamFactory implements StreamFactory
 
             final PollerKey key = poller.doRegister(channel, 0, null);
 
+            final LongSupplier readFrameCounter = request.readFrameCounter;
+            final LongConsumer readBytesAccumulator = request.readBytesAccumulator;
             final ReadStream stream = new ReadStream(target, targetId, key, channel,
-                    readByteBuffer, readBuffer, writer, groupBudgetClaimer, groupBudgetReleaser);
+                    readByteBuffer, readBuffer, writer, readFrameCounter, readBytesAccumulator,
+                    groupBudgetClaimer, groupBudgetReleaser);
             stream.setCorrelatedThrottle(correlatedStreamId, correlatedThrottle);
 
             router.setThrottle(targetName, targetId, stream::handleThrottle);
@@ -391,6 +410,8 @@ public class ClientStreamFactory implements StreamFactory
         private final MessageConsumer outputThrottle;
         private final long outputStreamdId;
         private final LongObjectBiConsumer<MessageConsumer> setCorrelatedInput;
+        private final LongSupplier readFrameCounter;
+        private final LongConsumer readBytesAccumulator;
 
         private Request(SocketChannel channel,
                         WriteStream stream,
@@ -398,7 +419,9 @@ public class ClientStreamFactory implements StreamFactory
                         long correlationId,
                         MessageConsumer outputThrottle,
                         long outputStreamId,
-                        LongObjectBiConsumer<MessageConsumer> setCorrelatedInput)
+                        LongObjectBiConsumer<MessageConsumer> setCorrelatedInput,
+                        LongSupplier readFrameCounter,
+                        LongConsumer readBytesAccumulator)
         {
             this.channel = channel;
             this.stream = stream;
@@ -407,6 +430,8 @@ public class ClientStreamFactory implements StreamFactory
             this.outputThrottle = outputThrottle;
             this.outputStreamdId = outputStreamId;
             this.setCorrelatedInput = setCorrelatedInput;
+            this.readFrameCounter = readFrameCounter;
+            this.readBytesAccumulator = readBytesAccumulator;
         }
 
         @Override
@@ -435,6 +460,7 @@ public class ClientStreamFactory implements StreamFactory
 
             return 1;
         }
+
     }
 
 

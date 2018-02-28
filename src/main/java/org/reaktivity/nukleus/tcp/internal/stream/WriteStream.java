@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.function.IntUnaryOperator;
 import java.util.function.LongFunction;
+import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
@@ -58,6 +59,9 @@ public final class WriteStream
     private final ToIntFunction<PollerKey> writeHandler;
     private final LongFunction<IntUnaryOperator> groupBudgetReleaser;
 
+    private final LongSupplier frameCounter;
+    private final LongConsumer bytesAccumulator;
+
     private int slot = BufferPool.NO_SLOT;
     private int slotOffset; // index of the first byte of unwritten data
     private int slotPosition; // index of the byte following the last byte of unwritten data
@@ -80,7 +84,10 @@ public final class WriteStream
         LongSupplier incrementOverflow,
         BufferPool bufferPool,
         ByteBuffer writeBuffer,
-        MessageWriter writer, LongFunction<IntUnaryOperator> groupBudgetReleaser)
+        MessageWriter writer,
+        LongSupplier frameCounter,
+        LongConsumer bytesAccumulator,
+        LongFunction<IntUnaryOperator> groupBudgetReleaser)
     {
         this.streamId = streamId;
         this.sourceThrottle = sourceThrottle;
@@ -92,6 +99,8 @@ public final class WriteStream
         this.writer = writer;
         this.writeHandler = this::handleWrite;
         this.groupBudgetReleaser = groupBudgetReleaser;
+        this.frameCounter = frameCounter;
+        this.bytesAccumulator = bytesAccumulator;
     }
 
     void handleStream(
@@ -185,6 +194,9 @@ public final class WriteStream
         final int writableBytes = writer.dataRO.length();
         groupId = writer.dataRO.groupId();
 
+        frameCounter.getAsLong();
+        bytesAccumulator.accept(writableBytes);
+
         if (reduceWindow(writableBytes))
         {
             final ByteBuffer writeBuffer = getWriteBuffer(buffer, payload.offset(), writableBytes);
@@ -258,7 +270,11 @@ public final class WriteStream
 
     private void doCleanup()
     {
-        key.clear(OP_WRITE);
+        if (key != null)
+        {
+            key.clear(OP_WRITE);
+        }
+
         try
         {
             channel.shutdownOutput();

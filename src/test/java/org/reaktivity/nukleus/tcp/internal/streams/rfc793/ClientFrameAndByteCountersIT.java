@@ -16,6 +16,9 @@
 package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.junit.Assert.assertThat;
 import static org.junit.rules.RuleChain.outerRule;
 
 import org.junit.Rule;
@@ -26,18 +29,18 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
-import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
+import org.reaktivity.nukleus.tcp.internal.TcpFrameAndBytesCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
  * Tests the TCP nukleus when acting as a client.
  */
-public class ClientRoutingIT
+public class ClientFrameAndByteCountersIT
 {
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/tcp/routing")
-            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/routing");
+            .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
+            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -50,7 +53,7 @@ public class ClientRoutingIT
         .counterValuesBufferCapacity(1024)
         .clean();
 
-    private final TcpCountersRule counters = new TcpCountersRule(reaktor);
+    private final TcpFrameAndBytesCountersRule counters = new TcpFrameAndBytesCountersRule(reaktor);
 
     @Rule
     public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
@@ -58,55 +61,16 @@ public class ClientRoutingIT
     @Test
     @Specification({
         "${route}/client.host/controller",
-        "${client}/client.connect.with.host.extension/client",
-        "${server}/client.connect.with.host.extension/server"
+        "${client}/client.and.server.sent.data.multiple.frames/client",
+        "${server}/client.and.server.sent.data.multiple.frames/server"
     })
-    public void clientConnectHostExtWhenRoutedViaHost() throws Exception
+    public void shouldSendAndReceiveData() throws Exception
     {
         k3po.finish();
+        final long routeId = 0;
+        assertThat(counters.bytesRead(routeId), equalTo(26L));
+        assertThat(counters.bytesWritten(routeId), equalTo(26L));
+        assertThat(counters.framesRead(routeId), greaterThanOrEqualTo(1L));
+        assertThat(counters.framesWritten(routeId), greaterThanOrEqualTo(1L));
     }
-
-    @Test
-    @Specification({
-        "${route}/client.subnet/controller",
-        "${client}/client.connect.with.ip.extension/client",
-        "${server}/client.connect.with.ip.extension/server"
-    })
-    public void shouldConnectIpExtWhenRoutedViaSubnet() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
-        "${route}/client.host.and.subnet/controller",
-        "${client}/client.connect.with.ip.extension/client",
-        "${server}/client.connect.with.ip.extension/server"
-    })
-    public void shouldConnectIpExtWhenRoutedViaSubnetMultipleRoutes() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
-        "${route}/client.subnet/controller",
-        "${client}/client.connect.with.host.extension/client",
-        "${server}/client.connect.with.host.extension/server"
-    })
-    public void shouldConnectHostExtWhenRoutedViaSubnet() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
-        "${route}/client.subnet/controller",
-        "${client}/client.reset.with.no.subnet.match/client"
-    })
-    public void shouldResetClientWithNoSubnetMatch() throws Exception
-    {
-        k3po.finish();
-    }
-
 }
