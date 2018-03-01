@@ -264,13 +264,16 @@ public final class WriteStream
             key.clear(OP_WRITE);
         }
 
-        try
+        if (channel.isConnected())
         {
-            channel.shutdownOutput();
-        }
-        catch (IOException ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
+            try
+            {
+                channel.shutdownOutput();
+            }
+            catch (IOException ex)
+            {
+                LangUtil.rethrowUnchecked(ex);
+            }
         }
     }
 
