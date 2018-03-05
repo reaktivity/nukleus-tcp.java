@@ -70,6 +70,7 @@ public final class WriteStream
     private int readableBytes;
 
     private ByteBuffer writeBuffer;
+    private int reserved;
 
     private MessageConsumer correlatedInput;
 
@@ -192,6 +193,7 @@ public final class WriteStream
 
         final OctetsFW payload = writer.dataRO.payload();
         final int writableBytes = writer.dataRO.length();
+        reserved += writer.dataRO.reserved();
         groupId = writer.dataRO.groupId();
 
         frameCounter.getAsLong();
@@ -334,15 +336,12 @@ public final class WriteStream
                     buffer.position(slotOffset);
                     buffer.put(written);
                     slotPosition = buffer.position();
-                    if (bytesWritten > 0)
-                    {
-                        offerWindow(bytesWritten);
-                    }
                 }
             }
-            else if (bytesWritten > 0)
+            else if (reserved > 0)
             {
-                offerWindow(bytesWritten);
+                offerWindow(reserved);
+                reserved = 0;
             }
         }
         else
@@ -355,8 +354,8 @@ public final class WriteStream
             else
             {
                 // Free the slot, but first send a window update for all data that had ever been saved in the slot
-                int slotStart = bufferPool.byteBuffer(slot).position();
-                offerWindow(slotPosition - slotStart);
+                offerWindow(reserved);
+                reserved = 0;
                 bufferPool.release(slot);
                 slot = NO_SLOT;
             }

@@ -96,7 +96,7 @@ final class MessageWriter
         MessageConsumer stream,
         long streamId,
         long groupId,
-        int padding,
+        int reserved,
         DirectBuffer payload,
         int offset,
         int length)
@@ -104,7 +104,7 @@ final class MessageWriter
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
                 .groupId(groupId)
-                .padding(padding)
+                .reserved(reserved)
                 .payload(payload, offset, length)
                 .build();
 
