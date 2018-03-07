@@ -165,15 +165,17 @@ public final class Acceptor
         {
             final ServerSocketChannel serverChannel = channel(key);
 
-            final SocketChannel channel = serverChannel.accept();
-            channel.configureBlocking(false);
-            channel.setOption(TCP_NODELAY, true);
+            for (final SocketChannel channel = serverChannel.accept(); channel != null; )
+            {
+                channel.configureBlocking(false);
+                channel.setOption(TCP_NODELAY, true);
 
-            final InetSocketAddress address = localAddress(channel);
-            final String sourceName = sourcesByLocalAddress.get(address);
-            final long sourceRef = address.getPort();
+                final InetSocketAddress address = localAddress(channel);
+                final String sourceName = sourcesByLocalAddress.get(address);
+                final long sourceRef = address.getPort();
 
-            serverStreamFactory.onAccepted(sourceName, sourceRef, channel, address);
+                serverStreamFactory.onAccepted(sourceName, sourceRef, channel, address);
+            }
         }
         catch (Exception ex)
         {
