@@ -165,7 +165,7 @@ public final class Acceptor
         {
             final ServerSocketChannel serverChannel = channel(key);
 
-            for (final SocketChannel channel = serverChannel.accept(); channel != null; )
+            for (SocketChannel channel = serverChannel.accept(); channel != null; channel = serverChannel.accept())
             {
                 channel.configureBlocking(false);
                 channel.setOption(TCP_NODELAY, true);

@@ -19,6 +19,7 @@ import static java.nio.channels.SelectionKey.OP_READ;
 
 import java.io.IOException;
 import java.net.StandardSocketOptions;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.function.LongConsumer;
@@ -80,8 +81,8 @@ final class ReadStream
 
         final int limit = Math.min(readableBytes - readPadding, readBuffer.capacity());
 
-        readBuffer.position(0);
-        readBuffer.limit(limit);
+        ((Buffer) readBuffer).position(0);
+        ((Buffer) readBuffer).limit(limit);
 
         int bytesRead = 0;
         try
