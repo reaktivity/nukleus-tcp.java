@@ -275,19 +275,21 @@ public class ClientStreamFactory implements StreamFactory
         Predicate<? super InetAddress> result;
         if (targetName.contains("/"))
         {
-            result = lazyTargetToSubsetUtils.computeIfAbsent(targetName, t ->
-                 candidate -> new CIDR(targetName).isInRange(candidate.getHostAddress())
-            );
+            result = lazyTargetToSubsetUtils.computeIfAbsent(targetName, this::inetMatchesCIDR);
         }
         else
         {
             InetAddress toMatch = InetAddress.getByName(targetName);
             result = lazyTargetToSubsetUtils.computeIfAbsent(targetName, tN ->
-                 candidate ->
-                     toMatch.equals(candidate)
+                 candidate -> toMatch.equals(candidate)
             );
         }
         return result;
+    }
+
+    private Predicate<InetAddress> inetMatchesCIDR(String targetName)
+    {
+        return candidate -> new CIDR(targetName).isInRange(candidate.getHostAddress());
     }
 
     private SocketChannel newSocketChannel()
