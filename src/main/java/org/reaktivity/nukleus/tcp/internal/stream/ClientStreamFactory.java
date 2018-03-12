@@ -296,7 +296,9 @@ public class ClientStreamFactory implements StreamFactory
         {
             InetAddress toMatch = InetAddress.getByName(targetName);
             return candidate -> toMatch.equals(candidate);
-        } catch (UnknownHostException e) {
+        }
+        catch (UnknownHostException e)
+        {
             LangUtil.rethrowUnchecked(e);
         }
         return candidate -> false;
