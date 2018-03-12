@@ -20,6 +20,7 @@ import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.util.Objects.requireNonNull;
+import static org.agrona.LangUtil.rethrowUnchecked;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -41,7 +42,6 @@ import java.util.function.ToIntFunction;
 
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
-import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Configuration;
@@ -300,7 +300,7 @@ public class ClientStreamFactory implements StreamFactory
         }
         catch (UnknownHostException e)
         {
-            LangUtil.rethrowUnchecked(e);
+            rethrowUnchecked(e);
         }
         return candidate -> false;
     }
@@ -316,7 +316,7 @@ public class ClientStreamFactory implements StreamFactory
         }
         catch (IOException ex)
         {
-            LangUtil.rethrowUnchecked(ex);
+            rethrowUnchecked(ex);
         }
 
         // unreachable
@@ -358,7 +358,7 @@ public class ClientStreamFactory implements StreamFactory
         catch (IOException ex)
         {
             handleConnectFailed(request);
-            LangUtil.rethrowUnchecked(ex);
+            rethrowUnchecked(ex);
         }
     }
 
@@ -402,7 +402,7 @@ public class ClientStreamFactory implements StreamFactory
         catch (IOException ex)
         {
             CloseHelper.quietClose(channel);
-            LangUtil.rethrowUnchecked(ex);
+            rethrowUnchecked(ex);
         }
 
     }

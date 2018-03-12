@@ -57,7 +57,7 @@ public class CIDR
             final long address = matchAddress(matcher);
 
             final int cidrPart = Integer.parseInt(matcher.group(5));
-            final int netmask = cidrPart == 0 ? 0 : (-1 << 32 - cidrPart);
+            final int netmask = cidrPart == 0 ? 0 : -1 << (32 - cidrPart);
 
             final long network = (address & netmask);
             final long broadcast = network | ~(netmask);
