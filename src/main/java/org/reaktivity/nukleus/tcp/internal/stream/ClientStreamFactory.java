@@ -20,6 +20,7 @@ import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.util.Objects.requireNonNull;
+import static org.agrona.LangUtil.rethrowUnchecked;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -41,7 +42,6 @@ import java.util.function.ToIntFunction;
 
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
-import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Configuration;
@@ -58,8 +58,7 @@ import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.TcpBeginExFW;
-import org.reaktivity.nukleus.tcp.internal.util.SubnetUtils;
-import org.reaktivity.nukleus.tcp.internal.util.SubnetUtils.SubnetInfo;
+import org.reaktivity.nukleus.tcp.internal.util.CIDR;
 import org.reaktivity.nukleus.tcp.internal.util.function.LongObjectBiConsumer;
 
 public class ClientStreamFactory implements StreamFactory
@@ -79,7 +78,7 @@ public class ClientStreamFactory implements StreamFactory
     private final MutableDirectBuffer readBuffer;
     private final ByteBuffer writeByteBuffer;
     private final MessageWriter writer;
-    private final Map<String, Predicate<? super InetAddress>> lazyTargetTpSubsetUtils;
+    private final Map<String, Predicate<? super InetAddress>> targetToCidrMatch;
 
     private final Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
     private final Function<RouteFW, LongSupplier> supplyReadFrameCounter;
@@ -117,7 +116,7 @@ public class ClientStreamFactory implements StreamFactory
 
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
-        this.lazyTargetTpSubsetUtils = new HashMap<>();
+        this.targetToCidrMatch = new HashMap<>();
 
         this.supplyWriteFrameCounter = supplyWriteFrameCounter;
         this.supplyReadFrameCounter = supplyReadFrameCounter;
@@ -276,20 +275,34 @@ public class ClientStreamFactory implements StreamFactory
         Predicate<? super InetAddress> result;
         if (targetName.contains("/"))
         {
-            final SubnetInfo subnet = new SubnetUtils(targetName).getInfo();
-            result = lazyTargetTpSubsetUtils.computeIfAbsent(targetName, t ->
-                 candidate -> subnet.isInRange(candidate.getHostAddress())
-            );
+            result = targetToCidrMatch.computeIfAbsent(targetName, this::inetMatchesCIDR);
         }
         else
         {
             InetAddress toMatch = InetAddress.getByName(targetName);
-            result = lazyTargetTpSubsetUtils.computeIfAbsent(targetName, tN ->
-                 candidate ->
-                     toMatch.equals(candidate)
-            );
+            result = targetToCidrMatch.computeIfAbsent(targetName, this::inetMatchesInet);
         }
         return result;
+    }
+
+    private Predicate<InetAddress> inetMatchesCIDR(String targetName)
+    {
+        final CIDR cidr = new CIDR(targetName);
+        return candidate -> cidr.isInRange(candidate.getHostAddress());
+    }
+
+    private Predicate<InetAddress> inetMatchesInet(String targetName)
+    {
+        try
+        {
+            InetAddress toMatch = InetAddress.getByName(targetName);
+            return candidate -> toMatch.equals(candidate);
+        }
+        catch (UnknownHostException e)
+        {
+            rethrowUnchecked(e);
+        }
+        return candidate -> false;
     }
 
     private SocketChannel newSocketChannel()
@@ -303,7 +316,7 @@ public class ClientStreamFactory implements StreamFactory
         }
         catch (IOException ex)
         {
-            LangUtil.rethrowUnchecked(ex);
+            rethrowUnchecked(ex);
         }
 
         // unreachable
@@ -345,7 +358,7 @@ public class ClientStreamFactory implements StreamFactory
         catch (IOException ex)
         {
             handleConnectFailed(request);
-            LangUtil.rethrowUnchecked(ex);
+            rethrowUnchecked(ex);
         }
     }
 
@@ -389,7 +402,7 @@ public class ClientStreamFactory implements StreamFactory
         catch (IOException ex)
         {
             CloseHelper.quietClose(channel);
-            LangUtil.rethrowUnchecked(ex);
+            rethrowUnchecked(ex);
         }
 
     }
