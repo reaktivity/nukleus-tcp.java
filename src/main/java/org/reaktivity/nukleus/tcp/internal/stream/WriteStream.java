@@ -72,6 +72,10 @@ public final class WriteStream
 
     private long correlatedStreamId;
 
+    private int windowThreshold;
+
+    private int pendingCredit;
+
     WriteStream(
         MessageConsumer sourceThrottle,
         long streamId,
@@ -82,7 +86,8 @@ public final class WriteStream
         ByteBuffer writeBuffer,
         MessageWriter writer,
         LongSupplier frameCounter,
-        LongConsumer bytesAccumulator)
+        LongConsumer bytesAccumulator,
+        int windowThreshold)
     {
         this.streamId = streamId;
         this.sourceThrottle = sourceThrottle;
@@ -95,6 +100,7 @@ public final class WriteStream
         this.writeHandler = this::handleWrite;
         this.frameCounter = frameCounter;
         this.bytesAccumulator = bytesAccumulator;
+        this.windowThreshold = windowThreshold;
     }
 
     void handleStream(
@@ -183,6 +189,7 @@ public final class WriteStream
         int limit) throws IOException
     {
         writer.dataRO.wrap(buffer, offset, limit);
+        assert writer.dataRO.padding() == 0;
 
         final OctetsFW payload = writer.dataRO.payload();
         final int writableBytes = writer.dataRO.length();
@@ -397,14 +404,17 @@ public final class WriteStream
 
     private void offerWindow(final int credit)
     {
+        pendingCredit += credit;
+
         // If readableBytes indicates EOS has been received we must not destroy that information
         // (and in this case there is no need to write the window update)
         // We can also get update < 0 if we received data GT window (protocol violation) while
         // we have data waiting to be written (incomplete writes)
-        if (readableBytes > EOS_REQUESTED)
+        if (pendingCredit > windowThreshold && readableBytes > EOS_REQUESTED)
         {
-            readableBytes += credit;
-            writer.doWindow(sourceThrottle, streamId, credit, 0, 0);
+            readableBytes += pendingCredit;
+            writer.doWindow(sourceThrottle, streamId, pendingCredit, 0, 0);
+            pendingCredit = 0;
         }
     }
 

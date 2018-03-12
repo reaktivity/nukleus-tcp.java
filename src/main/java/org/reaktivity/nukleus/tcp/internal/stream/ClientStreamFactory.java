@@ -44,12 +44,12 @@ import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
-import org.reaktivity.nukleus.Configuration;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
+import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
@@ -71,6 +71,7 @@ public class ClientStreamFactory implements StreamFactory
     private final BufferPool bufferPool;
     private final LongSupplier incrementOverflow;
     private Poller poller;
+    private final TcpConfiguration config;
     private final RouteManager router;
     private final LongSupplier supplyStreamId;
     private final LongFunction<IntUnaryOperator> groupBudgetClaimer;
@@ -87,7 +88,7 @@ public class ClientStreamFactory implements StreamFactory
     private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
 
     public ClientStreamFactory(
-            Configuration configuration,
+            TcpConfiguration configuration,
             RouteManager router,
             Poller poller,
             MutableDirectBuffer writeBuffer,
@@ -101,6 +102,7 @@ public class ClientStreamFactory implements StreamFactory
             Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
             Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
     {
+        this.config = configuration;
         this.router = requireNonNull(router);
         this.poller = poller;
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
@@ -187,8 +189,9 @@ public class ClientStreamFactory implements StreamFactory
             final LongConsumer writeBytesAccumulator = supplyWriteBytesAccumulator.apply(route);
             final LongSupplier readFrameCounter = supplyReadFrameCounter.apply(route);
             final LongConsumer readBytesAccumulator = supplyReadBytesAccumulator.apply(route);
+            final int windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                    bufferPool, writeByteBuffer, writer, writeFrameCounter, writeBytesAccumulator);
+                    bufferPool, writeByteBuffer, writer, writeFrameCounter, writeBytesAccumulator, windowThreshold);
             result = stream::handleStream;
 
             doConnect(

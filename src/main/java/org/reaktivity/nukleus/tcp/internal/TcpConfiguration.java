@@ -20,11 +20,14 @@ import org.reaktivity.nukleus.Configuration;
 public class TcpConfiguration extends Configuration
 {
     public static final String MAXIMUM_BACKLOG_PROPERTY_NAME = "nukleus.tcp.maximum.backlog";
+    public static final String WINDOW_THRESHOLD_PROPERTY_NAME = "nukleus.tcp.window.threshold";
 
     /**
      * @see java.nio.channels.ServerSocketChannel#bind(java.net.SocketAddress, int)
      */
     private static final int MAXIMUM_BACKLOG_DEFAULT = 0;
+
+    private static final int WINDOW_THRESHOLD_DEFAULT = 50;
 
     public TcpConfiguration(
         Configuration config)
@@ -35,6 +38,20 @@ public class TcpConfiguration extends Configuration
     public int maximumBacklog()
     {
         return getInteger(MAXIMUM_BACKLOG_PROPERTY_NAME, MAXIMUM_BACKLOG_DEFAULT);
+    }
+
+    // Accumulates window until the threshold and sends it once it reaches over the threshold
+    // @return window's threshold
+    public int windowThreshold()
+    {
+        int threshold = getInteger(WINDOW_THRESHOLD_PROPERTY_NAME, WINDOW_THRESHOLD_DEFAULT);
+        if (threshold < 0 || threshold > 100)
+        {
+            String message = String.format(
+                    "TCP write window threshold is %d (should be between 0 and 100 inclusive)", threshold);
+            throw new IllegalArgumentException(message);
+        }
+        return threshold;
     }
 
 }

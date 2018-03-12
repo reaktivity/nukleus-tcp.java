@@ -46,8 +46,8 @@ public final class TcpNukleusFactorySpi implements NukleusFactorySpi
         Poller poller = new Poller();
         acceptor.setPoller(poller);
 
-        ServerStreamFactoryBuilder serverStreamFactoryBuilder = new ServerStreamFactoryBuilder(config, acceptor, poller);
-        ClientStreamFactoryBuilder clientStreamFactoryBuilder = new ClientStreamFactoryBuilder(config, poller);
+        ServerStreamFactoryBuilder serverStreamFactoryBuilder = new ServerStreamFactoryBuilder(tcpConfig, acceptor, poller);
+        ClientStreamFactoryBuilder clientStreamFactoryBuilder = new ClientStreamFactoryBuilder(tcpConfig, poller);
 
         final MessagePredicate routeHandler = (m, b, i, l) ->
             acceptor.handleRoute(m, b, i, l) &&
