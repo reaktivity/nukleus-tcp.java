@@ -280,9 +280,7 @@ public class ClientStreamFactory implements StreamFactory
         else
         {
             InetAddress toMatch = InetAddress.getByName(targetName);
-            result = lazyTargetToSubsetUtils.computeIfAbsent(targetName, tN ->
-                 candidate -> toMatch.equals(candidate)
-            );
+            result = lazyTargetToSubsetUtils.computeIfAbsent(targetName, this::inetMatchesInet);
         }
         return result;
     }
@@ -290,6 +288,18 @@ public class ClientStreamFactory implements StreamFactory
     private Predicate<InetAddress> inetMatchesCIDR(String targetName)
     {
         return candidate -> new CIDR(targetName).isInRange(candidate.getHostAddress());
+    }
+
+    private Predicate<InetAddress> inetMatchesInet(String targetName)
+    {
+        try
+        {
+            InetAddress toMatch = InetAddress.getByName(targetName);
+            return candidate -> toMatch.equals(candidate);
+        } catch (UnknownHostException e) {
+            LangUtil.rethrowUnchecked(e);
+        }
+        return candidate -> false;
     }
 
     private SocketChannel newSocketChannel()
