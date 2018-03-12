@@ -58,8 +58,7 @@ import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.TcpBeginExFW;
-import org.reaktivity.nukleus.tcp.internal.util.SubnetUtils;
-import org.reaktivity.nukleus.tcp.internal.util.SubnetUtils.SubnetInfo;
+import org.reaktivity.nukleus.tcp.internal.util.CIDR;
 import org.reaktivity.nukleus.tcp.internal.util.function.LongObjectBiConsumer;
 
 public class ClientStreamFactory implements StreamFactory
@@ -79,7 +78,7 @@ public class ClientStreamFactory implements StreamFactory
     private final MutableDirectBuffer readBuffer;
     private final ByteBuffer writeByteBuffer;
     private final MessageWriter writer;
-    private final Map<String, Predicate<? super InetAddress>> lazyTargetTpSubsetUtils;
+    private final Map<String, Predicate<? super InetAddress>> lazyTargetToSubsetUtils;
 
     private final Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
     private final Function<RouteFW, LongSupplier> supplyReadFrameCounter;
@@ -117,7 +116,7 @@ public class ClientStreamFactory implements StreamFactory
 
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
-        this.lazyTargetTpSubsetUtils = new HashMap<>();
+        this.lazyTargetToSubsetUtils = new HashMap<>();
 
         this.supplyWriteFrameCounter = supplyWriteFrameCounter;
         this.supplyReadFrameCounter = supplyReadFrameCounter;
@@ -276,15 +275,14 @@ public class ClientStreamFactory implements StreamFactory
         Predicate<? super InetAddress> result;
         if (targetName.contains("/"))
         {
-            final SubnetInfo subnet = new SubnetUtils(targetName).getInfo();
-            result = lazyTargetTpSubsetUtils.computeIfAbsent(targetName, t ->
-                 candidate -> subnet.isInRange(candidate.getHostAddress())
+            result = lazyTargetToSubsetUtils.computeIfAbsent(targetName, t ->
+                 candidate -> new CIDR(targetName).isInRange(candidate.getHostAddress())
             );
         }
         else
         {
             InetAddress toMatch = InetAddress.getByName(targetName);
-            result = lazyTargetTpSubsetUtils.computeIfAbsent(targetName, tN ->
+            result = lazyTargetToSubsetUtils.computeIfAbsent(targetName, tN ->
                  candidate ->
                      toMatch.equals(candidate)
             );

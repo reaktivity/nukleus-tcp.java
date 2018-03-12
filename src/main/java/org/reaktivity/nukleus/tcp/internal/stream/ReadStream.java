@@ -103,6 +103,7 @@ final class ReadStream
         }
         else if (bytesRead != 0)
         {
+            final long start = System.currentTimeMillis();
             frameCounter.getAsLong();
             bytesAccumulator.accept(bytesRead);
             // atomic buffer is zero copy with read buffer
