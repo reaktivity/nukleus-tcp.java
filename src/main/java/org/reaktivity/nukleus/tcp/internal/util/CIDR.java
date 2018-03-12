@@ -39,6 +39,7 @@ import java.util.regex.Pattern;
 
 public class CIDR
 {
+    private static final long LARGEST_IPV4 = 0xFFFFFFFFL;
     private static final String IP_ADDRESS = "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})";
     private static final String SLASH_FORMAT = IP_ADDRESS + "/(\\d{1,3})";
     private static final Pattern ADDRESS_PATTERN = Pattern.compile(IP_ADDRESS);
@@ -59,11 +60,11 @@ public class CIDR
             final int cidrPart = Integer.parseInt(matcher.group(5));
             final int netmask = cidrPart == 0 ? 0 : -1 << (32 - cidrPart);
 
-            final long network = (address & netmask);
-            final long broadcast = network | ~(netmask);
+            final long network = address & netmask;
+            final long broadcast = network | ~netmask;
 
             low = network;
-            high = broadcast  == -1 ? Long.MAX_VALUE : broadcast;
+            high = broadcast == -1 ? LARGEST_IPV4 : broadcast;
         }
         else
         {
