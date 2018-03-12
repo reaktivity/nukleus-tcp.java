@@ -78,7 +78,7 @@ public class ClientStreamFactory implements StreamFactory
     private final MutableDirectBuffer readBuffer;
     private final ByteBuffer writeByteBuffer;
     private final MessageWriter writer;
-    private final Map<String, Predicate<? super InetAddress>> lazyTargetToSubsetUtils;
+    private final Map<String, Predicate<? super InetAddress>> targetToCidrMatch;
 
     private final Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
     private final Function<RouteFW, LongSupplier> supplyReadFrameCounter;
@@ -116,7 +116,7 @@ public class ClientStreamFactory implements StreamFactory
 
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
-        this.lazyTargetToSubsetUtils = new HashMap<>();
+        this.targetToCidrMatch = new HashMap<>();
 
         this.supplyWriteFrameCounter = supplyWriteFrameCounter;
         this.supplyReadFrameCounter = supplyReadFrameCounter;
@@ -275,19 +275,20 @@ public class ClientStreamFactory implements StreamFactory
         Predicate<? super InetAddress> result;
         if (targetName.contains("/"))
         {
-            result = lazyTargetToSubsetUtils.computeIfAbsent(targetName, this::inetMatchesCIDR);
+            result = targetToCidrMatch.computeIfAbsent(targetName, this::inetMatchesCIDR);
         }
         else
         {
             InetAddress toMatch = InetAddress.getByName(targetName);
-            result = lazyTargetToSubsetUtils.computeIfAbsent(targetName, this::inetMatchesInet);
+            result = targetToCidrMatch.computeIfAbsent(targetName, this::inetMatchesInet);
         }
         return result;
     }
 
     private Predicate<InetAddress> inetMatchesCIDR(String targetName)
     {
-        return candidate -> new CIDR(targetName).isInRange(candidate.getHostAddress());
+        final CIDR cidr = new CIDR(targetName);
+        return candidate -> cidr.isInRange(candidate.getHostAddress());
     }
 
     private Predicate<InetAddress> inetMatchesInet(String targetName)

@@ -57,15 +57,11 @@ public class CIDR
             final long address = matchAddress(matcher);
 
             final int cidrPart = Integer.parseInt(matcher.group(5));
-            int netmask = 0;
-            for (int j = 0; j < cidrPart; ++j)
-            {
-                netmask |= (1 << 31-j);
-            }
+            final int netmask = cidrPart == 0 ? 0 : (-1 << 32 - cidrPart);
 
             final long network = (address & netmask);
-
             final long broadcast = network | ~(netmask);
+
             low = network;
             high = broadcast  == -1 ? Long.MAX_VALUE : broadcast;
         }
