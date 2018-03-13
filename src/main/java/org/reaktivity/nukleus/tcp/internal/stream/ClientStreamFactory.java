@@ -44,12 +44,12 @@ import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
-import org.reaktivity.nukleus.Configuration;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
+import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
@@ -85,8 +85,10 @@ public class ClientStreamFactory implements StreamFactory
     private final Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
     private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
 
+    private final int windowThreshold;
+
     public ClientStreamFactory(
-            Configuration configuration,
+            TcpConfiguration configuration,
             RouteManager router,
             Poller poller,
             MutableDirectBuffer writeBuffer,
@@ -122,6 +124,7 @@ public class ClientStreamFactory implements StreamFactory
         this.supplyReadFrameCounter = supplyReadFrameCounter;
         this.supplyWriteBytesAccumulator = supplyWriteBytesAccumulator;
         this.supplyReadBytesAccumulator = supplyReadBytesAccumulator;
+        windowThreshold = (bufferPool.slotCapacity() * configuration.windowThreshold()) / 100;
     }
 
     @Override
@@ -187,7 +190,7 @@ public class ClientStreamFactory implements StreamFactory
             final LongSupplier readFrameCounter = supplyReadFrameCounter.apply(route);
             final LongConsumer readBytesAccumulator = supplyReadBytesAccumulator.apply(route);
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                    bufferPool, writeByteBuffer, writer, writeFrameCounter, writeBytesAccumulator);
+                    bufferPool, writeByteBuffer, writer, writeFrameCounter, writeBytesAccumulator, windowThreshold);
             result = stream::handleStream;
 
             doConnect(

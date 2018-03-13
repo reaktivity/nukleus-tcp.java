@@ -25,18 +25,18 @@ import java.util.function.Supplier;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
-import org.reaktivity.nukleus.Configuration;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
+import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
 
 public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 {
-    private final Configuration config;
+    private final TcpConfiguration config;
     private final Poller poller;
 
     private final UnrouteFW unrouteRO = new UnrouteFW();
@@ -63,7 +63,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
 
-    public ClientStreamFactoryBuilder(Configuration config, Poller poller)
+    public ClientStreamFactoryBuilder(TcpConfiguration config, Poller poller)
     {
         this.config = config;
         this.poller = poller;
