@@ -38,12 +38,12 @@ import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.UnsafeBuffer;
-import org.reaktivity.nukleus.Configuration;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
+import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
@@ -75,8 +75,10 @@ public class ServerStreamFactory implements StreamFactory
     private final Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
     private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
 
+    private final int windowThreshold;
+
     public ServerStreamFactory(
-            Configuration config,
+            TcpConfiguration config,
             RouteManager router,
             MutableDirectBuffer writeBuffer,
             BufferPool bufferPool,
@@ -115,6 +117,7 @@ public class ServerStreamFactory implements StreamFactory
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
         this.poller = poller;
+        windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
     }
 
     @Override
@@ -220,7 +223,7 @@ public class ServerStreamFactory implements StreamFactory
             final LongSupplier readFrameCounter = correlation.readFrameCounter();
             final LongConsumer readBytesAccumulator = correlation.readBytesAccumulator();
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                    bufferPool, writeByteBuffer, writer, readFrameCounter, readBytesAccumulator);
+                    bufferPool, writeByteBuffer, writer, readFrameCounter, readBytesAccumulator, windowThreshold);
             stream.setCorrelatedInput(correlation.correlatedStreamId(), correlation.correlatedStream());
             stream.doConnected();
             result = stream::handleStream;
