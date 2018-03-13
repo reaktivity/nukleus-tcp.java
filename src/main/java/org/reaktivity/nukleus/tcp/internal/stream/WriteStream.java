@@ -410,7 +410,7 @@ public final class WriteStream
         // (and in this case there is no need to write the window update)
         // We can also get update < 0 if we received data GT window (protocol violation) while
         // we have data waiting to be written (incomplete writes)
-        if (pendingCredit > windowThreshold && readableBytes > EOS_REQUESTED)
+        if (pendingCredit >= windowThreshold && readableBytes > EOS_REQUESTED)
         {
             readableBytes += pendingCredit;
             writer.doWindow(sourceThrottle, streamId, pendingCredit, 0, 0);

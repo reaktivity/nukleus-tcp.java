@@ -70,7 +70,6 @@ public class ClientStreamFactory implements StreamFactory
     private final BufferPool bufferPool;
     private final LongSupplier incrementOverflow;
     private Poller poller;
-    private final TcpConfiguration config;
     private final RouteManager router;
     private final LongSupplier supplyStreamId;
     private final LongFunction<IntUnaryOperator> groupBudgetClaimer;
@@ -85,6 +84,8 @@ public class ClientStreamFactory implements StreamFactory
     private final Function<RouteFW, LongSupplier> supplyReadFrameCounter;
     private final Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
     private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
+
+    private final int windowThreshold;
 
     public ClientStreamFactory(
             TcpConfiguration configuration,
@@ -101,7 +102,6 @@ public class ClientStreamFactory implements StreamFactory
             Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
             Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
     {
-        this.config = configuration;
         this.router = requireNonNull(router);
         this.poller = poller;
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
@@ -124,6 +124,7 @@ public class ClientStreamFactory implements StreamFactory
         this.supplyReadFrameCounter = supplyReadFrameCounter;
         this.supplyWriteBytesAccumulator = supplyWriteBytesAccumulator;
         this.supplyReadBytesAccumulator = supplyReadBytesAccumulator;
+        windowThreshold = (bufferPool.slotCapacity() * configuration.windowThreshold()) / 100;
     }
 
     @Override
@@ -188,7 +189,6 @@ public class ClientStreamFactory implements StreamFactory
             final LongConsumer writeBytesAccumulator = supplyWriteBytesAccumulator.apply(route);
             final LongSupplier readFrameCounter = supplyReadFrameCounter.apply(route);
             final LongConsumer readBytesAccumulator = supplyReadBytesAccumulator.apply(route);
-            final int windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
                     bufferPool, writeByteBuffer, writer, writeFrameCounter, writeBytesAccumulator, windowThreshold);
             result = stream::handleStream;

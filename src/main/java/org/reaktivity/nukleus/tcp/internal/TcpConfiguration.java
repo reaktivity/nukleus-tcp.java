@@ -27,7 +27,7 @@ public class TcpConfiguration extends Configuration
      */
     private static final int MAXIMUM_BACKLOG_DEFAULT = 0;
 
-    private static final int WINDOW_THRESHOLD_DEFAULT = 50;
+    private static final int WINDOW_THRESHOLD_DEFAULT = 0;
 
     public TcpConfiguration(
         Configuration config)

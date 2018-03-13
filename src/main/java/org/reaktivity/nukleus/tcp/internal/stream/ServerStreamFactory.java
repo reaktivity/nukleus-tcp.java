@@ -75,7 +75,7 @@ public class ServerStreamFactory implements StreamFactory
     private final Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
     private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
 
-    private final TcpConfiguration config;
+    private final int windowThreshold;
 
     public ServerStreamFactory(
             TcpConfiguration config,
@@ -94,7 +94,6 @@ public class ServerStreamFactory implements StreamFactory
             Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
             Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
     {
-        this.config = config;
         this.router = requireNonNull(router);
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
         this.writer = new MessageWriter(requireNonNull(writeBuffer));
@@ -118,6 +117,7 @@ public class ServerStreamFactory implements StreamFactory
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
         this.poller = poller;
+        windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
     }
 
     @Override
@@ -222,7 +222,6 @@ public class ServerStreamFactory implements StreamFactory
 
             final LongSupplier readFrameCounter = correlation.readFrameCounter();
             final LongConsumer readBytesAccumulator = correlation.readBytesAccumulator();
-            final int windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
                     bufferPool, writeByteBuffer, writer, readFrameCounter, readBytesAccumulator, windowThreshold);
             stream.setCorrelatedInput(correlation.correlatedStreamId(), correlation.correlatedStream());
