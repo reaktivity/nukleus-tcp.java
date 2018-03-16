@@ -170,7 +170,6 @@ public final class Acceptor
             {
                 channel.configureBlocking(false);
                 channel.setOption(TCP_NODELAY, true);
-                channel.setOption(TCP_NODELAY, true);
 
                 final InetSocketAddress address = localAddress(channel);
                 final String sourceName = sourcesByLocalAddress.get(address);
