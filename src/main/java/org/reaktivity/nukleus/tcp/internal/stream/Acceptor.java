@@ -38,6 +38,7 @@ import java.util.function.ToIntFunction;
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
+import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
@@ -55,17 +56,21 @@ public final class Acceptor
     private final UnrouteFW unrouteRO = new UnrouteFW();
 
     private final int backlog;
+    private final int maxConnections;
     private final Map<SocketAddress, String> sourcesByLocalAddress;
     private final Function<SocketAddress, PollerKey> registerHandler;
     private final ToIntFunction<PollerKey> acceptHandler;
+    private int connections;
 
     private Poller poller;
     private ServerStreamFactory serverStreamFactory;
+    private RouteManager router;
 
     public Acceptor(
         TcpConfiguration config)
     {
         this.backlog = config.maximumBacklog();
+        this.maxConnections = config.maxConnections();
         this.sourcesByLocalAddress = new TreeMap<>(IpUtil::compareAddresses);
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
@@ -110,6 +115,11 @@ public final class Acceptor
     {
         this.serverStreamFactory = serverStreamFactory;
 
+    }
+
+    void setRouter(RouteManager router)
+    {
+        this.router = router;
     }
 
     private boolean doRegister(
@@ -175,7 +185,8 @@ public final class Acceptor
                 final String sourceName = sourcesByLocalAddress.get(address);
                 final long sourceRef = address.getPort();
 
-                serverStreamFactory.onAccepted(sourceName, sourceRef, channel, address);
+                newConnection();
+                serverStreamFactory.onAccepted(sourceName, sourceRef, channel, address, this::connectionDone);
             }
         }
         catch (Exception ex)
@@ -184,6 +195,32 @@ public final class Acceptor
         }
 
         return 1;
+    }
+
+    private void newConnection()
+    {
+        connections++;
+        if (connections >= maxConnections)
+        {
+            router.forEach((id, buffer, index, length) ->
+            {
+                routeRO.wrap(buffer, index, index + length);
+                doUnregister(routeRO.source().asString(), routeRO.sourceRef());
+            });
+        }
+    }
+
+    private void connectionDone()
+    {
+        connections--;
+        if (connections < maxConnections)
+        {
+            router.forEach((id, buffer, index, length) ->
+            {
+                routeRO.wrap(buffer, index, index + length);
+                doRegister(routeRO.correlationId(), routeRO.source().asString(), routeRO.sourceRef());
+            });
+        }
     }
 
     private PollerKey findRegisteredKey(
