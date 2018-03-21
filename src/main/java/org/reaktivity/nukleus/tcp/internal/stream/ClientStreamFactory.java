@@ -88,19 +88,20 @@ public class ClientStreamFactory implements StreamFactory
     private final int windowThreshold;
 
     public ClientStreamFactory(
-            TcpConfiguration configuration,
-            RouteManager router,
-            Poller poller,
-            MutableDirectBuffer writeBuffer,
-            BufferPool bufferPool,
-            LongSupplier incrementOverflow,
-            LongSupplier supplyStreamId,
-            LongFunction<IntUnaryOperator> groupBudgetClaimer,
-            LongFunction<IntUnaryOperator> groupBudgetReleaser,
-            Function<RouteFW, LongSupplier> supplyReadFrameCounter,
-            Function<RouteFW, LongConsumer> supplyReadBytesAccumulator,
-            Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
-            Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
+        TcpConfiguration configuration,
+        RouteManager router,
+        Poller poller,
+        MutableDirectBuffer writeBuffer,
+        BufferPool bufferPool,
+        LongSupplier incrementOverflow,
+        LongSupplier supplyStreamId,
+        LongSupplier supplyTrace,
+        LongFunction<IntUnaryOperator> groupBudgetClaimer,
+        LongFunction<IntUnaryOperator> groupBudgetReleaser,
+        Function<RouteFW, LongSupplier> supplyReadFrameCounter,
+        Function<RouteFW, LongConsumer> supplyReadBytesAccumulator,
+        Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
+        Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
     {
         this.router = requireNonNull(router);
         this.poller = poller;
@@ -110,7 +111,7 @@ public class ClientStreamFactory implements StreamFactory
         this.supplyStreamId = requireNonNull(supplyStreamId);
         this.groupBudgetClaimer = requireNonNull(groupBudgetClaimer);
         this.groupBudgetReleaser = requireNonNull(groupBudgetReleaser);
-        this.writer = new MessageWriter(requireNonNull(writeBuffer));
+        this.writer = new MessageWriter(requireNonNull(writeBuffer), requireNonNull(supplyTrace));
         int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
 
         // Data frame length must fit into a 2 byte unsigned integer

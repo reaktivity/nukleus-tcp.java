@@ -106,7 +106,6 @@ public class ClientIT
     public void shouldReceiveClientSentData() throws Exception
     {
        k3po.finish();
-       assertEquals(1, counters.streams());
        assertEquals(1, counters.routes());
        assertEquals(0, counters.overflows());
     }
@@ -131,7 +130,6 @@ public class ClientIT
     public void shouldReceiveClientSentDataMultipleStreams() throws Exception
     {
         k3po.finish();
-        assertEquals(2, counters.streams());
         assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -167,8 +165,6 @@ public class ClientIT
                 k3po.finish();
             }
         }
-
-        assertEquals(1, counters.streams());
     }
 
     @Test
@@ -243,7 +239,6 @@ public class ClientIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -259,7 +254,6 @@ public class ClientIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -285,7 +279,6 @@ public class ClientIT
     {
         k3po.finish();
 
-        assertEquals(2, counters.streams());
         assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }

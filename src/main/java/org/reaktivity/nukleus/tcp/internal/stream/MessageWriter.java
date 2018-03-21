@@ -19,6 +19,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.socketAddress;
 
 import java.net.InetSocketAddress;
+import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -55,10 +56,14 @@ final class MessageWriter
     private final TcpBeginExFW.Builder beginExRW = new TcpBeginExFW.Builder();
 
     private final MutableDirectBuffer writeBuffer;
+    private final LongSupplier supplyTrace;
 
-    MessageWriter(MutableDirectBuffer writeBuffer)
+    MessageWriter(
+        MutableDirectBuffer writeBuffer,
+        LongSupplier supplyTrace)
     {
         this.writeBuffer = writeBuffer;
+        this.supplyTrace = supplyTrace;
     }
 
     public void doTcpAbort(
@@ -67,6 +72,7 @@ final class MessageWriter
     {
         AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
+                .trace(supplyTrace.getAsLong())
                 .extension(b -> b.set((buf, off, len) -> 0))
                 .build();
 
@@ -83,6 +89,7 @@ final class MessageWriter
     {
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
+                .trace(supplyTrace.getAsLong())
                 .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
                 .sourceRef(referenceId)
                 .correlationId(correlationId)
@@ -103,6 +110,7 @@ final class MessageWriter
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
+                .trace(supplyTrace.getAsLong())
                 .groupId(groupId)
                 .padding(padding)
                 .payload(payload, offset, length)
@@ -117,6 +125,7 @@ final class MessageWriter
     {
         EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(streamId)
+                .trace(supplyTrace.getAsLong())
                 .extension(b -> b.set((buf, off, len) -> 0))
                 .build();
 
@@ -132,6 +141,7 @@ final class MessageWriter
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(throttleId)
+                .trace(supplyTrace.getAsLong())
                 .credit(credit)
                 .padding(padding)
                 .groupId(groupId)
@@ -146,12 +156,11 @@ final class MessageWriter
     {
         final ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                .streamId(throttleId)
+               .trace(supplyTrace.getAsLong())
                .build();
 
         throttle.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
     }
-
-
 
     private Flyweight.Builder.Visitor visitBeginEx(
         InetSocketAddress localAddress,
