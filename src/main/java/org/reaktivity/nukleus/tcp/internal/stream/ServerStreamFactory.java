@@ -78,25 +78,26 @@ public class ServerStreamFactory implements StreamFactory
     private final int windowThreshold;
 
     public ServerStreamFactory(
-            TcpConfiguration config,
-            RouteManager router,
-            MutableDirectBuffer writeBuffer,
-            BufferPool bufferPool,
-            LongSupplier incrementOverflow,
-            LongSupplier supplyStreamId,
-            LongSupplier supplyCorrelationId,
-            Long2ObjectHashMap<Correlation> correlations,
-            Poller poller,
-            LongFunction<IntUnaryOperator> groupBudgetClaimer,
-            LongFunction<IntUnaryOperator> groupBudgetReleaser,
-            Function<RouteFW, LongSupplier> supplyReadFrameCounter,
-            Function<RouteFW, LongConsumer> supplyReadBytesAccumulator,
-            Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
-            Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
+        TcpConfiguration config,
+        RouteManager router,
+        MutableDirectBuffer writeBuffer,
+        BufferPool bufferPool,
+        LongSupplier incrementOverflow,
+        LongSupplier supplyStreamId,
+        LongSupplier supplyTrace,
+        LongSupplier supplyCorrelationId,
+        Long2ObjectHashMap<Correlation> correlations,
+        Poller poller,
+        LongFunction<IntUnaryOperator> groupBudgetClaimer,
+        LongFunction<IntUnaryOperator> groupBudgetReleaser,
+        Function<RouteFW, LongSupplier> supplyReadFrameCounter,
+        Function<RouteFW, LongConsumer> supplyReadBytesAccumulator,
+        Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
+        Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
     {
         this.router = requireNonNull(router);
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
-        this.writer = new MessageWriter(requireNonNull(writeBuffer));
+        this.writer = new MessageWriter(requireNonNull(writeBuffer), requireNonNull(supplyTrace));
         this.bufferPool = bufferPool;
         this.incrementOverflow = incrementOverflow;
         this.supplyStreamId = requireNonNull(supplyStreamId);

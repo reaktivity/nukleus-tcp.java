@@ -115,11 +115,6 @@ public final class TcpController implements Controller
         return controllerSpi.doCount("routes");
     }
 
-    public long streams()
-    {
-        return controllerSpi.doCount("streams");
-    }
-
     public long overflows()
     {
         return controllerSpi.doCount("overflows");

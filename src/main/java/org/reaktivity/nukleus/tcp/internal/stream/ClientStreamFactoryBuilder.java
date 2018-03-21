@@ -50,6 +50,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     private RouteManager router;
     private Supplier<BufferPool> supplyBufferPool;
     private LongSupplier supplyStreamId;
+    private LongSupplier supplyTrace;
 
     private MutableDirectBuffer writeBuffer;
 
@@ -102,6 +103,14 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
         LongSupplier supplyStreamId)
     {
         this.supplyStreamId = supplyStreamId;
+        return this;
+    }
+
+    @Override
+    public ClientStreamFactoryBuilder setTraceSupplier(
+        LongSupplier supplyTrace)
+    {
+        this.supplyTrace = supplyTrace;
         return this;
     }
 
@@ -215,6 +224,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
             bufferPool,
             incrementOverflow,
             supplyStreamId,
+            supplyTrace,
             groupBudgetClaimer,
             groupBudgetReleaser,
             supplyReadFrameCounter,

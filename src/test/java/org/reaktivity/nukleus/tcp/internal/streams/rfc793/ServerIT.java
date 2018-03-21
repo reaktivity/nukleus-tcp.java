@@ -105,7 +105,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -121,7 +120,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -147,7 +145,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(2, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -209,7 +206,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(3, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -224,7 +220,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -240,7 +235,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -256,7 +250,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -286,7 +279,6 @@ public class ServerIT
             }
         }
 
-        assertEquals(0, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -312,7 +304,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -357,7 +348,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(2, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
