@@ -177,7 +177,7 @@ public final class Acceptor
         {
             final ServerSocketChannel serverChannel = channel(key);
 
-            for (SocketChannel channel = serverChannel.accept(); channel != null; channel = serverChannel.accept())
+            for (SocketChannel channel = accept(serverChannel); channel != null; channel = accept(serverChannel))
             {
                 channel.configureBlocking(false);
                 channel.setOption(TCP_NODELAY, true);
@@ -186,7 +186,6 @@ public final class Acceptor
                 final String sourceName = sourcesByLocalAddress.get(address);
                 final long sourceRef = address.getPort();
 
-                newConnection();
                 serverStreamFactory.onAccepted(sourceName, sourceRef, channel, address, this::connectionDone);
             }
         }
@@ -198,10 +197,11 @@ public final class Acceptor
         return 1;
     }
 
-    private void newConnection()
+    // @return null if max connections are reached or no more accept channels
+    private SocketChannel accept(ServerSocketChannel serverChannel) throws Exception
     {
         connections++;
-        if (!unbound && connections >= maxConnections)
+        if (!unbound && connections > maxConnections)
         {
             router.forEach((id, buffer, index, length) ->
             {
@@ -209,6 +209,11 @@ public final class Acceptor
                 doUnregister(routeRO.source().asString(), routeRO.sourceRef());
             });
             unbound = true;
+            return null;
+        }
+        else
+        {
+            return serverChannel.accept();
         }
     }
 
