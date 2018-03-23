@@ -102,7 +102,6 @@ public class ServerPartialWriteLimitsIT
 
         k3po.finish();
 
-        assertEquals(1, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
@@ -161,7 +160,6 @@ public class ServerPartialWriteLimitsIT
             k3po.finish();
         }
 
-        assertEquals(2, counters.streams());
         assertEquals(0, counters.routes());
         assertEquals(1, counters.overflows());
     }

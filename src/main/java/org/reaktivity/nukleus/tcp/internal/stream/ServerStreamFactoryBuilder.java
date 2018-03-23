@@ -51,6 +51,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier incrementOverflow;
     private RouteManager router;
     private LongSupplier supplyStreamId;
+    private LongSupplier supplyTrace;
     private Supplier<BufferPool> supplyBufferPool;
     private LongSupplier supplyCorrelationId;
     private MutableDirectBuffer writeBuffer;
@@ -106,6 +107,14 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
         LongSupplier supplyStreamId)
     {
         this.supplyStreamId = supplyStreamId;
+        return this;
+    }
+
+    @Override
+    public ServerStreamFactoryBuilder setTraceSupplier(
+        LongSupplier supplyTrace)
+    {
+        this.supplyTrace = supplyTrace;
         return this;
     }
 
@@ -219,6 +228,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
             bufferPool,
             incrementOverflow,
             supplyStreamId,
+            supplyTrace,
             supplyCorrelationId,
             correlations,
             poller,
