@@ -65,6 +65,7 @@ public final class Acceptor
     private Poller poller;
     private ServerStreamFactory serverStreamFactory;
     private RouteManager router;
+    private boolean bound = true;
 
     public Acceptor(
         TcpConfiguration config)
@@ -200,26 +201,28 @@ public final class Acceptor
     private void newConnection()
     {
         connections++;
-        if (connections >= maxConnections)
+        if (bound && connections >= maxConnections)
         {
             router.forEach((id, buffer, index, length) ->
             {
                 routeRO.wrap(buffer, index, index + length);
                 doUnregister(routeRO.source().asString(), routeRO.sourceRef());
             });
+            bound = false;
         }
     }
 
     private void connectionDone()
     {
         connections--;
-        if (connections < maxConnections)
+        if (!bound && connections < maxConnections)
         {
             router.forEach((id, buffer, index, length) ->
             {
                 routeRO.wrap(buffer, index, index + length);
                 doRegister(routeRO.correlationId(), routeRO.source().asString(), routeRO.sourceRef());
             });
+            bound = true;
         }
     }
 
