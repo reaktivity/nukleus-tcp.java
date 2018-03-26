@@ -83,7 +83,11 @@ public final class Acceptor
         this.poller = poller;
     }
 
-    public boolean handleRoute(int msgTypeId, DirectBuffer buffer, int index, int length)
+    public boolean handleRoute(
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length)
     {
         boolean result = true;
         switch(msgTypeId)
@@ -112,13 +116,15 @@ public final class Acceptor
         return result;
     }
 
-    void setServerStreamFactory(ServerStreamFactory serverStreamFactory)
+    void setServerStreamFactory(
+        ServerStreamFactory serverStreamFactory)
     {
         this.serverStreamFactory = serverStreamFactory;
 
     }
 
-    void setRouter(RouteManager router)
+    void setRouter(
+        RouteManager router)
     {
         this.router = router;
     }
@@ -198,7 +204,8 @@ public final class Acceptor
     }
 
     // @return null if max connections are reached or no more accept channels
-    private SocketChannel accept(ServerSocketChannel serverChannel) throws Exception
+    private SocketChannel accept(
+        ServerSocketChannel serverChannel) throws Exception
     {
         connections++;
         if (!unbound && connections > maxConnections)
