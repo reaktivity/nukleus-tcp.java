@@ -207,8 +207,9 @@ public final class Acceptor
     private SocketChannel accept(
         ServerSocketChannel serverChannel) throws Exception
     {
-        connections++;
-        if (!unbound && connections > maxConnections)
+        SocketChannel channel = null;
+
+        if (!unbound && connections >= maxConnections)
         {
             router.forEach((id, buffer, index, length) ->
             {
@@ -216,12 +217,17 @@ public final class Acceptor
                 doUnregister(routeRO.source().asString(), routeRO.sourceRef());
             });
             unbound = true;
-            return null;
         }
         else
         {
-            return serverChannel.accept();
+            SocketChannel channel = serverChannel.accept();
+            if (channel != null)
+            {
+                connections++;
+            }
         }
+
+        return channel;
     }
 
     private void connectionDone()
