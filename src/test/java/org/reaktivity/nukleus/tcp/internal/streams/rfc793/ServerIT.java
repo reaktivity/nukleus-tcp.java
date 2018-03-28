@@ -431,9 +431,12 @@ public class ServerIT
         SocketChannel channel3 = SocketChannel.open();
         channel3.connect(new InetSocketAddress("127.0.0.1", 8080));
 
-        k3po.awaitBarrier("CONNECTION_ACCEPTED");
-        k3po.awaitBarrier("CONNECTION_ACCEPTED");
-        k3po.awaitBarrier("CONNECTION_ACCEPTED");
+        k3po.awaitBarrier("CONNECTION_ACCEPTED_1");
+        k3po.awaitBarrier("CONNECTION_ACCEPTED_2");
+        k3po.awaitBarrier("CONNECTION_ACCEPTED_3");
+
+        // sleep so that unbind happens
+        Thread.sleep(200);
 
         SocketChannel channel4 = SocketChannel.open();
         try
@@ -447,16 +450,17 @@ public class ServerIT
         }
 
         channel1.close();
-        channel2.close();
-        channel3.close();
         channel4.close();
 
         k3po.awaitBarrier("CLOSED");
-        k3po.awaitBarrier("CLOSED");
-        k3po.awaitBarrier("CLOSED");
+
+        // sleep so that rebind happens
+        Thread.sleep(200);
         SocketChannel channel5 = SocketChannel.open();
         channel5.connect(new InetSocketAddress("127.0.0.1", 8080));
-        k3po.awaitBarrier("CONNECTION_ACCEPTED");
+        k3po.awaitBarrier("CONNECTION_ACCEPTED_4");
+        channel2.close();
+        channel3.close();
         channel5.close();
 
         k3po.finish();

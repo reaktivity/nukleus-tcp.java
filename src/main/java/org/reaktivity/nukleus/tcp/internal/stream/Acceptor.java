@@ -220,7 +220,7 @@ public final class Acceptor
         }
         else
         {
-            SocketChannel channel = serverChannel.accept();
+            channel = serverChannel.accept();
             if (channel != null)
             {
                 connections++;
