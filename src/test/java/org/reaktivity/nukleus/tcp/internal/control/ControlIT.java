@@ -29,7 +29,6 @@ import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
@@ -44,7 +43,7 @@ public class ControlIT
 
     private final ReaktorRule reaktor = new ReaktorRule()
         .nukleus("tcp"::equals)
-        .controller(TcpController.class::isAssignableFrom)
+        .controller("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)

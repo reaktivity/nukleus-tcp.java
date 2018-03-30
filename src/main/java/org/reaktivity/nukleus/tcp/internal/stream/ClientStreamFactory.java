@@ -394,7 +394,7 @@ public class ClientStreamFactory implements StreamFactory
             final LongSupplier readFrameCounter = request.readFrameCounter;
             final LongConsumer readBytesAccumulator = request.readBytesAccumulator;
             final ReadStream stream = new ReadStream(target, targetId, key, channel,
-                    readByteBuffer, readBuffer, writer, readFrameCounter, readBytesAccumulator);
+                    readByteBuffer, readBuffer, writer, readFrameCounter, readBytesAccumulator, () -> {});
             stream.setCorrelatedThrottle(correlatedStreamId, correlatedThrottle);
 
             router.setThrottle(targetName, targetId, stream::handleThrottle);

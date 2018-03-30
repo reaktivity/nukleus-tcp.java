@@ -18,7 +18,9 @@ package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.MAX_CONNECTIONS_NAME;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -34,7 +36,6 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.ScriptProperty;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
@@ -50,11 +51,12 @@ public class ServerIT
 
     private final ReaktorRule reaktor = new ReaktorRule()
         .nukleus("tcp"::equals)
-        .controller(TcpController.class::isAssignableFrom)
+        .controller("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
+        .configure(MAX_CONNECTIONS_NAME, 3)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -407,6 +409,60 @@ public class ServerIT
 
             k3po.finish();
         }
+    }
+
+    @Test
+    @Specification({
+        "${route}/server/controller",
+        "${server}/max.connections/server"
+    })
+    public void shouldUnbindRebind() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_SERVER");
+
+        SocketChannel channel1 = SocketChannel.open();
+        channel1.connect(new InetSocketAddress("127.0.0.1", 8080));
+
+        SocketChannel channel2 = SocketChannel.open();
+        channel2.connect(new InetSocketAddress("127.0.0.1", 8080));
+
+        SocketChannel channel3 = SocketChannel.open();
+        channel3.connect(new InetSocketAddress("127.0.0.1", 8080));
+
+        k3po.awaitBarrier("CONNECTION_ACCEPTED_1");
+        k3po.awaitBarrier("CONNECTION_ACCEPTED_2");
+        k3po.awaitBarrier("CONNECTION_ACCEPTED_3");
+
+        // sleep so that unbind happens
+        Thread.sleep(200);
+
+        SocketChannel channel4 = SocketChannel.open();
+        try
+        {
+            channel4.connect(new InetSocketAddress("127.0.0.1", 8080));
+            fail("4th connect shouldn't succeed as max.connections = 3");
+        }
+        catch (IOException ioe)
+        {
+            // expected
+        }
+
+        channel1.close();
+        channel4.close();
+
+        k3po.awaitBarrier("CLOSED");
+
+        // sleep so that rebind happens
+        Thread.sleep(200);
+        SocketChannel channel5 = SocketChannel.open();
+        channel5.connect(new InetSocketAddress("127.0.0.1", 8080));
+        k3po.awaitBarrier("CONNECTION_ACCEPTED_4");
+        channel2.close();
+        channel3.close();
+        channel5.close();
+
+        k3po.finish();
     }
 
 }

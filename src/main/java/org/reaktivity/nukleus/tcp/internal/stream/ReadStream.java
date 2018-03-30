@@ -35,6 +35,8 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
 
 final class ReadStream
 {
+    private String sourceName;
+    private long sourceRef;
     private final MessageConsumer target;
     private final long streamId;
     private final PollerKey key;
@@ -44,6 +46,7 @@ final class ReadStream
     private final MessageWriter writer;
     private final LongSupplier frameCounter;
     private final LongConsumer bytesAccumulator;
+    private Runnable connectionDone;
 
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
@@ -61,8 +64,11 @@ final class ReadStream
         MutableDirectBuffer readBuffer,
         MessageWriter writer,
         LongSupplier frameCounter,
-        LongConsumer bytesAccumulator)
+        LongConsumer bytesAccumulator,
+        Runnable connectionDone)
     {
+        this.sourceName = sourceName;
+        this.sourceRef = sourceRef;
         this.target = target;
         this.streamId = streamId;
         this.key = key;
@@ -72,6 +78,7 @@ final class ReadStream
         this.writer = writer;
         this.frameCounter = frameCounter;
         this.bytesAccumulator = bytesAccumulator;
+        this.connectionDone = connectionDone;
     }
 
     int handleStream(
@@ -100,6 +107,7 @@ final class ReadStream
             readableBytes = -1;
             writer.doTcpEnd(target, streamId);
             key.cancel(OP_READ);
+            connectionDone.run();
         }
         else if (bytesRead != 0)
         {
@@ -125,6 +133,7 @@ final class ReadStream
         readableBytes = -1;
         writer.doTcpAbort(target, streamId);
         key.cancel(OP_READ);
+        connectionDone.run();
         if (correlatedThrottle != null)
         {
             writer.doReset(correlatedThrottle, correlatedStreamId);
@@ -193,6 +202,8 @@ final class ReadStream
     {
         try
         {
+            connectionDone.run();
+
             if (correlatedThrottle != null)
             {
                 // Begin on correlated WriteStream was already processed

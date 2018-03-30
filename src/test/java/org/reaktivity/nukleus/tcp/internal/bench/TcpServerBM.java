@@ -70,7 +70,7 @@ public class TcpServerBM
         this.reaktor = Reaktor.builder()
                     .config(configuration)
                     .nukleus("tcp"::equals)
-                    .controller(TcpController.class::isAssignableFrom)
+                    .controller("tcp"::equals)
                     .errorHandler(ex -> ex.printStackTrace(System.err))
                     .build();
 

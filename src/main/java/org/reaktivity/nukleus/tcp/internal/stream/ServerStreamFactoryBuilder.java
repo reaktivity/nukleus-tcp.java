@@ -239,6 +239,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
             supplyWriteFrameCounter,
             supplyWriteBytesAccumulator);
         acceptor.setServerStreamFactory(factory);
+        acceptor.setRouter(router);
         return factory;
 
     }

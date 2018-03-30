@@ -37,7 +37,7 @@ public class ControllerScriptlessIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .controller(TcpController.class::isAssignableFrom);
+        .controller("tcp"::equals);
 
     @Rule
     public final TestRule chain = outerRule(timeout).around(reaktor);
