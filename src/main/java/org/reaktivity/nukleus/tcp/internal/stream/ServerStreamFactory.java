@@ -149,7 +149,8 @@ public class ServerStreamFactory implements StreamFactory
         return newStream;
     }
 
-    public void onAccepted(String sourceName, long sourceRef, SocketChannel channel, InetSocketAddress address)
+    public void onAccepted(String sourceName, long sourceRef, SocketChannel channel, InetSocketAddress address,
+                           Runnable connectionDone)
     {
         final MessagePredicate filter = (t, b, o, l) ->
         {
@@ -185,7 +186,7 @@ public class ServerStreamFactory implements StreamFactory
                 final LongConsumer readFrameAccumulator = supplyReadBytesAccumulator.apply(route);
 
                 final ReadStream stream = new ReadStream(target, targetId, key, channel,
-                        readByteBuffer, readBuffer, writer, writeFrameCounter, writeFrameAccumulator);
+                        readByteBuffer, readBuffer, writer, writeFrameCounter, writeFrameAccumulator, connectionDone);
                 final Correlation correlation = new Correlation(sourceName, channel, stream::setCorrelatedThrottle,
                         target, targetId, readFrameCounter, readFrameAccumulator);
                 correlations.put(correlationId, correlation);
@@ -198,12 +199,14 @@ public class ServerStreamFactory implements StreamFactory
             }
             catch (IOException ex)
             {
+                connectionDone.run();
                 CloseHelper.quietClose(channel);
                 LangUtil.rethrowUnchecked(ex);
             }
         }
         else
         {
+            connectionDone.run();
             CloseHelper.close(channel);
         }
 
