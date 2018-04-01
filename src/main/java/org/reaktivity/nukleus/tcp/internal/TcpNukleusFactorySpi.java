@@ -49,15 +49,17 @@ public final class TcpNukleusFactorySpi implements NukleusFactorySpi
         ServerStreamFactoryBuilder serverStreamFactoryBuilder = new ServerStreamFactoryBuilder(tcpConfig, acceptor, poller);
         ClientStreamFactoryBuilder clientStreamFactoryBuilder = new ClientStreamFactoryBuilder(tcpConfig, poller);
 
-        final MessagePredicate routeHandler = (m, b, i, l) ->
+        final MessagePredicate serverRouteHandler = (m, b, i, l) ->
             acceptor.handleRoute(m, b, i, l) &&
             serverStreamFactoryBuilder.handleRoute(m, b, i, l);
 
         return builder.streamFactory(RouteKind.CLIENT, clientStreamFactoryBuilder)
                       .streamFactory(RouteKind.SERVER, serverStreamFactoryBuilder)
-                      .routeHandler(RouteKind.SERVER, routeHandler)
-                      .allowZeroRouteRef(RouteKind.SERVER::equals)
+                      .routeHandler(RouteKind.SERVER, serverRouteHandler)
                       .routeHandler(RouteKind.CLIENT, clientStreamFactoryBuilder::handleRoute)
+                      .allowZeroRouteRef(RouteKind.SERVER::equals)
+                      .layoutTarget(RouteKind.SERVER::equals)
+                      .layoutSource(RouteKind.CLIENT::equals)
                       .inject(poller)
                       .build();
 
