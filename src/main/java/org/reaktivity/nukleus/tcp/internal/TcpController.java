@@ -28,6 +28,7 @@ import org.reaktivity.nukleus.ControllerSpi;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
+import org.reaktivity.nukleus.tcp.internal.types.control.FreezeFW;
 
 public final class TcpController implements Controller
 {
@@ -36,6 +37,7 @@ public final class TcpController implements Controller
     // TODO: thread-safe flyweights or command queue from public methods
     private final RouteFW.Builder routeRW = new RouteFW.Builder();
     private final UnrouteFW.Builder unrouteRW = new UnrouteFW.Builder();
+    private final FreezeFW.Builder freezeRW = new FreezeFW.Builder();
 
     private final ControllerSpi controllerSpi;
     private final AtomicBuffer atomicBuffer;
@@ -110,6 +112,17 @@ public final class TcpController implements Controller
         return unroute(Role.CLIENT, source, sourceRef, target, targetRef);
     }
 
+    public CompletableFuture<Void> freeze()
+    {
+        long correlationId = controllerSpi.nextCorrelationId();
+
+        FreezeFW freeze = freezeRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
+                                  .correlationId(correlationId)
+                                  .build();
+
+        return controllerSpi.doFreeze(freeze.typeId(), freeze.buffer(), freeze.offset(), freeze.sizeof());
+    }
+
     public long routes()
     {
         return controllerSpi.doCount("routes");
@@ -181,5 +194,4 @@ public final class TcpController implements Controller
 
         return controllerSpi.doUnroute(unrouteRO.typeId(), unrouteRO.buffer(), unrouteRO.offset(), unrouteRO.sizeof());
     }
-
 }
