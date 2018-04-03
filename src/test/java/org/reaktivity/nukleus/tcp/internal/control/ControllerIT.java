@@ -25,6 +25,7 @@ import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.kaazing.k3po.junit.annotation.ScriptProperty;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
@@ -34,7 +35,8 @@ public class ControllerIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/tcp/control/unroute");
+        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/tcp/control/unroute")
+        .addScriptRoot("freeze", "org/reaktivity/specification/nukleus/control/freeze");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -139,6 +141,22 @@ public class ControllerIT
 
         reaktor.controller(TcpController.class)
                .unrouteClient("source", sourceRef, "localhost", 8080)
+               .get();
+
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${freeze}/nukleus"
+    })
+    @ScriptProperty("nameF00N \"tcp\"")
+    public void shouldFreeze() throws Exception
+    {
+        k3po.start();
+
+        reaktor.controller(TcpController.class)
+               .freeze()
                .get();
 
         k3po.finish();
