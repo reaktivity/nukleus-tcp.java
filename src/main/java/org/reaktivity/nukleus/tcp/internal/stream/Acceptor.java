@@ -213,8 +213,11 @@ public final class Acceptor
         {
             router.forEach((id, buffer, index, length) ->
             {
-                routeRO.wrap(buffer, index, index + length);
-                doUnregister(routeRO.source().asString(), routeRO.sourceRef());
+                RouteFW route = routeRO.wrap(buffer, index, index + length);
+                if (route.role().get() == Role.SERVER)
+                {
+                    doUnregister(routeRO.source().asString(), routeRO.sourceRef());
+                }
             });
             unbound = true;
         }
@@ -237,8 +240,11 @@ public final class Acceptor
         {
             router.forEach((id, buffer, index, length) ->
             {
-                routeRO.wrap(buffer, index, index + length);
-                doRegister(routeRO.correlationId(), routeRO.source().asString(), routeRO.sourceRef());
+                RouteFW route = routeRO.wrap(buffer, index, index + length);
+                if (route.role().get() == Role.SERVER)
+                {
+                    doRegister(routeRO.correlationId(), routeRO.source().asString(), routeRO.sourceRef());
+                }
             });
             unbound = false;
         }
