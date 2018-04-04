@@ -35,8 +35,6 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
 
 final class ReadStream
 {
-    private String sourceName;
-    private long sourceRef;
     private final MessageConsumer target;
     private final long streamId;
     private final PollerKey key;
@@ -67,8 +65,6 @@ final class ReadStream
         LongConsumer bytesAccumulator,
         Runnable connectionDone)
     {
-        this.sourceName = sourceName;
-        this.sourceRef = sourceRef;
         this.target = target;
         this.streamId = streamId;
         this.key = key;

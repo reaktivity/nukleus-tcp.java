@@ -413,12 +413,13 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/server/controller",
+        "${route}/client.and.server/controller",
         "${server}/max.connections/server"
     })
     public void shouldUnbindRebind() throws Exception
     {
         k3po.start();
+        k3po.awaitBarrier("ROUTED_CLIENT");
         k3po.awaitBarrier("ROUTED_SERVER");
 
         SocketChannel channel1 = SocketChannel.open();
