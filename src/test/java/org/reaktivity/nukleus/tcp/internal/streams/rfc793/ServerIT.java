@@ -55,7 +55,7 @@ public class ServerIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024)
+        .counterValuesBufferCapacity(2048)
         .configure(MAX_CONNECTIONS_NAME, 3)
         .clean();
 
@@ -435,8 +435,7 @@ public class ServerIT
         k3po.awaitBarrier("CONNECTION_ACCEPTED_2");
         k3po.awaitBarrier("CONNECTION_ACCEPTED_3");
 
-        // sleep so that unbind happens
-        Thread.sleep(200);
+        assertEquals(3, counters.openConnections());
 
         SocketChannel channel4 = SocketChannel.open();
         try
@@ -448,6 +447,8 @@ public class ServerIT
         {
             // expected
         }
+        assertEquals(3, counters.openConnections());
+
 
         channel1.close();
         channel4.close();
@@ -456,12 +457,18 @@ public class ServerIT
 
         // sleep so that rebind happens
         Thread.sleep(200);
+        assertEquals(1, counters.closeConnections());
+
         SocketChannel channel5 = SocketChannel.open();
         channel5.connect(new InetSocketAddress("127.0.0.1", 8080));
         k3po.awaitBarrier("CONNECTION_ACCEPTED_4");
+        assertEquals(4, counters.openConnections());
+
         channel2.close();
         channel3.close();
         channel5.close();
+        Thread.sleep(200);
+        assertEquals(4, counters.closeConnections());
 
         k3po.finish();
     }

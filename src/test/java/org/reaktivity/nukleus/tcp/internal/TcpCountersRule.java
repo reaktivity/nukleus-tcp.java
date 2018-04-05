@@ -59,6 +59,16 @@ public class TcpCountersRule implements TestRule
         return controller().overflows();
     }
 
+    public long openConnections()
+    {
+        return controller().openConnections();
+    }
+
+    public long closeConnections()
+    {
+        return controller().closeConnections();
+    }
+
     private TcpController controller()
     {
         return reaktor.controller(TcpController.class);

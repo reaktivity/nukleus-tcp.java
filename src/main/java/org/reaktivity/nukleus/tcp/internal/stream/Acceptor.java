@@ -226,6 +226,7 @@ public final class Acceptor
             channel = serverChannel.accept();
             if (channel != null)
             {
+                serverStreamFactory.openConnectionsCounter.getAsLong();
                 connections++;
             }
         }
@@ -235,7 +236,9 @@ public final class Acceptor
 
     private void connectionDone()
     {
+        serverStreamFactory.closeConnectionsCounter.getAsLong();
         connections--;
+        assert connections >= 0;
         if (unbound && connections < maxConnections)
         {
             router.forEach((id, buffer, index, length) ->
