@@ -435,7 +435,7 @@ public class ServerIT
         k3po.awaitBarrier("CONNECTION_ACCEPTED_2");
         k3po.awaitBarrier("CONNECTION_ACCEPTED_3");
 
-        assertEquals(3, counters.openConnections());
+        assertEquals(3, counters.connections());
 
         SocketChannel channel4 = SocketChannel.open();
         try
@@ -447,7 +447,7 @@ public class ServerIT
         {
             // expected
         }
-        assertEquals(3, counters.openConnections());
+        assertEquals(3, counters.connections());
 
 
         channel1.close();
@@ -457,18 +457,18 @@ public class ServerIT
 
         // sleep so that rebind happens
         Thread.sleep(200);
-        assertEquals(1, counters.closeConnections());
+        assertEquals(2, counters.connections());
 
         SocketChannel channel5 = SocketChannel.open();
         channel5.connect(new InetSocketAddress("127.0.0.1", 8080));
         k3po.awaitBarrier("CONNECTION_ACCEPTED_4");
-        assertEquals(4, counters.openConnections());
+        assertEquals(3, counters.connections());
 
         channel2.close();
         channel3.close();
         channel5.close();
         Thread.sleep(200);
-        assertEquals(4, counters.closeConnections());
+        assertEquals(0, counters.connections());
 
         k3po.finish();
     }

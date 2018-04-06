@@ -59,14 +59,9 @@ public class TcpCountersRule implements TestRule
         return controller().overflows();
     }
 
-    public long openConnections()
+    public long connections()
     {
-        return controller().openConnections();
-    }
-
-    public long closeConnections()
-    {
-        return controller().closeConnections();
+        return controller().connections();
     }
 
     private TcpController controller()

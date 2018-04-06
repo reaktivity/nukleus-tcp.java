@@ -133,14 +133,9 @@ public final class TcpController implements Controller
         return controllerSpi.doCount("overflows");
     }
 
-    public long openConnections()
+    public long connections()
     {
-        return controllerSpi.doCount("open.connections");
-    }
-
-    public long closeConnections()
-    {
-        return controllerSpi.doCount("close.connections");
+        return controllerSpi.doCount("connections");
     }
 
     public long bytesRead(long routeId)
