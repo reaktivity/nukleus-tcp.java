@@ -45,6 +45,7 @@ final class ReadStream
     private final LongSupplier frameCounter;
     private final LongConsumer bytesAccumulator;
     private Runnable connectionDone;
+    private boolean closed;
 
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
@@ -103,7 +104,11 @@ final class ReadStream
             readableBytes = -1;
             writer.doTcpEnd(target, streamId);
             key.cancel(OP_READ);
-            connectionDone.run();
+            if (!closed)
+            {
+                closed = true;
+                connectionDone.run();
+            }
         }
         else if (bytesRead != 0)
         {
@@ -129,7 +134,11 @@ final class ReadStream
         readableBytes = -1;
         writer.doTcpAbort(target, streamId);
         key.cancel(OP_READ);
-        connectionDone.run();
+        if (!closed)
+        {
+            closed = true;
+            connectionDone.run();
+        }
         if (correlatedThrottle != null)
         {
             writer.doReset(correlatedThrottle, correlatedStreamId);
@@ -198,7 +207,11 @@ final class ReadStream
     {
         try
         {
-            connectionDone.run();
+            if (!closed)
+            {
+                closed = true;
+                connectionDone.run();
+            }
 
             if (correlatedThrottle != null)
             {

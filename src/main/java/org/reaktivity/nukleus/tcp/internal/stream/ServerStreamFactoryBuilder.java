@@ -49,6 +49,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     private final Long2ObjectHashMap<LongConsumer> bytesReadByteRouteId;
 
     private LongSupplier incrementOverflow;
+    private LongConsumer connectionsAccumulator;
     private RouteManager router;
     private LongSupplier supplyStreamId;
     private LongSupplier supplyTrace;
@@ -185,6 +186,12 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
         {
             incrementOverflow = supplyCounter.apply("overflows");
         }
+
+        if (connectionsAccumulator == null)
+        {
+            connectionsAccumulator = supplyAccumulator.apply("connections");
+        }
+
         if (supplyWriteFrameCounter == null)
         {
             this.supplyWriteFrameCounter = r ->
@@ -237,7 +244,8 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
             supplyReadFrameCounter,
             supplyReadBytesAccumulator,
             supplyWriteFrameCounter,
-            supplyWriteBytesAccumulator);
+            supplyWriteBytesAccumulator,
+            connectionsAccumulator);
         acceptor.setServerStreamFactory(factory);
         acceptor.setRouter(router);
         return factory;
