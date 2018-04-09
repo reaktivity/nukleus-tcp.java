@@ -76,6 +76,7 @@ public class ServerStreamFactory implements StreamFactory
     private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
 
     private final int windowThreshold;
+    final LongConsumer connectionsAccumulator;
 
     public ServerStreamFactory(
         TcpConfiguration config,
@@ -93,7 +94,8 @@ public class ServerStreamFactory implements StreamFactory
         Function<RouteFW, LongSupplier> supplyReadFrameCounter,
         Function<RouteFW, LongConsumer> supplyReadBytesAccumulator,
         Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
-        Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
+        Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator,
+        LongConsumer connectionsAccumulator)
     {
         this.router = requireNonNull(router);
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
@@ -114,6 +116,8 @@ public class ServerStreamFactory implements StreamFactory
         this.supplyReadFrameCounter = supplyReadFrameCounter;
         this.supplyWriteBytesAccumulator = supplyWriteBytesAccumulator;
         this.supplyReadBytesAccumulator = supplyReadBytesAccumulator;
+
+        this.connectionsAccumulator = connectionsAccumulator;
 
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
