@@ -46,6 +46,11 @@ public final class PollerKey
         return key.channel();
     }
 
+    public boolean isValid()
+    {
+        return key.isValid();
+    }
+
     public void register(
         int registerOps)
     {

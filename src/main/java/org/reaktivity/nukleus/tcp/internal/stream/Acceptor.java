@@ -271,6 +271,7 @@ public final class Acceptor
     {
         final Optional<PollerKey> optional =
                 poller.keys()
+                      .filter(PollerKey::isValid)
                       .filter(k -> ServerSocketChannel.class.isInstance(k.channel()))
                       .filter(k -> hasLocalAddress(channel(k), localAddress))
                       .findFirst();
