@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
+import static java.net.StandardSocketOptions.SO_KEEPALIVE;
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.net.StandardSocketOptions.SO_REUSEPORT;
 import static java.net.StandardSocketOptions.TCP_NODELAY;
@@ -57,6 +58,7 @@ public final class Acceptor
 
     private final int backlog;
     private final int maxConnections;
+    private final boolean tcpKeepalive;
     private final Map<SocketAddress, String> sourcesByLocalAddress;
     private final Function<SocketAddress, PollerKey> registerHandler;
     private final ToIntFunction<PollerKey> acceptHandler;
@@ -72,6 +74,7 @@ public final class Acceptor
     {
         this.backlog = config.maximumBacklog();
         this.maxConnections = config.maxConnections();
+        this.tcpKeepalive = config.tcpKeepalive();
         this.sourcesByLocalAddress = new TreeMap<>(IpUtil::compareAddresses);
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
@@ -187,6 +190,7 @@ public final class Acceptor
             {
                 channel.configureBlocking(false);
                 channel.setOption(TCP_NODELAY, true);
+                channel.setOption(SO_KEEPALIVE, tcpKeepalive);
 
                 final InetSocketAddress address = localAddress(channel);
                 final String sourceName = sourcesByLocalAddress.get(address);
