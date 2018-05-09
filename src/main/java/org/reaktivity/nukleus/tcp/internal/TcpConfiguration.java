@@ -22,6 +22,7 @@ public class TcpConfiguration extends Configuration
     public static final String MAXIMUM_BACKLOG_PROPERTY_NAME = "nukleus.tcp.maximum.backlog";
     public static final String WINDOW_THRESHOLD_PROPERTY_NAME = "nukleus.tcp.window.threshold";
     public static final String MAX_CONNECTIONS_NAME = "nukleus.tcp.max.connections";
+    public static final String KEEPALIVE_NAME = "nukleus.tcp.keepalive";
 
     /**
      * @see java.nio.channels.ServerSocketChannel#bind(java.net.SocketAddress, int)
@@ -31,6 +32,8 @@ public class TcpConfiguration extends Configuration
     private static final int WINDOW_THRESHOLD_DEFAULT = 0;
 
     private static final int MAX_CONNECTIONS_DEFAULT = Integer.MAX_VALUE;
+
+    private static final boolean KEEPALIVE_DEFAULT = false;
 
     public TcpConfiguration(
         Configuration config)
@@ -60,6 +63,11 @@ public class TcpConfiguration extends Configuration
     public int maxConnections()
     {
         return getInteger(MAX_CONNECTIONS_NAME, MAX_CONNECTIONS_DEFAULT);
+    }
+
+    public boolean keepalive()
+    {
+        return getBoolean(KEEPALIVE_NAME, KEEPALIVE_DEFAULT);
     }
 
 }
