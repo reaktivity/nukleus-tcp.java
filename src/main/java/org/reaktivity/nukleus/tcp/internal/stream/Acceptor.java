@@ -58,7 +58,7 @@ public final class Acceptor
 
     private final int backlog;
     private final int maxConnections;
-    private final boolean tcpKeepalive;
+    private final boolean keepalive;
     private final Map<SocketAddress, String> sourcesByLocalAddress;
     private final Function<SocketAddress, PollerKey> registerHandler;
     private final ToIntFunction<PollerKey> acceptHandler;
@@ -74,7 +74,7 @@ public final class Acceptor
     {
         this.backlog = config.maximumBacklog();
         this.maxConnections = config.maxConnections();
-        this.tcpKeepalive = config.tcpKeepalive();
+        this.keepalive = config.keepalive();
         this.sourcesByLocalAddress = new TreeMap<>(IpUtil::compareAddresses);
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
@@ -190,7 +190,7 @@ public final class Acceptor
             {
                 channel.configureBlocking(false);
                 channel.setOption(TCP_NODELAY, true);
-                channel.setOption(SO_KEEPALIVE, tcpKeepalive);
+                channel.setOption(SO_KEEPALIVE, keepalive);
 
                 final InetSocketAddress address = localAddress(channel);
                 final String sourceName = sourcesByLocalAddress.get(address);
