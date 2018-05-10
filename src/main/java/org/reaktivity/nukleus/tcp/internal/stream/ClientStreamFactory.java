@@ -466,7 +466,7 @@ public class ClientStreamFactory implements StreamFactory
                 channel.finishConnect();
                 handleConnected(this);
             }
-            catch (IOException ex)
+            catch (UnresolvedAddressException | IOException ex)
             {
                 handleConnectFailed(this);
             }
