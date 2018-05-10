@@ -28,6 +28,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.nio.channels.UnresolvedAddressException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -359,7 +360,7 @@ public class ClientStreamFactory implements StreamFactory
                 poller.doRegister(channel, OP_CONNECT, request);
             }
         }
-        catch (IOException ex)
+        catch (UnresolvedAddressException | IOException ex)
         {
             handleConnectFailed(request);
             rethrowUnchecked(ex);
