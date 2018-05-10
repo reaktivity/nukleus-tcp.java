@@ -349,6 +349,7 @@ public class ClientStreamFactory implements StreamFactory
         final Request request = new Request(channel, stream, acceptReplyName, correlationId,
                 outputThrottle, outputStreamId, setCorrelatedInput, readFrameCounter, readBytesAccumulator);
 
+
         try
         {
             if (channel.connect(remoteAddress))
@@ -363,7 +364,6 @@ public class ClientStreamFactory implements StreamFactory
         catch (UnresolvedAddressException | IOException ex)
         {
             handleConnectFailed(request);
-            rethrowUnchecked(ex);
         }
     }
 
