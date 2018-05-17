@@ -25,6 +25,7 @@ import java.nio.channels.SocketChannel;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 
+import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
@@ -106,8 +107,20 @@ final class ReadStream
             key.cancel(OP_READ);
             if (!closed)
             {
-                closed = true;
-                connectionDone.run();
+                try
+                {
+                    closed = true;
+                    connectionDone.run();
+                    channel.shutdownInput();
+                    if (channel.socket().isOutputShutdown())
+                    {
+                        CloseHelper.quietClose(channel);
+                    }
+                }
+                catch (IOException e)
+                {
+                    LangUtil.rethrowUnchecked(e);
+                }
             }
         }
         else if (bytesRead != 0)
@@ -138,6 +151,7 @@ final class ReadStream
         {
             closed = true;
             connectionDone.run();
+            CloseHelper.quietClose(channel);
         }
         if (correlatedThrottle != null)
         {
@@ -217,6 +231,10 @@ final class ReadStream
             {
                 // Begin on correlated WriteStream was already processed
                 channel.shutdownInput();
+                if (channel.socket().isOutputShutdown())
+                {
+                    CloseHelper.quietClose(channel);
+                }
             }
             else
             {
