@@ -107,20 +107,10 @@ final class ReadStream
             key.cancel(OP_READ);
             if (!closed)
             {
-                try
-                {
-                    closed = true;
-                    connectionDone.run();
-                    channel.shutdownInput();
-                    if (channel.socket().isOutputShutdown())
-                    {
-                        CloseHelper.quietClose(channel);
-                    }
-                }
-                catch (IOException e)
-                {
-                    LangUtil.rethrowUnchecked(e);
-                }
+                closed = true;
+                connectionDone.run();
+                shutdownInput();
+                closeIfOutputShutdown();
             }
         }
         else if (bytesRead != 0)
@@ -230,11 +220,8 @@ final class ReadStream
             if (correlatedThrottle != null)
             {
                 // Begin on correlated WriteStream was already processed
-                channel.shutdownInput();
-                if (channel.socket().isOutputShutdown())
-                {
-                    CloseHelper.quietClose(channel);
-                }
+               shutdownInput();
+               closeIfOutputShutdown();
             }
             else
             {
@@ -247,6 +234,26 @@ final class ReadStream
         catch (IOException ex)
         {
             LangUtil.rethrowUnchecked(ex);
+        }
+    }
+
+    private void shutdownInput()
+    {
+        try
+        {
+            channel.shutdownInput();
+        }
+        catch (IOException ex)
+        {
+            LangUtil.rethrowUnchecked(ex);
+        }
+    }
+
+    private void closeIfOutputShutdown()
+    {
+        if (channel.socket().isOutputShutdown())
+        {
+            CloseHelper.quietClose(channel);
         }
     }
 }

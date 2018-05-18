@@ -277,10 +277,7 @@ public final class WriteStream
             try
             {
                 channel.shutdownOutput();
-                if(channel.socket().isInputShutdown())
-                {
-                    CloseHelper.quietClose(channel);
-                }
+                closeIfInputShutdown();
             }
             catch (IOException ex)
             {
@@ -420,6 +417,14 @@ public final class WriteStream
             readableBytes += pendingCredit;
             writer.doWindow(sourceThrottle, streamId, pendingCredit, 0, 0);
             pendingCredit = 0;
+        }
+    }
+
+    private void closeIfInputShutdown()
+    {
+        if (channel.socket().isInputShutdown())
+        {
+            CloseHelper.quietClose(channel);
         }
     }
 
