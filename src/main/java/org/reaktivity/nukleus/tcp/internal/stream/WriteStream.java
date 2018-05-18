@@ -25,6 +25,7 @@ import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
+import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.reaktivity.nukleus.buffer.BufferPool;
@@ -276,6 +277,7 @@ public final class WriteStream
             try
             {
                 channel.shutdownOutput();
+                closeIfInputShutdown();
             }
             catch (IOException ex)
             {
@@ -415,6 +417,14 @@ public final class WriteStream
             readableBytes += pendingCredit;
             writer.doWindow(sourceThrottle, streamId, pendingCredit, 0, 0);
             pendingCredit = 0;
+        }
+    }
+
+    private void closeIfInputShutdown()
+    {
+        if (channel.socket().isInputShutdown())
+        {
+            CloseHelper.quietClose(channel);
         }
     }
 
