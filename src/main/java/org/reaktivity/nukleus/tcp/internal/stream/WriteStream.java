@@ -20,6 +20,7 @@ import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.CancelledKeyException;
 import java.nio.channels.SocketChannel;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
@@ -365,36 +366,37 @@ public final class WriteStream
     private int handleWrite(
         PollerKey key)
     {
-        key.clear(OP_WRITE);
-        ByteBuffer writeBuffer = bufferPool.byteBuffer(slot);
-        writeBuffer.position(slotOffset);
-        writeBuffer.limit(slotPosition);
-
         int bytesWritten = 0;
+
         try
         {
+            key.clear(OP_WRITE);
+            ByteBuffer writeBuffer = bufferPool.byteBuffer(slot);
+            writeBuffer.position(slotOffset);
+            writeBuffer.limit(slotPosition);
+
             bytesWritten = channel.write(writeBuffer);
-        }
-        catch (IOException ex)
-        {
-            handleIOExceptionFromWrite();
-            return 0;
-        }
 
-        handleUnwrittenData(writeBuffer, bytesWritten);
+            handleUnwrittenData(writeBuffer, bytesWritten);
 
-        if (slot == NO_SLOT)
-        {
-            if (readableBytes < 0) // deferred EOS and/or window was exceeded
+            if (slot == NO_SLOT)
             {
-                doCleanup();
+                if (readableBytes < 0) // deferred EOS and/or window was exceeded
+                {
+                    doCleanup();
+                }
+            }
+            else
+            {
+                // incomplete write
+                key.register(OP_WRITE);
             }
         }
-        else
+        catch (IOException | CancelledKeyException ex)
         {
-            // incomplete write
-            key.register(OP_WRITE);
+            handleIOExceptionFromWrite();
         }
+
         return bytesWritten;
     }
 
