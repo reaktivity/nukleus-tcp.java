@@ -268,7 +268,7 @@ public final class WriteStream
 
     private void doCleanup()
     {
-        if (key != null)
+        if (key != null && key.isValid())
         {
             key.clear(OP_WRITE);
         }
