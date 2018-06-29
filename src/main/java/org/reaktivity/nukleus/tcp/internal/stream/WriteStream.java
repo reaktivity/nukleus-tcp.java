@@ -273,7 +273,7 @@ public final class WriteStream
             key.clear(OP_WRITE);
         }
 
-        if (channel.isConnected())
+        if (channel.isConnected() && channel.isOpen())
         {
             try
             {
