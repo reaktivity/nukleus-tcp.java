@@ -84,13 +84,6 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ClientStreamFactoryBuilder setCorrelationIdSupplier(
-        LongSupplier supplyCorrelationId)
-    {
-        return this;
-    }
-
-    @Override
     public ClientStreamFactoryBuilder setRouteManager(
         RouteManager router)
     {
