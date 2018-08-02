@@ -138,6 +138,12 @@ public final class TcpController implements Controller
         return controllerSpi.doCount("connections");
     }
 
+    public long connectFailed(long routeId)
+    {
+        return controllerSpi.doCount(format("%d.connect.failed", routeId));
+    }
+
+
     public long bytesRead(long routeId)
     {
         return controllerSpi.doCount(format("%d.bytes.read", routeId));
