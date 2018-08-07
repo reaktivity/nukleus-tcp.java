@@ -61,6 +61,8 @@ public final class WriteStream
     private final LongSupplier frameCounter;
     private final LongConsumer bytesAccumulator;
 
+    private final LongSupplier connectFailedCounter;
+
     private int slot = BufferPool.NO_SLOT;
     private int slotOffset; // index of the first byte of unwritten data
     private int slotPosition; // index of the byte following the last byte of unwritten data
@@ -89,6 +91,7 @@ public final class WriteStream
         MessageWriter writer,
         LongSupplier frameCounter,
         LongConsumer bytesAccumulator,
+        LongSupplier connectFailedCounter,
         int windowThreshold)
     {
         this.streamId = streamId;
@@ -103,6 +106,7 @@ public final class WriteStream
         this.frameCounter = frameCounter;
         this.bytesAccumulator = bytesAccumulator;
         this.windowThreshold = windowThreshold;
+        this.connectFailedCounter = connectFailedCounter;
     }
 
     void handleStream(
@@ -146,6 +150,7 @@ public final class WriteStream
 
     void doConnectFailed()
     {
+        connectFailedCounter.getAsLong();
         writer.doReset(sourceThrottle, streamId);
     }
 
