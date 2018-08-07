@@ -64,6 +64,11 @@ public class TcpCountersRule implements TestRule
         return controller().connections();
     }
 
+    public long connectFailed(long routeId)
+    {
+        return controller().connectFailed(routeId);
+    }
+
     private TcpController controller()
     {
         return reaktor.controller(TcpController.class);

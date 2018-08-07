@@ -43,6 +43,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 
     private final Long2ObjectHashMap<LongSupplier> framesWrittenByteRouteId;
     private final Long2ObjectHashMap<LongSupplier> framesReadByteRouteId;
+    private final Long2ObjectHashMap<LongSupplier> connectFailedRouteId;
     private final Long2ObjectHashMap<LongConsumer> bytesWrittenByteRouteId;
     private final Long2ObjectHashMap<LongConsumer> bytesReadByteRouteId;
 
@@ -59,6 +60,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 
     private Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
     private Function<RouteFW, LongSupplier> supplyReadFrameCounter;
+    private Function<RouteFW, LongSupplier> supplyConnectFailedCounter;
     private Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
     private Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
     private Function<String, LongSupplier> supplyCounter;
@@ -71,6 +73,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 
         this.framesWrittenByteRouteId = new Long2ObjectHashMap<>();
         this.framesReadByteRouteId = new Long2ObjectHashMap<>();
+        this.connectFailedRouteId = new Long2ObjectHashMap<>();
         this.bytesWrittenByteRouteId = new Long2ObjectHashMap<>();
         this.bytesReadByteRouteId = new Long2ObjectHashMap<>();
     }
@@ -155,6 +158,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
                 final long routeId = unroute.correlationId();
                 bytesWrittenByteRouteId.remove(routeId);
                 bytesReadByteRouteId.remove(routeId);
+                connectFailedRouteId.remove(routeId);
                 framesWrittenByteRouteId.remove(routeId);
                 framesReadByteRouteId.remove(routeId);
             }
@@ -186,6 +190,13 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
                 return framesReadByteRouteId.computeIfAbsent(
                         routeId,
                         t -> supplyCounter.apply(String.format("%d.frames.read", t)));
+            };
+            this.supplyConnectFailedCounter = r ->
+            {
+                final long routeId = r.correlationId();
+                return connectFailedRouteId.computeIfAbsent(
+                        routeId,
+                        t -> supplyCounter.apply(String.format("%d.connect.failed", t)));
             };
         }
 
@@ -223,6 +234,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
             supplyReadFrameCounter,
             supplyReadBytesAccumulator,
             supplyWriteFrameCounter,
-            supplyWriteBytesAccumulator);
+            supplyWriteBytesAccumulator,
+            supplyConnectFailedCounter);
     }
 }

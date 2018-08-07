@@ -215,6 +215,7 @@ public class ClientIT
     public void connnectionFailed() throws Exception
     {
         k3po.finish();
+        assertEquals(1, counters.connectFailed(0));
     }
 
     @Test

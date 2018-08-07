@@ -231,7 +231,7 @@ public class ServerStreamFactory implements StreamFactory
             final LongSupplier readFrameCounter = correlation.readFrameCounter();
             final LongConsumer readBytesAccumulator = correlation.readBytesAccumulator();
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                    bufferPool, writeByteBuffer, writer, readFrameCounter, readBytesAccumulator, windowThreshold);
+                    bufferPool, writeByteBuffer, writer, readFrameCounter, readBytesAccumulator, null, windowThreshold);
             stream.setCorrelatedInput(correlation.correlatedStreamId(), correlation.correlatedStream());
             stream.doConnected();
             result = stream::handleStream;

@@ -85,6 +85,7 @@ public class ClientStreamFactory implements StreamFactory
     private final Function<RouteFW, LongSupplier> supplyReadFrameCounter;
     private final Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
     private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
+    private final Function<RouteFW, LongSupplier> supplyConnectFailedCounter;
 
     private final int windowThreshold;
 
@@ -102,7 +103,8 @@ public class ClientStreamFactory implements StreamFactory
         Function<RouteFW, LongSupplier> supplyReadFrameCounter,
         Function<RouteFW, LongConsumer> supplyReadBytesAccumulator,
         Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
-        Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator)
+        Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator,
+        Function<RouteFW, LongSupplier> supplyConnectFailedCounter)
     {
         this.router = requireNonNull(router);
         this.poller = poller;
@@ -126,6 +128,7 @@ public class ClientStreamFactory implements StreamFactory
         this.supplyReadFrameCounter = supplyReadFrameCounter;
         this.supplyWriteBytesAccumulator = supplyWriteBytesAccumulator;
         this.supplyReadBytesAccumulator = supplyReadBytesAccumulator;
+        this.supplyConnectFailedCounter = supplyConnectFailedCounter;
         windowThreshold = (bufferPool.slotCapacity() * configuration.windowThreshold()) / 100;
     }
 
@@ -191,8 +194,11 @@ public class ClientStreamFactory implements StreamFactory
             final LongConsumer writeBytesAccumulator = supplyWriteBytesAccumulator.apply(route);
             final LongSupplier readFrameCounter = supplyReadFrameCounter.apply(route);
             final LongConsumer readBytesAccumulator = supplyReadBytesAccumulator.apply(route);
+            final LongSupplier connectFailedCounter = supplyConnectFailedCounter.apply(route);
+
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                    bufferPool, writeByteBuffer, writer, writeFrameCounter, writeBytesAccumulator, windowThreshold);
+                    bufferPool, writeByteBuffer, writer, writeFrameCounter, writeBytesAccumulator,
+                    connectFailedCounter, windowThreshold);
             result = stream::handleStream;
 
             doConnect(
