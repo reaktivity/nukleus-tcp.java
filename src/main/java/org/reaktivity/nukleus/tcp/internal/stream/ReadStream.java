@@ -198,6 +198,10 @@ final class ReadStream
             {
                 handleStream(key);
             }
+            else
+            {
+                key.clear(OP_READ);
+            }
 
             if (readableBytes > readPadding)
             {
