@@ -150,6 +150,7 @@ public final class WriteStream
 
     void doConnectFailed()
     {
+        CloseHelper.quietClose(channel);
         connectFailedCounter.getAsLong();
         writer.doReset(sourceThrottle, streamId);
     }
