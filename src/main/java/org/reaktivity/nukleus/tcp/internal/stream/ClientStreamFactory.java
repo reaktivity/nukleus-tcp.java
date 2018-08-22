@@ -33,9 +33,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
-import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
@@ -51,6 +49,8 @@ import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
+import org.reaktivity.nukleus.tcp.internal.TcpCounters;
+import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
@@ -69,7 +69,6 @@ public class ClientStreamFactory implements StreamFactory
     private final BeginFW beginRO = new BeginFW();
 
     private final BufferPool bufferPool;
-    private final LongSupplier incrementOverflow;
     private Poller poller;
     private final RouteManager router;
     private final LongSupplier supplyStreamId;
@@ -80,13 +79,7 @@ public class ClientStreamFactory implements StreamFactory
     private final ByteBuffer writeByteBuffer;
     private final MessageWriter writer;
     private final Map<String, Predicate<? super InetAddress>> targetToCidrMatch;
-
-    private final Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
-    private final Function<RouteFW, LongSupplier> supplyReadFrameCounter;
-    private final Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
-    private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
-    private final Function<RouteFW, LongSupplier> supplyConnectFailedCounter;
-
+    private final TcpCounters counters;
     private final int windowThreshold;
 
     public ClientStreamFactory(
@@ -95,22 +88,16 @@ public class ClientStreamFactory implements StreamFactory
         Poller poller,
         MutableDirectBuffer writeBuffer,
         BufferPool bufferPool,
-        LongSupplier incrementOverflow,
         LongSupplier supplyStreamId,
         LongSupplier supplyTrace,
         LongFunction<IntUnaryOperator> groupBudgetClaimer,
         LongFunction<IntUnaryOperator> groupBudgetReleaser,
-        Function<RouteFW, LongSupplier> supplyReadFrameCounter,
-        Function<RouteFW, LongConsumer> supplyReadBytesAccumulator,
-        Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
-        Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator,
-        Function<RouteFW, LongSupplier> supplyConnectFailedCounter)
+        TcpCounters counters)
     {
         this.router = requireNonNull(router);
         this.poller = poller;
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
         this.bufferPool = requireNonNull(bufferPool);
-        this.incrementOverflow = incrementOverflow;
         this.supplyStreamId = requireNonNull(supplyStreamId);
         this.groupBudgetClaimer = requireNonNull(groupBudgetClaimer);
         this.groupBudgetReleaser = requireNonNull(groupBudgetReleaser);
@@ -124,12 +111,8 @@ public class ClientStreamFactory implements StreamFactory
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
         this.targetToCidrMatch = new HashMap<>();
 
-        this.supplyWriteFrameCounter = supplyWriteFrameCounter;
-        this.supplyReadFrameCounter = supplyReadFrameCounter;
-        this.supplyWriteBytesAccumulator = supplyWriteBytesAccumulator;
-        this.supplyReadBytesAccumulator = supplyReadBytesAccumulator;
-        this.supplyConnectFailedCounter = supplyConnectFailedCounter;
-        windowThreshold = (bufferPool.slotCapacity() * configuration.windowThreshold()) / 100;
+        this.counters = counters;
+        this.windowThreshold = (bufferPool.slotCapacity() * configuration.windowThreshold()) / 100;
     }
 
     @Override
@@ -190,15 +173,11 @@ public class ClientStreamFactory implements StreamFactory
             InetSocketAddress remoteAddress = hasExtension ? resolveRemoteAddressExt(extension, targetName, targetRef) :
                                                              new InetSocketAddress(targetName, (int)targetRef);
             assert remoteAddress != null;
-            final LongSupplier writeFrameCounter = supplyWriteFrameCounter.apply(route);
-            final LongConsumer writeBytesAccumulator = supplyWriteBytesAccumulator.apply(route);
-            final LongSupplier readFrameCounter = supplyReadFrameCounter.apply(route);
-            final LongConsumer readBytesAccumulator = supplyReadBytesAccumulator.apply(route);
-            final LongSupplier connectFailedCounter = supplyConnectFailedCounter.apply(route);
 
-            final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                    bufferPool, writeByteBuffer, writer, writeFrameCounter, writeBytesAccumulator,
-                    connectFailedCounter, windowThreshold);
+            final TcpRouteCounters routeCounters = counters.supplyRoute(route.correlationId());
+
+            final WriteStream stream = new WriteStream(throttle, streamId, channel, poller,
+                    bufferPool, writeByteBuffer, writer, routeCounters, windowThreshold);
             result = stream::handleStream;
 
             doConnect(
@@ -210,8 +189,7 @@ public class ClientStreamFactory implements StreamFactory
                 throttle,
                 streamId,
                 stream::setCorrelatedInput,
-                readFrameCounter,
-                readBytesAccumulator);
+                routeCounters);
         }
         else
         {
@@ -349,11 +327,10 @@ public class ClientStreamFactory implements StreamFactory
         MessageConsumer outputThrottle,
         long outputStreamId,
         LongObjectBiConsumer<MessageConsumer> setCorrelatedInput,
-        LongSupplier readFrameCounter,
-        LongConsumer readBytesAccumulator)
+        TcpRouteCounters counters)
     {
         final Request request = new Request(channel, stream, acceptReplyName, correlationId,
-                outputThrottle, outputStreamId, setCorrelatedInput, readFrameCounter, readBytesAccumulator);
+                outputThrottle, outputStreamId, setCorrelatedInput, counters);
 
         try
         {
@@ -397,10 +374,9 @@ public class ClientStreamFactory implements StreamFactory
 
             final PollerKey key = poller.doRegister(channel, 0, null);
 
-            final LongSupplier readFrameCounter = request.readFrameCounter;
-            final LongConsumer readBytesAccumulator = request.readBytesAccumulator;
+            final TcpRouteCounters counters = request.counters;
             final ReadStream stream = new ReadStream(target, targetId, key, channel,
-                    readByteBuffer, readBuffer, writer, readFrameCounter, readBytesAccumulator, () -> {});
+                    readByteBuffer, readBuffer, writer, counters, () -> {});
             stream.setCorrelatedThrottle(correlatedStreamId, correlatedThrottle);
 
             router.setThrottle(targetName, targetId, stream::handleThrottle);
@@ -432,18 +408,17 @@ public class ClientStreamFactory implements StreamFactory
         private final MessageConsumer outputThrottle;
         private final long outputStreamdId;
         private final LongObjectBiConsumer<MessageConsumer> setCorrelatedInput;
-        private final LongSupplier readFrameCounter;
-        private final LongConsumer readBytesAccumulator;
+        private final TcpRouteCounters counters;
 
-        private Request(SocketChannel channel,
-                        WriteStream stream,
-                        String acceptReplyName,
-                        long correlationId,
-                        MessageConsumer outputThrottle,
-                        long outputStreamId,
-                        LongObjectBiConsumer<MessageConsumer> setCorrelatedInput,
-                        LongSupplier readFrameCounter,
-                        LongConsumer readBytesAccumulator)
+        private Request(
+            SocketChannel channel,
+            WriteStream stream,
+            String acceptReplyName,
+            long correlationId,
+            MessageConsumer outputThrottle,
+            long outputStreamId,
+            LongObjectBiConsumer<MessageConsumer> setCorrelatedInput,
+            TcpRouteCounters counters)
         {
             this.channel = channel;
             this.stream = stream;
@@ -452,8 +427,7 @@ public class ClientStreamFactory implements StreamFactory
             this.outputThrottle = outputThrottle;
             this.outputStreamdId = outputStreamId;
             this.setCorrelatedInput = setCorrelatedInput;
-            this.readFrameCounter = readFrameCounter;
-            this.readBytesAccumulator = readBytesAccumulator;
+            this.counters = counters;
         }
 
         @Override

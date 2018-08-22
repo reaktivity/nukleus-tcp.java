@@ -22,8 +22,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.CancelledKeyException;
 import java.nio.channels.SocketChannel;
-import java.util.function.LongConsumer;
-import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 
 import org.agrona.CloseHelper;
@@ -31,6 +29,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
@@ -55,13 +54,9 @@ public final class WriteStream
     private final BufferPool bufferPool;
 
     private final MessageWriter writer;
-    private final LongSupplier incrementOverflow;
     private final ToIntFunction<PollerKey> writeHandler;
 
-    private final LongSupplier frameCounter;
-    private final LongConsumer bytesAccumulator;
-
-    private final LongSupplier connectFailedCounter;
+    private final TcpRouteCounters counters;
 
     private int slot = BufferPool.NO_SLOT;
     private int slotOffset; // index of the first byte of unwritten data
@@ -80,33 +75,28 @@ public final class WriteStream
 
     private int pendingCredit;
 
+
     WriteStream(
         MessageConsumer sourceThrottle,
         long streamId,
         SocketChannel channel,
         Poller poller,
-        LongSupplier incrementOverflow,
         BufferPool bufferPool,
         ByteBuffer writeBuffer,
         MessageWriter writer,
-        LongSupplier frameCounter,
-        LongConsumer bytesAccumulator,
-        LongSupplier connectFailedCounter,
+        TcpRouteCounters counters,
         int windowThreshold)
     {
         this.streamId = streamId;
         this.sourceThrottle = sourceThrottle;
         this.channel = channel;
         this.poller = poller;
-        this.incrementOverflow = incrementOverflow;
         this.bufferPool = bufferPool;
         this.writeBuffer = writeBuffer;
         this.writer = writer;
         this.writeHandler = this::handleWrite;
-        this.frameCounter = frameCounter;
-        this.bytesAccumulator = bytesAccumulator;
+        this.counters = counters;
         this.windowThreshold = windowThreshold;
-        this.connectFailedCounter = connectFailedCounter;
     }
 
     void handleStream(
@@ -151,7 +141,7 @@ public final class WriteStream
     void doConnectFailed()
     {
         CloseHelper.quietClose(channel);
-        connectFailedCounter.getAsLong();
+        counters.connectFailed.getAsLong();
         writer.doReset(sourceThrottle, streamId);
     }
 
@@ -202,8 +192,8 @@ public final class WriteStream
         final OctetsFW payload = writer.dataRO.payload();
         final int writableBytes = writer.dataRO.length();
 
-        frameCounter.getAsLong();
-        bytesAccumulator.accept(writableBytes);
+        counters.framesWritten.getAsLong();
+        counters.bytesWritten.accept(writableBytes);
 
         if (reduceWindow(writableBytes))
         {
@@ -328,7 +318,7 @@ public final class WriteStream
                 slot = bufferPool.acquire(streamId);
                 if (slot == NO_SLOT)
                 {
-                    incrementOverflow.getAsLong();
+                    counters.overflows.getAsLong();
                     doFail();
                     result = false;
                 }

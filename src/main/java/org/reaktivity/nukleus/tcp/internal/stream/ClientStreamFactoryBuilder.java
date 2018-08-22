@@ -30,8 +30,9 @@ import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
+import org.reaktivity.nukleus.tcp.internal.TcpCounters;
+import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
-import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
 
 public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
@@ -41,13 +42,6 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 
     private final UnrouteFW unrouteRO = new UnrouteFW();
 
-    private final Long2ObjectHashMap<LongSupplier> framesWrittenByteRouteId;
-    private final Long2ObjectHashMap<LongSupplier> framesReadByteRouteId;
-    private final Long2ObjectHashMap<LongSupplier> connectFailedRouteId;
-    private final Long2ObjectHashMap<LongConsumer> bytesWrittenByteRouteId;
-    private final Long2ObjectHashMap<LongConsumer> bytesReadByteRouteId;
-
-    private LongSupplier incrementOverflow;
     private RouteManager router;
     private Supplier<BufferPool> supplyBufferPool;
     private LongSupplier supplyStreamId;
@@ -58,24 +52,16 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     private LongFunction<IntUnaryOperator> groupBudgetClaimer;
     private LongFunction<IntUnaryOperator> groupBudgetReleaser;
 
-    private Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
-    private Function<RouteFW, LongSupplier> supplyReadFrameCounter;
-    private Function<RouteFW, LongSupplier> supplyConnectFailedCounter;
-    private Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
-    private Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
+    private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
 
     public ClientStreamFactoryBuilder(TcpConfiguration config, Poller poller)
     {
         this.config = config;
         this.poller = poller;
 
-        this.framesWrittenByteRouteId = new Long2ObjectHashMap<>();
-        this.framesReadByteRouteId = new Long2ObjectHashMap<>();
-        this.connectFailedRouteId = new Long2ObjectHashMap<>();
-        this.bytesWrittenByteRouteId = new Long2ObjectHashMap<>();
-        this.bytesReadByteRouteId = new Long2ObjectHashMap<>();
+        this.countersByRouteId = new Long2ObjectHashMap<>();
     }
 
     @Override
@@ -156,11 +142,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
             {
                 final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
                 final long routeId = unroute.correlationId();
-                bytesWrittenByteRouteId.remove(routeId);
-                bytesReadByteRouteId.remove(routeId);
-                connectFailedRouteId.remove(routeId);
-                framesWrittenByteRouteId.remove(routeId);
-                framesReadByteRouteId.remove(routeId);
+                countersByRouteId.remove(routeId);
             }
             break;
         }
@@ -170,55 +152,8 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     @Override
     public StreamFactory build()
     {
-        if (incrementOverflow == null)
-        {
-            incrementOverflow = supplyCounter.apply("overflows");
-        }
-
-        if (supplyWriteFrameCounter == null)
-        {
-            this.supplyWriteFrameCounter = r ->
-            {
-                final long routeId = r.correlationId();
-                return framesWrittenByteRouteId.computeIfAbsent(
-                        routeId,
-                        t -> supplyCounter.apply(String.format("%d.frames.written", t)));
-            };
-            this.supplyReadFrameCounter = r ->
-            {
-                final long routeId = r.correlationId();
-                return framesReadByteRouteId.computeIfAbsent(
-                        routeId,
-                        t -> supplyCounter.apply(String.format("%d.frames.read", t)));
-            };
-            this.supplyConnectFailedCounter = r ->
-            {
-                final long routeId = r.correlationId();
-                return connectFailedRouteId.computeIfAbsent(
-                        routeId,
-                        t -> supplyCounter.apply(String.format("%d.connect.failed", t)));
-            };
-        }
-
-        if (supplyWriteBytesAccumulator == null)
-        {
-            this.supplyWriteBytesAccumulator = r ->
-            {
-                final long routeId = r.correlationId();
-                return bytesWrittenByteRouteId.computeIfAbsent(
-                        routeId,
-                        t -> supplyAccumulator.apply(String.format("%d.bytes.written", t)));
-            };
-            this.supplyReadBytesAccumulator = r ->
-            {
-                final long routeId = r.correlationId();
-                return bytesReadByteRouteId.computeIfAbsent(
-                        routeId,
-                        t -> supplyAccumulator.apply(String.format("%d.bytes.read", t)));
-            };
-        }
-
         final BufferPool bufferPool = supplyBufferPool.get();
+        final TcpCounters counters = new TcpCounters(supplyCounter, supplyAccumulator, countersByRouteId);
 
         return new ClientStreamFactory(
             config,
@@ -226,15 +161,10 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
             poller,
             writeBuffer,
             bufferPool,
-            incrementOverflow,
             supplyStreamId,
             supplyTrace,
             groupBudgetClaimer,
             groupBudgetReleaser,
-            supplyReadFrameCounter,
-            supplyReadBytesAccumulator,
-            supplyWriteFrameCounter,
-            supplyWriteBytesAccumulator,
-            supplyConnectFailedCounter);
+            counters);
     }
 }
