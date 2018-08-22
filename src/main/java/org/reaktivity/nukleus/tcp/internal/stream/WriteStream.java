@@ -140,7 +140,12 @@ public final class WriteStream
 
     void doConnectFailed()
     {
-        CloseHelper.quietClose(channel);
+        if (channel.isOpen())
+        {
+            CloseHelper.quietClose(channel);
+            counters.connectionsClosed.getAsLong();
+        }
+
         counters.connectFailed.getAsLong();
         writer.doReset(sourceThrottle, streamId);
     }
@@ -422,7 +427,11 @@ public final class WriteStream
     {
         if (channel.socket().isInputShutdown())
         {
-            CloseHelper.quietClose(channel);
+            if (channel.isOpen())
+            {
+                CloseHelper.quietClose(channel);
+                counters.connectionsClosed.getAsLong();
+            }
         }
     }
 

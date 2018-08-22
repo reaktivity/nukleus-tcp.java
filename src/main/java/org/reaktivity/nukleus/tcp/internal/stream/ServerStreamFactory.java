@@ -169,6 +169,8 @@ public class ServerStreamFactory implements StreamFactory
 
                 final TcpRouteCounters routeCounters = counters.supplyRoute(route.correlationId());
 
+                routeCounters.connectionsOpened.getAsLong();
+
                 final ReadStream stream = new ReadStream(target, targetId, key, channel,
                         readByteBuffer, readBuffer, writer, routeCounters, connectionDone);
                 final Correlation correlation = new Correlation(sourceName, channel, stream::setCorrelatedThrottle,

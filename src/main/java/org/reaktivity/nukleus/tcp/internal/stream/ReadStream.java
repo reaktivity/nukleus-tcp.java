@@ -253,7 +253,11 @@ final class ReadStream
     {
         if (channel.socket().isOutputShutdown())
         {
-            CloseHelper.quietClose(channel);
+            if (channel.isOpen())
+            {
+                CloseHelper.quietClose(channel);
+                counters.connectionsClosed.getAsLong();
+            }
         }
     }
 }

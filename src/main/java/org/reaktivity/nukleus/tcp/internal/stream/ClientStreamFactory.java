@@ -176,6 +176,8 @@ public class ClientStreamFactory implements StreamFactory
 
             final TcpRouteCounters routeCounters = counters.supplyRoute(route.correlationId());
 
+            routeCounters.connectionsOpened.getAsLong();
+
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller,
                     bufferPool, writeByteBuffer, writer, routeCounters, windowThreshold);
             result = stream::handleStream;

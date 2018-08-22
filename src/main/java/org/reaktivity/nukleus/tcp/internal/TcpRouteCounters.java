@@ -22,6 +22,8 @@ import java.util.function.LongSupplier;
 public final class TcpRouteCounters
 {
     public final LongSupplier overflows;
+    public final LongSupplier connectionsOpened;
+    public final LongSupplier connectionsClosed;
     public final LongSupplier framesWritten;
     public final LongConsumer bytesWritten;
     public final LongSupplier framesRead;
@@ -34,6 +36,8 @@ public final class TcpRouteCounters
         Function<String, LongConsumer> supplyAccumulator)
     {
         this.overflows = supplyCounter.apply("overflows");
+        this.connectionsOpened = supplyCounter.apply(String.format("%d.connections.opened", routeId));
+        this.connectionsClosed = supplyCounter.apply(String.format("%d.connections.closed", routeId));
         this.framesWritten = supplyCounter.apply(String.format("%d.frames.written", routeId));
         this.bytesWritten = supplyAccumulator.apply(String.format("%d.bytes.written", routeId));
         this.framesRead = supplyCounter.apply(String.format("%d.frames.read", routeId));
