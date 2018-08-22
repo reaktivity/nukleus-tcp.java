@@ -30,26 +30,21 @@ import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
+import org.reaktivity.nukleus.tcp.internal.TcpCounters;
+import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 
 public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
 {
+    private final UnrouteFW unrouteRO = new UnrouteFW();
+
     private final Acceptor acceptor;
     private final TcpConfiguration config;
     private final Poller poller;
     private final Long2ObjectHashMap<Correlation> correlations;
+    private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
 
-    private final UnrouteFW unrouteRO = new UnrouteFW();
-
-    private final Long2ObjectHashMap<LongSupplier> framesWrittenByteRouteId;
-    private final Long2ObjectHashMap<LongSupplier> framesReadByteRouteId;
-    private final Long2ObjectHashMap<LongConsumer> bytesWrittenByteRouteId;
-    private final Long2ObjectHashMap<LongConsumer> bytesReadByteRouteId;
-
-    private LongSupplier incrementOverflow;
-    private LongConsumer connectionsAccumulator;
     private RouteManager router;
     private LongSupplier supplyStreamId;
     private LongSupplier supplyTrace;
@@ -61,22 +56,16 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
 
-    private Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
-    private Function<RouteFW, LongSupplier> supplyReadFrameCounter;
-    private Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
-    private Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
-
-    public ServerStreamFactoryBuilder(TcpConfiguration config, Acceptor acceptor, Poller poller)
+    public ServerStreamFactoryBuilder(
+        TcpConfiguration config,
+        Acceptor acceptor,
+        Poller poller)
     {
         this.config = config;
         this.acceptor = acceptor;
         this.poller = poller;
         this.correlations = new Long2ObjectHashMap<>();
-
-        this.framesWrittenByteRouteId = new Long2ObjectHashMap<>();
-        this.framesReadByteRouteId = new Long2ObjectHashMap<>();
-        this.bytesWrittenByteRouteId = new Long2ObjectHashMap<>();
-        this.bytesReadByteRouteId = new Long2ObjectHashMap<>();
+        this.countersByRouteId = new Long2ObjectHashMap<>();
     }
 
     @Override
@@ -167,10 +156,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
             {
                 final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
                 final long routeId = unroute.correlationId();
-                bytesWrittenByteRouteId.remove(routeId);
-                bytesReadByteRouteId.remove(routeId);
-                framesWrittenByteRouteId.remove(routeId);
-                framesReadByteRouteId.remove(routeId);
+                countersByRouteId.remove(routeId);
             }
             break;
         }
@@ -181,59 +167,13 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactory build()
     {
         final BufferPool bufferPool = supplyBufferPool.get();
-
-        if (incrementOverflow == null)
-        {
-            incrementOverflow = supplyCounter.apply("overflows");
-        }
-
-        if (connectionsAccumulator == null)
-        {
-            connectionsAccumulator = supplyAccumulator.apply("connections");
-        }
-
-        if (supplyWriteFrameCounter == null)
-        {
-            this.supplyWriteFrameCounter = r ->
-            {
-                final long routeId = r.correlationId();
-                return framesWrittenByteRouteId.computeIfAbsent(
-                        routeId,
-                        t -> supplyCounter.apply(String.format("%d.frames.written", t)));
-            };
-            this.supplyReadFrameCounter = r ->
-            {
-                final long routeId = r.correlationId();
-                return framesReadByteRouteId.computeIfAbsent(
-                        routeId,
-                        t -> supplyCounter.apply(String.format("%d.frames.read", t)));
-            };
-        }
-
-        if (supplyWriteBytesAccumulator == null)
-        {
-            this.supplyWriteBytesAccumulator = r ->
-            {
-                final long routeId = r.correlationId();
-                return bytesWrittenByteRouteId.computeIfAbsent(
-                        routeId,
-                        t -> supplyAccumulator.apply(String.format("%d.bytes.written", t)));
-            };
-            this.supplyReadBytesAccumulator = r ->
-            {
-                final long routeId = r.correlationId();
-                return bytesReadByteRouteId.computeIfAbsent(
-                        routeId,
-                        t -> supplyAccumulator.apply(String.format("%d.bytes.read", t)));
-            };
-        }
+        final TcpCounters counters = new TcpCounters(supplyCounter, supplyAccumulator, countersByRouteId);
 
         ServerStreamFactory factory = new ServerStreamFactory(
             config,
             router,
             writeBuffer,
             bufferPool,
-            incrementOverflow,
             supplyStreamId,
             supplyTrace,
             supplyCorrelationId,
@@ -241,11 +181,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
             poller,
             groupBudgetClaimer,
             groupBudgetReleaser,
-            supplyReadFrameCounter,
-            supplyReadBytesAccumulator,
-            supplyWriteFrameCounter,
-            supplyWriteBytesAccumulator,
-            connectionsAccumulator);
+            counters);
         acceptor.setServerStreamFactory(factory);
         acceptor.setRouter(router);
         return factory;

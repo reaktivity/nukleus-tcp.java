@@ -22,14 +22,13 @@ import java.net.StandardSocketOptions;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.function.LongConsumer;
-import java.util.function.LongSupplier;
 
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
@@ -43,8 +42,7 @@ final class ReadStream
     private final ByteBuffer readBuffer;
     private final MutableDirectBuffer atomicBuffer;
     private final MessageWriter writer;
-    private final LongSupplier frameCounter;
-    private final LongConsumer bytesAccumulator;
+    private final TcpRouteCounters counters;
     private Runnable connectionDone;
     private boolean closed;
 
@@ -63,8 +61,7 @@ final class ReadStream
         ByteBuffer readByteBuffer,
         MutableDirectBuffer readBuffer,
         MessageWriter writer,
-        LongSupplier frameCounter,
-        LongConsumer bytesAccumulator,
+        TcpRouteCounters counters,
         Runnable connectionDone)
     {
         this.target = target;
@@ -74,8 +71,7 @@ final class ReadStream
         this.readBuffer = readByteBuffer;
         this.atomicBuffer = readBuffer;
         this.writer = writer;
-        this.frameCounter = frameCounter;
-        this.bytesAccumulator = bytesAccumulator;
+        this.counters = counters;
         this.connectionDone = connectionDone;
     }
 
@@ -115,8 +111,8 @@ final class ReadStream
         }
         else if (bytesRead != 0)
         {
-            frameCounter.getAsLong();
-            bytesAccumulator.accept(bytesRead);
+            counters.framesRead.getAsLong();
+            counters.bytesRead.accept(bytesRead);
             // atomic buffer is zero copy with read buffer
             writer.doTcpData(target, streamId, readGroupId, readPadding, atomicBuffer, 0, bytesRead);
 
@@ -257,7 +253,11 @@ final class ReadStream
     {
         if (channel.socket().isOutputShutdown())
         {
-            CloseHelper.quietClose(channel);
+            if (channel.isOpen())
+            {
+                CloseHelper.quietClose(channel);
+                counters.connectionsClosed.getAsLong();
+            }
         }
     }
 }

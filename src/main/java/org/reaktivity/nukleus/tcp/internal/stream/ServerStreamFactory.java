@@ -25,9 +25,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
-import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
@@ -44,6 +42,8 @@ import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
+import org.reaktivity.nukleus.tcp.internal.TcpCounters;
+import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
@@ -53,7 +53,7 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 public class ServerStreamFactory implements StreamFactory
 {
     private final RouteFW routeRO = new RouteFW();
-    private final BeginFW beginRO = new org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW();
+    private final BeginFW beginRO = new BeginFW();
 
     private final RouteManager router;
     private final LongSupplier supplyStreamId;
@@ -64,26 +64,19 @@ public class ServerStreamFactory implements StreamFactory
     private final Poller poller;
 
     private final BufferPool bufferPool;
-    private final LongSupplier incrementOverflow;
     private final ByteBuffer readByteBuffer;
     private final MutableDirectBuffer readBuffer;
     private final ByteBuffer writeByteBuffer;
     private final MessageWriter writer;
-
-    private final Function<RouteFW, LongSupplier> supplyWriteFrameCounter;
-    private final Function<RouteFW, LongSupplier> supplyReadFrameCounter;
-    private final Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator;
-    private final Function<RouteFW, LongConsumer> supplyReadBytesAccumulator;
-
     private final int windowThreshold;
-    final LongConsumer connectionsAccumulator;
+
+    final TcpCounters counters;
 
     public ServerStreamFactory(
         TcpConfiguration config,
         RouteManager router,
         MutableDirectBuffer writeBuffer,
         BufferPool bufferPool,
-        LongSupplier incrementOverflow,
         LongSupplier supplyStreamId,
         LongSupplier supplyTrace,
         LongSupplier supplyCorrelationId,
@@ -91,38 +84,28 @@ public class ServerStreamFactory implements StreamFactory
         Poller poller,
         LongFunction<IntUnaryOperator> groupBudgetClaimer,
         LongFunction<IntUnaryOperator> groupBudgetReleaser,
-        Function<RouteFW, LongSupplier> supplyReadFrameCounter,
-        Function<RouteFW, LongConsumer> supplyReadBytesAccumulator,
-        Function<RouteFW, LongSupplier> supplyWriteFrameCounter,
-        Function<RouteFW, LongConsumer> supplyWriteBytesAccumulator,
-        LongConsumer connectionsAccumulator)
+        TcpCounters counters)
     {
         this.router = requireNonNull(router);
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
         this.writer = new MessageWriter(requireNonNull(writeBuffer), requireNonNull(supplyTrace));
         this.bufferPool = bufferPool;
-        this.incrementOverflow = incrementOverflow;
         this.supplyStreamId = requireNonNull(supplyStreamId);
         this.groupBudgetClaimer = requireNonNull(groupBudgetClaimer);
         this.groupBudgetReleaser = requireNonNull(groupBudgetReleaser);
         this.supplyCorrelationId = supplyCorrelationId;
         this.correlations = requireNonNull(correlations);
+        this.counters = counters;
+
         int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
 
         // Data frame length must fit into a 2 byte unsigned integer
         readBufferSize = Math.min(readBufferSize, (1 << Short.SIZE) - 1);
 
-        this.supplyWriteFrameCounter = supplyWriteFrameCounter;
-        this.supplyReadFrameCounter = supplyReadFrameCounter;
-        this.supplyWriteBytesAccumulator = supplyWriteBytesAccumulator;
-        this.supplyReadBytesAccumulator = supplyReadBytesAccumulator;
-
-        this.connectionsAccumulator = connectionsAccumulator;
-
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
         this.poller = poller;
-        windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
+        this.windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
     }
 
     @Override
@@ -184,15 +167,14 @@ public class ServerStreamFactory implements StreamFactory
 
                 final PollerKey key = poller.doRegister(channel, 0, null);
 
-                final LongSupplier writeFrameCounter = supplyWriteFrameCounter.apply(route);
-                final LongConsumer writeFrameAccumulator = supplyWriteBytesAccumulator.apply(route);
-                final LongSupplier readFrameCounter = supplyReadFrameCounter.apply(route);
-                final LongConsumer readFrameAccumulator = supplyReadBytesAccumulator.apply(route);
+                final TcpRouteCounters routeCounters = counters.supplyRoute(route.correlationId());
+
+                routeCounters.connectionsOpened.getAsLong();
 
                 final ReadStream stream = new ReadStream(target, targetId, key, channel,
-                        readByteBuffer, readBuffer, writer, writeFrameCounter, writeFrameAccumulator, connectionDone);
+                        readByteBuffer, readBuffer, writer, routeCounters, connectionDone);
                 final Correlation correlation = new Correlation(sourceName, channel, stream::setCorrelatedThrottle,
-                        target, targetId, readFrameCounter, readFrameAccumulator);
+                        target, targetId, routeCounters);
                 correlations.put(correlationId, correlation);
 
                 router.setThrottle(targetName, targetId, stream::handleThrottle);
@@ -228,10 +210,9 @@ public class ServerStreamFactory implements StreamFactory
             correlation.setCorrelatedThrottle(throttle, streamId);
             final SocketChannel channel = correlation.channel();
 
-            final LongSupplier readFrameCounter = correlation.readFrameCounter();
-            final LongConsumer readBytesAccumulator = correlation.readBytesAccumulator();
-            final WriteStream stream = new WriteStream(throttle, streamId, channel, poller, incrementOverflow,
-                    bufferPool, writeByteBuffer, writer, readFrameCounter, readBytesAccumulator, null, windowThreshold);
+            final TcpRouteCounters counters = correlation.counters();
+            final WriteStream stream = new WriteStream(throttle, streamId, channel, poller,
+                    bufferPool, writeByteBuffer, writer, counters, windowThreshold);
             stream.setCorrelatedInput(correlation.correlatedStreamId(), correlation.correlatedStream());
             stream.doConnected();
             result = stream::handleStream;
