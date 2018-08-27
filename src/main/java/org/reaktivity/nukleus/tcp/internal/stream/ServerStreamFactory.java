@@ -171,8 +171,14 @@ public class ServerStreamFactory implements StreamFactory
 
                 routeCounters.connectionsOpened.getAsLong();
 
+                final Runnable connectionCleanup = () ->
+                {
+                    correlations.remove(correlationId);
+                    connectionDone.run();
+                };
+
                 final ReadStream stream = new ReadStream(target, targetId, key, channel,
-                        readByteBuffer, readBuffer, writer, routeCounters, connectionDone);
+                        readByteBuffer, readBuffer, writer, routeCounters, connectionCleanup);
                 final Correlation correlation = new Correlation(sourceName, channel, stream::setCorrelatedThrottle,
                         target, targetId, routeCounters);
                 correlations.put(correlationId, correlation);
