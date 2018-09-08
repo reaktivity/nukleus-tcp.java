@@ -136,8 +136,12 @@ public class ServerStreamFactory implements StreamFactory
         return newStream;
     }
 
-    public void onAccepted(String sourceName, long sourceRef, SocketChannel channel, InetSocketAddress address,
-                           Runnable connectionDone)
+    public void onAccepted(
+        String sourceName,
+        long sourceRef,
+        SocketChannel channel,
+        InetSocketAddress address,
+        Runnable onConnectionClosed)
     {
         final MessagePredicate filter = (t, b, o, l) ->
         {
@@ -171,16 +175,16 @@ public class ServerStreamFactory implements StreamFactory
 
                 routeCounters.connectionsOpened.getAsLong();
 
-                final Runnable connectionCleanup = () ->
+                final Runnable doCleanupConnection = () ->
                 {
                     correlations.remove(correlationId);
-                    connectionDone.run();
+                    onConnectionClosed.run();
                 };
 
                 final ReadStream stream = new ReadStream(target, targetId, key, channel,
-                        readByteBuffer, readBuffer, writer, routeCounters, connectionCleanup);
+                        readByteBuffer, readBuffer, writer, routeCounters, doCleanupConnection);
                 final Correlation correlation = new Correlation(sourceName, channel, stream::setCorrelatedThrottle,
-                        target, targetId, routeCounters);
+                        target, targetId, routeCounters, onConnectionClosed);
                 correlations.put(correlationId, correlation);
 
                 router.setThrottle(targetName, targetId, stream::handleThrottle);
@@ -191,14 +195,14 @@ public class ServerStreamFactory implements StreamFactory
             }
             catch (IOException ex)
             {
-                connectionDone.run();
+                onConnectionClosed.run();
                 CloseHelper.quietClose(channel);
                 LangUtil.rethrowUnchecked(ex);
             }
         }
         else
         {
-            connectionDone.run();
+            onConnectionClosed.run();
             CloseHelper.close(channel);
         }
 
@@ -217,8 +221,9 @@ public class ServerStreamFactory implements StreamFactory
             final SocketChannel channel = correlation.channel();
 
             final TcpRouteCounters counters = correlation.counters();
+            final Runnable onConnectionClosed = correlation.onConnectionClosed();
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller,
-                    bufferPool, writeByteBuffer, writer, counters, windowThreshold);
+                    bufferPool, writeByteBuffer, writer, counters, windowThreshold, onConnectionClosed);
             stream.setCorrelatedInput(correlation.correlatedStreamId(), correlation.correlatedStream());
             stream.doConnected();
             result = stream::handleStream;

@@ -467,7 +467,7 @@ public class ServerIT
         channel2.close();
         channel3.close();
         channel5.close();
-        Thread.sleep(200);
+        Thread.sleep(500);
         assertEquals(0, counters.connections());
 
         k3po.finish();

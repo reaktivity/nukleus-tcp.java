@@ -43,8 +43,7 @@ final class ReadStream
     private final MutableDirectBuffer atomicBuffer;
     private final MessageWriter writer;
     private final TcpRouteCounters counters;
-    private Runnable connectionDone;
-    private boolean closed;
+    private Runnable onConnectionClosed;
 
     private MessageConsumer correlatedThrottle;
     private long correlatedStreamId;
@@ -62,7 +61,7 @@ final class ReadStream
         MutableDirectBuffer readBuffer,
         MessageWriter writer,
         TcpRouteCounters counters,
-        Runnable connectionDone)
+        Runnable onConnectionClosed)
     {
         this.target = target;
         this.streamId = streamId;
@@ -72,7 +71,7 @@ final class ReadStream
         this.atomicBuffer = readBuffer;
         this.writer = writer;
         this.counters = counters;
-        this.connectionDone = connectionDone;
+        this.onConnectionClosed = onConnectionClosed;
     }
 
     int handleStream(
@@ -85,43 +84,39 @@ final class ReadStream
         ((Buffer) readBuffer).position(0);
         ((Buffer) readBuffer).limit(limit);
 
-        int bytesRead = 0;
         try
         {
-            bytesRead = channel.read(readBuffer);
+            int bytesRead = channel.read(readBuffer);
+
+            if (bytesRead == -1)
+            {
+                // channel input closed
+                readableBytes = -1;
+                writer.doTcpEnd(target, streamId);
+                key.cancel(OP_READ);
+
+                shutdownInput();
+                closeIfOutputShutdown();
+            }
+            else if (bytesRead != 0)
+            {
+                counters.framesRead.getAsLong();
+                counters.bytesRead.accept(bytesRead);
+                // atomic buffer is zero copy with read buffer
+                writer.doTcpData(target, streamId, readGroupId, readPadding, atomicBuffer, 0, bytesRead);
+
+                readableBytes -= bytesRead + readPadding;
+
+                if (readableBytes <= readPadding)
+                {
+                    key.clear(OP_READ);
+                }
+            }
         }
         catch(IOException ex)
         {
             // TCP reset
             handleIOExceptionFromRead();
-        }
-        if (bytesRead == -1)
-        {
-            // channel input closed
-            readableBytes = -1;
-            writer.doTcpEnd(target, streamId);
-            key.cancel(OP_READ);
-            if (!closed)
-            {
-                closed = true;
-                connectionDone.run();
-                shutdownInput();
-                closeIfOutputShutdown();
-            }
-        }
-        else if (bytesRead != 0)
-        {
-            counters.framesRead.getAsLong();
-            counters.bytesRead.accept(bytesRead);
-            // atomic buffer is zero copy with read buffer
-            writer.doTcpData(target, streamId, readGroupId, readPadding, atomicBuffer, 0, bytesRead);
-
-            readableBytes -= bytesRead + readPadding;
-
-            if (readableBytes <= readPadding)
-            {
-                key.clear(OP_READ);
-            }
         }
 
         return 1;
@@ -133,12 +128,7 @@ final class ReadStream
         readableBytes = -1;
         writer.doTcpAbort(target, streamId);
         key.cancel(OP_READ);
-        if (!closed)
-        {
-            closed = true;
-            connectionDone.run();
-            CloseHelper.quietClose(channel);
-        }
+
         if (correlatedThrottle != null)
         {
             writer.doReset(correlatedThrottle, correlatedStreamId);
@@ -146,6 +136,13 @@ final class ReadStream
         else
         {
             resetRequired = true;
+        }
+
+        if (channel.isOpen())
+        {
+            CloseHelper.quietClose(channel);
+            counters.connectionsClosed.getAsLong();
+            onConnectionClosed.run();
         }
     }
 
@@ -171,7 +168,9 @@ final class ReadStream
         }
     }
 
-    void setCorrelatedThrottle(long correlatedStreamId, MessageConsumer correlatedThrottle)
+    void setCorrelatedThrottle(
+        long correlatedStreamId,
+        MessageConsumer correlatedThrottle)
     {
         this.correlatedThrottle = correlatedThrottle;
         this.correlatedStreamId = correlatedStreamId;
@@ -209,31 +208,15 @@ final class ReadStream
     private void processReset(
         ResetFW reset)
     {
-        try
+        if (correlatedThrottle != null)
         {
-            if (!closed)
-            {
-                closed = true;
-                connectionDone.run();
-            }
-
-            if (correlatedThrottle != null)
-            {
-                // Begin on correlated WriteStream was already processed
-               shutdownInput();
-               closeIfOutputShutdown();
-            }
-            else
-            {
-                // Force a hard reset (TCP RST), as documented in "Orderly Versus Abortive Connection Release in Java"
-                // (https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html)
-                channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-                channel.close();
-            }
+            // Begin on correlated WriteStream was already processed
+            shutdownInput();
+            closeIfOutputShutdown();
         }
-        catch (IOException ex)
+        else if (channel.isOpen())
         {
-            LangUtil.rethrowUnchecked(ex);
+            closeWithAbortiveRelease();
         }
     }
 
@@ -257,7 +240,26 @@ final class ReadStream
             {
                 CloseHelper.quietClose(channel);
                 counters.connectionsClosed.getAsLong();
+                onConnectionClosed.run();
             }
+        }
+    }
+
+    private void closeWithAbortiveRelease()
+    {
+        try
+        {
+            // Force a hard reset (TCP RST), as documented in "Orderly Versus Abortive Connection Release in Java"
+            // (https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html)
+            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+            channel.close();
+
+            counters.connectionsClosed.getAsLong();
+            onConnectionClosed.run();
+        }
+        catch (IOException ex)
+        {
+            LangUtil.rethrowUnchecked(ex);
         }
     }
 }

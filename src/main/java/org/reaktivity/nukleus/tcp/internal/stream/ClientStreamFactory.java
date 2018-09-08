@@ -143,7 +143,9 @@ public class ClientStreamFactory implements StreamFactory
         return result;
     }
 
-    private MessageConsumer newAcceptStream(BeginFW begin, MessageConsumer throttle)
+    private MessageConsumer newAcceptStream(
+        BeginFW begin,
+        MessageConsumer throttle)
     {
         MessageConsumer result = null;
         final long streamId = begin.streamId();
@@ -179,7 +181,7 @@ public class ClientStreamFactory implements StreamFactory
             routeCounters.connectionsOpened.getAsLong();
 
             final WriteStream stream = new WriteStream(throttle, streamId, channel, poller,
-                    bufferPool, writeByteBuffer, writer, routeCounters, windowThreshold);
+                    bufferPool, writeByteBuffer, writer, routeCounters, windowThreshold, () -> {});
             result = stream::handleStream;
 
             doConnect(

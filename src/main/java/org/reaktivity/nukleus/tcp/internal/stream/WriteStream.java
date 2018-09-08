@@ -57,6 +57,7 @@ public final class WriteStream
     private final ToIntFunction<PollerKey> writeHandler;
 
     private final TcpRouteCounters counters;
+    private final Runnable onConnectionClosed;
 
     private int slot = BufferPool.NO_SLOT;
     private int slotOffset; // index of the first byte of unwritten data
@@ -68,13 +69,10 @@ public final class WriteStream
     private ByteBuffer writeBuffer;
 
     private MessageConsumer correlatedInput;
-
     private long correlatedStreamId;
 
     private int windowThreshold;
-
     private int pendingCredit;
-
 
     WriteStream(
         MessageConsumer sourceThrottle,
@@ -85,7 +83,8 @@ public final class WriteStream
         ByteBuffer writeBuffer,
         MessageWriter writer,
         TcpRouteCounters counters,
-        int windowThreshold)
+        int windowThreshold,
+        Runnable onConnectionClosed)
     {
         this.streamId = streamId;
         this.sourceThrottle = sourceThrottle;
@@ -97,6 +96,7 @@ public final class WriteStream
         this.writeHandler = this::handleWrite;
         this.counters = counters;
         this.windowThreshold = windowThreshold;
+        this.onConnectionClosed = onConnectionClosed;
     }
 
     void handleStream(
@@ -134,7 +134,8 @@ public final class WriteStream
 
     void doConnected()
     {
-        this.key = this.poller.doRegister(channel, OP_WRITE, writeHandler);
+        this.key = this.poller.doRegister(channel, 0, null);
+        this.key.handler(OP_WRITE, writeHandler);
         offerWindow(bufferPool.slotCapacity());
     }
 
@@ -144,13 +145,16 @@ public final class WriteStream
         {
             CloseHelper.quietClose(channel);
             counters.connectionsClosed.getAsLong();
+            onConnectionClosed.run();
         }
 
         counters.connectFailed.getAsLong();
         writer.doReset(sourceThrottle, streamId);
     }
 
-    void setCorrelatedInput(long correlatedStreamId, MessageConsumer correlatedInput)
+    void setCorrelatedInput(
+        long correlatedStreamId,
+        MessageConsumer correlatedInput)
     {
         this.correlatedInput = correlatedInput;
         this.correlatedStreamId = correlatedStreamId;
@@ -158,11 +162,21 @@ public final class WriteStream
 
     private void handleIOExceptionFromWrite()
     {
-        // IOEXception from write implies channel input and output will no longer function
+        // IOException from write implies channel input and output will no longer function
         if (correlatedInput != null)
         {
             writer.doTcpAbort(correlatedInput, correlatedStreamId);
         }
+
+        try
+        {
+            channel.shutdownInput();
+        }
+        catch (IOException ex)
+        {
+            LangUtil.rethrowUnchecked(ex);
+        }
+
         doFail();
     }
 
@@ -191,11 +205,11 @@ public final class WriteStream
         int offset,
         int limit) throws IOException
     {
-        writer.dataRO.wrap(buffer, offset, limit);
-        assert writer.dataRO.padding() == 0;
+        final DataFW data = writer.dataRO.wrap(buffer, offset, limit);
+        assert data.padding() == 0;
 
-        final OctetsFW payload = writer.dataRO.payload();
-        final int writableBytes = writer.dataRO.length();
+        final OctetsFW payload = data.payload();
+        final int writableBytes = data.length();
 
         counters.framesWritten.getAsLong();
         counters.bytesWritten.accept(writableBytes);
@@ -274,17 +288,17 @@ public final class WriteStream
             key.clear(OP_WRITE);
         }
 
-        if (channel.isConnected() && channel.isOpen())
+        try
         {
-            try
+            if (!channel.isConnectionPending())
             {
                 channel.shutdownOutput();
-                closeIfInputShutdown();
             }
-            catch (IOException ex)
-            {
-                LangUtil.rethrowUnchecked(ex);
-            }
+            closeIfInputShutdown();
+        }
+        catch (IOException ex)
+        {
+            LangUtil.rethrowUnchecked(ex);
         }
     }
 
@@ -431,6 +445,7 @@ public final class WriteStream
             {
                 CloseHelper.quietClose(channel);
                 counters.connectionsClosed.getAsLong();
+                onConnectionClosed.run();
             }
         }
     }

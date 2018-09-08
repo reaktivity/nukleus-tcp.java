@@ -29,9 +29,11 @@ public class Correlation
     private final String sourceName;
     private final SocketChannel channel;
     private final LongObjectBiConsumer<MessageConsumer> setCorrelatedThrottle;
+    private final TcpRouteCounters counters;
+    private final Runnable onConnectionClosed;
+
     private MessageConsumer correlatedStream;
     private long correlatedStreamId;
-    private final TcpRouteCounters counters;
 
     public Correlation(
         String sourceName,
@@ -39,7 +41,8 @@ public class Correlation
         LongObjectBiConsumer<MessageConsumer> setCorrelatedThrottle,
         MessageConsumer target,
         long targetId,
-        TcpRouteCounters counters)
+        TcpRouteCounters counters,
+        Runnable onConnectionClosed)
     {
         this.sourceName = requireNonNull(sourceName, "sourceName");
         this.channel = requireNonNull(channel, "channel");
@@ -47,6 +50,7 @@ public class Correlation
         this.correlatedStream = target;
         this.correlatedStreamId = targetId;
         this.counters = counters;
+        this.onConnectionClosed = onConnectionClosed;
     }
 
     public String source()
@@ -67,6 +71,11 @@ public class Correlation
     public SocketChannel channel()
     {
         return channel;
+    }
+
+    public Runnable onConnectionClosed()
+    {
+        return onConnectionClosed;
     }
 
     public void setCorrelatedThrottle(MessageConsumer throttle, long streamId)
