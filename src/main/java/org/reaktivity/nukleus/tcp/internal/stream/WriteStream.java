@@ -168,14 +168,7 @@ public final class WriteStream
             writer.doTcpAbort(correlatedInput, correlatedStreamId);
         }
 
-        try
-        {
-            channel.shutdownInput();
-        }
-        catch (IOException ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
-        }
+        CloseHelper.quietClose(channel::shutdownInput);
 
         doFail();
     }
