@@ -26,7 +26,6 @@ import java.util.function.ToIntFunction;
 
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
-import org.agrona.LangUtil;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
@@ -281,18 +280,11 @@ public final class WriteStream
             key.clear(OP_WRITE);
         }
 
-        try
+        if (!channel.isConnectionPending())
         {
-            if (!channel.isConnectionPending())
-            {
-                channel.shutdownOutput();
-            }
-            closeIfInputShutdown();
+            CloseHelper.quietClose(channel::shutdownOutput);
         }
-        catch (IOException ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
-        }
+        closeIfInputShutdown();
     }
 
     private ByteBuffer getWriteBuffer(DirectBuffer data, int dataOffset, int dataLength)
