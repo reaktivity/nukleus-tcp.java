@@ -6,7 +6,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.reaktivity</groupId>
   <artifactId>nukleus-tcp</artifactId>
-  <version>0.59</version>
+  <version>0.60</version>
   <name>TCP Nukleus Implementation</name>
   <description>TCP Nukleus Implementation</description>
   <url>https://github.com/reaktivity/build-template.java</url>
@@ -52,12 +52,12 @@
     <jmh.profilers.version>0.1.3</jmh.profilers.version>
 
     <k3po.version>3.0.0-alpha-96</k3po.version>
-    <k3po.nukleus.ext.version>0.29</k3po.nukleus.ext.version>
+    <k3po.nukleus.ext.version>0.30</k3po.nukleus.ext.version>
     <nukleus.plugin.version>0.28</nukleus.plugin.version>
     <nukleus.version>0.23</nukleus.version>
 
-    <nukleus.tcp.spec.version>0.39</nukleus.tcp.spec.version>
-    <reaktor.version>0.60</reaktor.version>
+    <nukleus.tcp.spec.version>0.40</nukleus.tcp.spec.version>
+    <reaktor.version>0.61</reaktor.version>
   </properties>
 
   <dependencies>
@@ -191,7 +191,7 @@
         <configuration>
           <header>COPYRIGHT</header>
           <properties>
-            <copyrightYears>2016-2017</copyrightYears>
+            <copyrightYears>2016-2018</copyrightYears>
           </properties>
           <includes>
             <include>src/**</include>
@@ -213,7 +213,7 @@
       </plugin>
       <plugin>
         <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>2.17</version>
+        <version>3.0.0</version>
         <configuration>
           <includeTestSourceDirectory>true</includeTestSourceDirectory>
         </configuration>
@@ -225,6 +225,13 @@
             </goals>
           </execution>
         </executions>
+        <dependencies>
+          <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>8.3</version>
+          </dependency>
+        </dependencies>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
