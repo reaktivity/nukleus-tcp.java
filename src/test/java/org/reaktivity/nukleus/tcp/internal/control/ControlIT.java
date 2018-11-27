@@ -18,7 +18,7 @@ package org.reaktivity.nukleus.tcp.internal.control;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.MAXIMUM_BACKLOG_PROPERTY_NAME;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.TCP_MAXIMUM_BACKLOG;
 
 import org.jboss.byteman.contrib.bmunit.BMRule;
 import org.junit.Rule;
@@ -50,7 +50,7 @@ public class ControlIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .configure(MAXIMUM_BACKLOG_PROPERTY_NAME, 50)
+        .configure(TCP_MAXIMUM_BACKLOG, 50)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);

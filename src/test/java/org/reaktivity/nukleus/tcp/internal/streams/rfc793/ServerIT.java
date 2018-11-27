@@ -20,7 +20,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.MAX_CONNECTIONS_NAME;
+import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.TCP_MAX_CONNECTIONS;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -56,7 +56,7 @@ public class ServerIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(2048)
-        .configure(MAX_CONNECTIONS_NAME, 3)
+        .configure(TCP_MAX_CONNECTIONS, 3)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
