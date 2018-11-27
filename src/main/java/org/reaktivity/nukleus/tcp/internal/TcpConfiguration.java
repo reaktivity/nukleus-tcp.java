@@ -19,38 +19,41 @@ import org.reaktivity.nukleus.Configuration;
 
 public class TcpConfiguration extends Configuration
 {
-    public static final String MAXIMUM_BACKLOG_PROPERTY_NAME = "nukleus.tcp.maximum.backlog";
-    public static final String WINDOW_THRESHOLD_PROPERTY_NAME = "nukleus.tcp.window.threshold";
-    public static final String MAX_CONNECTIONS_NAME = "nukleus.tcp.max.connections";
-    public static final String KEEPALIVE_NAME = "nukleus.tcp.keepalive";
+    public static final IntPropertyDef TCP_MAXIMUM_BACKLOG;
+    public static final IntPropertyDef TCP_WINDOW_THRESHOLD;
+    public static final IntPropertyDef TCP_MAX_CONNECTIONS;
+    public static final BooleanPropertyDef TCP_KEEPALIVE;
 
-    /**
-     * @see java.nio.channels.ServerSocketChannel#bind(java.net.SocketAddress, int)
-     */
-    private static final int MAXIMUM_BACKLOG_DEFAULT = 0;
+    private static final ConfigurationDef TCP_CONFIG;
 
-    private static final int WINDOW_THRESHOLD_DEFAULT = 0;
-
-    private static final int MAX_CONNECTIONS_DEFAULT = Integer.MAX_VALUE;
-
-    private static final boolean KEEPALIVE_DEFAULT = false;
+    static
+    {
+        ConfigurationDef config = new ConfigurationDef("nukleus.tcp");
+        TCP_MAXIMUM_BACKLOG = config.property("maximum.backlog", 0);
+        TCP_WINDOW_THRESHOLD = config.property("window.threshold", 0);
+        TCP_MAX_CONNECTIONS = config.property("max.connections", Integer.MAX_VALUE);
+        TCP_KEEPALIVE = config.property("keepalive", false);
+        TCP_CONFIG = config;
+    }
 
     public TcpConfiguration(
         Configuration config)
     {
-        super(config);
+        super(TCP_CONFIG, config);
     }
 
+    /**
+     * @see java.nio.channels.ServerSocketChannel#bind(java.net.SocketAddress, int)
+     */
     public int maximumBacklog()
     {
-        return getInteger(MAXIMUM_BACKLOG_PROPERTY_NAME, MAXIMUM_BACKLOG_DEFAULT);
+        return TCP_MAXIMUM_BACKLOG.getAsInt(this);
     }
 
-    // Accumulates window until the threshold and sends it once it reaches over the threshold
-    // @return window's threshold
+    // accumulates window until the threshold and sends it once it reaches over the threshold
     public int windowThreshold()
     {
-        int threshold = getInteger(WINDOW_THRESHOLD_PROPERTY_NAME, WINDOW_THRESHOLD_DEFAULT);
+        int threshold = TCP_WINDOW_THRESHOLD.getAsInt(this);
         if (threshold < 0 || threshold > 100)
         {
             String message = String.format(
@@ -62,12 +65,12 @@ public class TcpConfiguration extends Configuration
 
     public int maxConnections()
     {
-        return getInteger(MAX_CONNECTIONS_NAME, MAX_CONNECTIONS_DEFAULT);
+        return TCP_MAX_CONNECTIONS.getAsInt(this);
     }
 
     public boolean keepalive()
     {
-        return getBoolean(KEEPALIVE_NAME, KEEPALIVE_DEFAULT);
+        return TCP_KEEPALIVE.getAsBoolean(this);
     }
 
 }

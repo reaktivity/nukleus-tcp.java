@@ -52,7 +52,7 @@ public class ClientLimitsIT
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
         // Initial window size for output to network:
-        .configure(ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY, 16)
+        .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);

@@ -53,7 +53,8 @@ public final class TcpNukleusFactorySpi implements NukleusFactorySpi
             acceptor.handleRoute(m, b, i, l) &&
             serverStreamFactoryBuilder.handleRoute(m, b, i, l);
 
-        return builder.streamFactory(RouteKind.CLIENT, clientStreamFactoryBuilder)
+        return builder.configure(tcpConfig)
+                      .streamFactory(RouteKind.CLIENT, clientStreamFactoryBuilder)
                       .streamFactory(RouteKind.SERVER, serverStreamFactoryBuilder)
                       .routeHandler(RouteKind.SERVER, serverRouteHandler)
                       .routeHandler(RouteKind.CLIENT, clientStreamFactoryBuilder::handleRoute)

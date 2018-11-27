@@ -71,9 +71,9 @@ public class ServerPartialWriteLimitsIT
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(2048)
         // Initial window size for output to network:
-        .configure(ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY, 16)
+        .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
         // Overall buffer pool size same as slot size so maximum concurrent streams with partial writes = 1
-        .configure(ReaktorConfiguration.BUFFER_POOL_CAPACITY_PROPERTY, 16);
+        .configure(ReaktorConfiguration.REAKTOR_BUFFER_POOL_CAPACITY, 16);
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
 
