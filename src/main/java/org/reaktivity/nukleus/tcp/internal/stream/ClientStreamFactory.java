@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.function.IntUnaryOperator;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
+import java.util.function.LongUnaryOperator;
 import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 
@@ -71,7 +72,7 @@ public class ClientStreamFactory implements StreamFactory
     private final BufferPool bufferPool;
     private Poller poller;
     private final RouteManager router;
-    private final LongSupplier supplyStreamId;
+    private final LongUnaryOperator supplyReplyId;
     private final LongFunction<IntUnaryOperator> groupBudgetClaimer;
     private final LongFunction<IntUnaryOperator> groupBudgetReleaser;
     private final ByteBuffer readByteBuffer;
@@ -88,7 +89,7 @@ public class ClientStreamFactory implements StreamFactory
         Poller poller,
         MutableDirectBuffer writeBuffer,
         BufferPool bufferPool,
-        LongSupplier supplyStreamId,
+        LongUnaryOperator supplyReplyId,
         LongSupplier supplyTrace,
         LongFunction<IntUnaryOperator> groupBudgetClaimer,
         LongFunction<IntUnaryOperator> groupBudgetReleaser,
@@ -98,7 +99,7 @@ public class ClientStreamFactory implements StreamFactory
         this.poller = poller;
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
         this.bufferPool = requireNonNull(bufferPool);
-        this.supplyStreamId = requireNonNull(supplyStreamId);
+        this.supplyReplyId = requireNonNull(supplyReplyId);
         this.groupBudgetClaimer = requireNonNull(groupBudgetClaimer);
         this.groupBudgetReleaser = requireNonNull(groupBudgetReleaser);
         this.writer = new MessageWriter(requireNonNull(writeBuffer), requireNonNull(supplyTrace));
@@ -363,7 +364,7 @@ public class ClientStreamFactory implements StreamFactory
     {
         final SocketChannel channel = request.channel;
         final String targetName = request.acceptReplyName;
-        final long targetId = supplyStreamId.getAsLong();
+        final long targetId = supplyReplyId.applyAsLong(request.outputStreamdId);
         final long correlationId = request.correlationId;
         final MessageConsumer correlatedThrottle = request.outputThrottle;
         final long correlatedStreamId = request.outputStreamdId;

@@ -20,6 +20,7 @@ import java.util.function.IntUnaryOperator;
 import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
+import java.util.function.LongUnaryOperator;
 import java.util.function.Supplier;
 
 import org.agrona.DirectBuffer;
@@ -46,7 +47,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
 
     private RouteManager router;
-    private LongSupplier supplyStreamId;
+    private LongSupplier supplyInitialId;
     private LongSupplier supplyTrace;
     private Supplier<BufferPool> supplyBufferPool;
     private LongSupplier supplyCorrelationId;
@@ -93,10 +94,17 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ServerStreamFactoryBuilder setStreamIdSupplier(
-        LongSupplier supplyStreamId)
+    public ServerStreamFactoryBuilder setInitialIdSupplier(
+        LongSupplier supplyInitialId)
     {
-        this.supplyStreamId = supplyStreamId;
+        this.supplyInitialId = supplyInitialId;
+        return this;
+    }
+
+    @Override
+    public StreamFactoryBuilder setReplyIdSupplier(
+        LongUnaryOperator supplyReplyId)
+    {
         return this;
     }
 
@@ -174,7 +182,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
             router,
             writeBuffer,
             bufferPool,
-            supplyStreamId,
+            supplyInitialId,
             supplyTrace,
             supplyCorrelationId,
             correlations,
