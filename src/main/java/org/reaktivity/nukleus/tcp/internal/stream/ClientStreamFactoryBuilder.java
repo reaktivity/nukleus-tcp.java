@@ -20,6 +20,7 @@ import java.util.function.IntUnaryOperator;
 import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
+import java.util.function.LongUnaryOperator;
 import java.util.function.Supplier;
 
 import org.agrona.DirectBuffer;
@@ -37,14 +38,15 @@ import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
 
 public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 {
+    private final UnrouteFW unrouteRO = new UnrouteFW();
+
     private final TcpConfiguration config;
     private final Poller poller;
-
-    private final UnrouteFW unrouteRO = new UnrouteFW();
+    private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
 
     private RouteManager router;
     private Supplier<BufferPool> supplyBufferPool;
-    private LongSupplier supplyStreamId;
+    private LongUnaryOperator supplyReplyId;
     private LongSupplier supplyTrace;
 
     private MutableDirectBuffer writeBuffer;
@@ -54,7 +56,6 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
-    private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
 
     public ClientStreamFactoryBuilder(TcpConfiguration config, Poller poller)
     {
@@ -81,10 +82,17 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ClientStreamFactoryBuilder setStreamIdSupplier(
-        LongSupplier supplyStreamId)
+    public ClientStreamFactoryBuilder setInitialIdSupplier(
+        LongSupplier supplyInitialId)
     {
-        this.supplyStreamId = supplyStreamId;
+        return this;
+    }
+
+    @Override
+    public ClientStreamFactoryBuilder setReplyIdSupplier(
+        LongUnaryOperator supplyReplyId)
+    {
+        this.supplyReplyId = supplyReplyId;
         return this;
     }
 
@@ -161,7 +169,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
             poller,
             writeBuffer,
             bufferPool,
-            supplyStreamId,
+            supplyReplyId,
             supplyTrace,
             groupBudgetClaimer,
             groupBudgetReleaser,
