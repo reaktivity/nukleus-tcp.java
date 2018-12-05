@@ -67,7 +67,7 @@ public class ClientIOExceptionFromWriteIT
     @Test
     @Specification({
         "${route}/client.host/controller",
-        "${client}/client.sent.data.received.reset.and.abort/client"
+        "${client}/client.sent.data.received.abort.and.reset/client"
     })
     @BMRule(name = "processData",
     targetClass = "^java.nio.channels.SocketChannel",
@@ -76,7 +76,7 @@ public class ClientIOExceptionFromWriteIT
       "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
       action = "throw new IOException(\"Simulating an IOException from write\")"
     )
-    public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
+    public void shouldAbortAndResetWhenImmediateWriteThrowsIOException() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
@@ -96,7 +96,7 @@ public class ClientIOExceptionFromWriteIT
     @Test
     @Specification({
         "${route}/client.host/controller",
-        "${client}/client.sent.data.received.reset.and.abort/client"
+        "${client}/client.sent.data.received.abort.and.reset/client"
     })
     @BMRules(rules = {
         @BMRule(name = "processData",
@@ -115,7 +115,7 @@ public class ClientIOExceptionFromWriteIT
           action = "throw new IOException(\"Simulating an IOException from write\")"
         )
     })
-    public void shouldResetWhenDeferredWriteThrowsIOException() throws Exception
+    public void shouldAbortAndResetWhenDeferredWriteThrowsIOException() throws Exception
     {
         ProcessDataHelper.fragmentWrites(generate(() -> 0));
         try (ServerSocketChannel server = ServerSocketChannel.open())

@@ -129,14 +129,7 @@ public class ClientStreamFactory implements StreamFactory
 
         MessageConsumer result = null;
 
-        if (sourceRef == 0L)
-        {
-            final long sourceId = begin.streamId();
-            writer.doReset(throttle, sourceId);
-            throw new IllegalArgumentException(String.format("Stream id %d is not a connect stream, sourceRef is zero",
-                    sourceId, sourceRef));
-        }
-        else
+        if (sourceRef != 0L)
         {
             result = newAcceptStream(begin, throttle);
         }
@@ -195,10 +188,6 @@ public class ClientStreamFactory implements StreamFactory
                 streamId,
                 stream::setCorrelatedInput,
                 routeCounters);
-        }
-        else
-        {
-            writer.doReset(throttle, streamId);
         }
 
         return result;
@@ -273,7 +262,7 @@ public class ClientStreamFactory implements StreamFactory
         }
         else
         {
-            InetAddress toMatch = InetAddress.getByName(targetName);
+            InetAddress.getByName(targetName);
             result = targetToCidrMatch.computeIfAbsent(targetName, this::inetMatchesInet);
         }
         return result;
