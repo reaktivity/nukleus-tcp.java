@@ -26,7 +26,6 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 
 import org.jboss.byteman.contrib.bmunit.BMRule;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -36,8 +35,8 @@ import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
-import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.CountDownHelper;
+import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
@@ -92,7 +91,6 @@ public class ServerResetAndAbortIT
         }
     }
 
-    @Ignore("BEGIN vs RESET read order not yet guaranteed to match write order")
     @Test
     @Specification({
         "${route}/server/controller",
@@ -128,7 +126,6 @@ public class ServerResetAndAbortIT
         }
     }
 
-    @Ignore("BEGIN vs RESET read order not yet guaranteed to match write order")
     @Test
     @Specification({
         "${route}/server/controller",
@@ -173,7 +170,6 @@ public class ServerResetAndAbortIT
         }
     }
 
-    @Ignore("BEGIN vs RESET read order not yet guaranteed to match write order")
     @Test
     @Specification({
         "${route}/server/controller",
