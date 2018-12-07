@@ -145,7 +145,7 @@ public class ServerStreamFactory implements StreamFactory
     {
         final MessagePredicate filter = (t, b, o, l) ->
         {
-            final RouteFW route = routeRO.wrap(b, o, l);
+            final RouteFW route = routeRO.wrap(b, o, o + l);
             InetAddress inetAddress = null;
             InetSocketAddress routedAddress = new InetSocketAddress(inetAddress, (int)sourceRef);
             return sourceRef == route.sourceRef() &&
