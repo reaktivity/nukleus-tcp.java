@@ -151,7 +151,7 @@ public class ClientStreamFactory implements StreamFactory
 
         MessagePredicate filter = (t, b, o, l) ->
         {
-            final RouteFW route = routeRO.wrap(b, o, l);
+            final RouteFW route = routeRO.wrap(b, o, o + l);
             final String targetName = route.target().asString();
             final long targetRef = route.targetRef();
             return sourceRef == route.sourceRef() &&

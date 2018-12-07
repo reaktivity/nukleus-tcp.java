@@ -37,6 +37,7 @@ public class ControllerScriptlessIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
+        .nukleus("tcp"::equals)
         .controller("tcp"::equals);
 
     @Rule
