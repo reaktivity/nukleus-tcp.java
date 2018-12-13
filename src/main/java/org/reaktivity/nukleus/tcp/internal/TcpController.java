@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.tcp.internal;
 
-import static java.lang.String.format;
 import static java.nio.ByteBuffer.allocateDirect;
 import static java.nio.ByteOrder.nativeOrder;
 
@@ -25,10 +24,10 @@ import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Controller;
 import org.reaktivity.nukleus.ControllerSpi;
+import org.reaktivity.nukleus.tcp.internal.types.control.FreezeFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.FreezeFW;
 
 public final class TcpController implements Controller
 {
@@ -136,32 +135,6 @@ public final class TcpController implements Controller
     public long connections()
     {
         return controllerSpi.doCount("connections");
-    }
-
-    public long connectFailed(long routeId)
-    {
-        return controllerSpi.doCount(format("%d.connect.failed", routeId));
-    }
-
-
-    public long bytesRead(long routeId)
-    {
-        return controllerSpi.doCount(format("%d.bytes.read", routeId));
-    }
-
-    public long bytesWritten(long routeId)
-    {
-        return controllerSpi.doCount(format("%d.bytes.written", routeId));
-    }
-
-    public long framesRead(long routeId)
-    {
-        return controllerSpi.doCount(format("%d.frames.read", routeId));
-    }
-
-    public long framesWritten(long routeId)
-    {
-        return controllerSpi.doCount(format("%d.frames.written", routeId));
     }
 
     private CompletableFuture<Long> route(

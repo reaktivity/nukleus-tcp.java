@@ -117,6 +117,7 @@ public class ServerStreamFactory implements StreamFactory
             MessageConsumer throttle)
     {
         final BeginFW begin = beginRO.wrap(buffer, index, index + length);
+        final long routeId = begin.routeId();
         final long sourceRef = begin.sourceRef();
 
         MessageConsumer newStream;
@@ -128,7 +129,7 @@ public class ServerStreamFactory implements StreamFactory
         else
         {
             final long sourceId = begin.streamId();
-            writer.doReset(throttle, sourceId);
+            writer.doReset(throttle, routeId, sourceId);
             throw new IllegalArgumentException(String.format("Stream id %d is not a reply stream, sourceRef %d is non-zero",
                     sourceId, sourceRef));
         }
@@ -157,6 +158,7 @@ public class ServerStreamFactory implements StreamFactory
 
         if (route != null)
         {
+            final long routeId = route.correlationId();
             final long targetRef = route.targetRef();
             final String targetName = route.target().asString();
             final long targetId = supplyStreamId.getAsLong();
@@ -167,13 +169,11 @@ public class ServerStreamFactory implements StreamFactory
                 final InetSocketAddress localAddress = (InetSocketAddress) channel.getLocalAddress();
                 final InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
                 final MessageConsumer target = router.supplyTarget(targetName);
-                writer.doTcpBegin(target, targetId, targetRef, correlationId, localAddress, remoteAddress);
+                writer.doTcpBegin(target, routeId, targetId, targetRef, correlationId, localAddress, remoteAddress);
 
                 final PollerKey key = poller.doRegister(channel, 0, null);
 
                 final TcpRouteCounters routeCounters = counters.supplyRoute(route.correlationId());
-
-                routeCounters.connectionsOpened.getAsLong();
 
                 final Runnable doCleanupConnection = () ->
                 {
@@ -181,9 +181,12 @@ public class ServerStreamFactory implements StreamFactory
                     onConnectionClosed.run();
                 };
 
-                final ReadStream stream = new ReadStream(target, targetId, key, channel,
+                routeCounters.opensRead.getAsLong();
+                routeCounters.opensWritten.getAsLong();
+
+                final ReadStream stream = new ReadStream(target, routeId, targetId, key, channel,
                         readByteBuffer, readBuffer, writer, routeCounters, doCleanupConnection);
-                final Correlation correlation = new Correlation(sourceName, channel, stream::setCorrelatedThrottle,
+                final Correlation correlation = new Correlation(sourceName, channel, stream,
                         target, targetId, routeCounters, onConnectionClosed);
                 correlations.put(correlationId, correlation);
 
@@ -208,12 +211,16 @@ public class ServerStreamFactory implements StreamFactory
 
     }
 
-    private MessageConsumer newConnectReplyStream(BeginFW begin, MessageConsumer throttle)
+    private MessageConsumer newConnectReplyStream(
+        BeginFW begin,
+        MessageConsumer throttle)
     {
         MessageConsumer result = null;
+
+        final long routeId = begin.routeId();
+        final long streamId = begin.streamId();
         final long correlationId = begin.correlationId();
         Correlation correlation = correlations.remove(correlationId);
-        final long streamId = begin.streamId();
 
         if (correlation != null)
         {
@@ -222,15 +229,15 @@ public class ServerStreamFactory implements StreamFactory
 
             final TcpRouteCounters counters = correlation.counters();
             final Runnable onConnectionClosed = correlation.onConnectionClosed();
-            final WriteStream stream = new WriteStream(throttle, streamId, channel, poller,
+            final WriteStream stream = new WriteStream(throttle, routeId, streamId, channel, poller,
                     bufferPool, writeByteBuffer, writer, counters, windowThreshold, onConnectionClosed);
             stream.setCorrelatedInput(correlation.correlatedStreamId(), correlation.correlatedStream());
-            stream.doConnected();
+            stream.onConnected();
             result = stream::handleStream;
         }
         else
         {
-            writer.doReset(throttle, streamId);
+            writer.doReset(throttle, routeId, streamId);
         }
 
         return result;

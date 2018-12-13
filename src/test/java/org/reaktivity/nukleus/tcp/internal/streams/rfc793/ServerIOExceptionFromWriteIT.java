@@ -33,7 +33,7 @@ import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
-import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ProcessDataHelper;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
@@ -55,7 +55,7 @@ public class ServerIOExceptionFromWriteIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024)
+        .counterValuesBufferCapacity(4096)
         .clean();
 
     @Rule
@@ -66,11 +66,11 @@ public class ServerIOExceptionFromWriteIT
         "${route}/server/controller",
         "${server}/server.sent.data.received.reset.and.abort/server"
     })
-    @BMRule(name = "processData",
+    @BMRule(name = "onData",
     targetClass = "^java.nio.channels.SocketChannel",
     targetMethod = "write(java.nio.ByteBuffer)",
     condition =
-      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
+      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onData\", true, true)",
       action = "throw new IOException(\"Simulating an IOException from write\")"
     )
     public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
@@ -92,12 +92,12 @@ public class ServerIOExceptionFromWriteIT
         "${server}/server.sent.data.received.reset.and.abort/server"
     })
     @BMRules(rules = {
-        @BMRule(name = "processData",
-        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$ProcessDataHelper",
+        @BMRule(name = "onData",
+        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$OnDataHelper",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
         condition =
-          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData\", true, true)",
+          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onData\", true, true)",
         action = "return doWrite($0, $1);"
         ),
         @BMRule(name = "handleWrite",
@@ -110,7 +110,7 @@ public class ServerIOExceptionFromWriteIT
     })
     public void shouldResetWhenDeferredWriteThrowsIOException() throws Exception
     {
-        ProcessDataHelper.fragmentWrites(generate(() -> 0));
+        OnDataHelper.fragmentWrites(generate(() -> 0));
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
 

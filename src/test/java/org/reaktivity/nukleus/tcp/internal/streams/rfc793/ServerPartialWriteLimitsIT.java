@@ -42,7 +42,7 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.HandleWriteHelper;
-import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ProcessDataHelper;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.internal.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
@@ -69,7 +69,7 @@ public class ServerPartialWriteLimitsIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(2048)
+        .counterValuesBufferCapacity(4096)
         // Initial window size for output to network:
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
         // Overall buffer pool size same as slot size so maximum concurrent streams with partial writes = 1
@@ -95,7 +95,7 @@ public class ServerPartialWriteLimitsIT
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritableWithoutOverflowingSlot() throws Exception
     {
         AtomicInteger dataFramesReceived = new AtomicInteger();
-        ProcessDataHelper.fragmentWrites(generate(() -> dataFramesReceived.incrementAndGet() == 1 ? 5
+        OnDataHelper.fragmentWrites(generate(() -> dataFramesReceived.incrementAndGet() == 1 ? 5
                 : dataFramesReceived.get() == 2 ? 6 : ALL));
         HandleWriteHelper.fragmentWrites(generate(() -> dataFramesReceived.get() >= 2 ? ALL : 0));
 
@@ -112,7 +112,7 @@ public class ServerPartialWriteLimitsIT
     })
     public void shouldResetStreamsExceedingPartialWriteStreamsLimit() throws Exception
     {
-        ProcessDataHelper.fragmentWrites(concat(of(1), generate(() -> 0))); // avoid spin write for first stream write
+        OnDataHelper.fragmentWrites(concat(of(1), generate(() -> 0))); // avoid spin write for first stream write
         AtomicBoolean resetReceived = new AtomicBoolean(false);
         HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? ALL : 0));
 

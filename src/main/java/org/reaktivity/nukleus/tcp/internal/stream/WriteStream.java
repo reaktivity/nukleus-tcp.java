@@ -46,6 +46,7 @@ public final class WriteStream
 
     private static final int EOS_REQUESTED = -1;
 
+    private final long routeId;
     private final long streamId;
     private final MessageConsumer sourceThrottle;
     private final SocketChannel channel;
@@ -75,6 +76,7 @@ public final class WriteStream
 
     WriteStream(
         MessageConsumer sourceThrottle,
+        long routeId,
         long streamId,
         SocketChannel channel,
         Poller poller,
@@ -85,6 +87,7 @@ public final class WriteStream
         int windowThreshold,
         Runnable onConnectionClosed)
     {
+        this.routeId = routeId;
         this.streamId = streamId;
         this.sourceThrottle = sourceThrottle;
         this.channel = channel;
@@ -106,24 +109,21 @@ public final class WriteStream
     {
         switch (msgTypeId)
         {
-        case AbortFW.TYPE_ID:
-            processAbort(buffer, index, index + length);
-            break;
         case BeginFW.TYPE_ID:
-            processBegin(buffer, index, index + length);
+            final BeginFW begin = writer.beginRO.wrap(buffer, index, index + length);
+            onBegin(begin);
             break;
         case DataFW.TYPE_ID:
-            try
-            {
-                processData(buffer, index, index + length);
-            }
-            catch (IOException ex)
-            {
-                handleIOExceptionFromWrite();
-            }
+            final DataFW data = writer.dataRO.wrap(buffer, index, index + length);
+            onData(data);
             break;
         case EndFW.TYPE_ID:
-            processEnd(buffer, index, index + length);
+            final EndFW end = writer.endRO.wrap(buffer, index, index + length);
+            onEnd(end);
+            break;
+        case AbortFW.TYPE_ID:
+            final AbortFW abort = writer.abortRO.wrap(buffer, index, index + length);
+            onAbort(abort);
             break;
         default:
             // ignore
@@ -131,24 +131,32 @@ public final class WriteStream
         }
     }
 
-    void doConnected()
+    void onConnected()
     {
+        if (isInitial(streamId))
+        {
+            counters.opensRead.getAsLong();
+        }
+
         this.key = this.poller.doRegister(channel, 0, null);
         this.key.handler(OP_WRITE, writeHandler);
         offerWindow(bufferPool.slotCapacity());
     }
 
-    void doConnectFailed()
+    void onConnectFailed()
     {
         if (channel.isOpen())
         {
             CloseHelper.quietClose(channel);
-            counters.connectionsClosed.getAsLong();
             onConnectionClosed.run();
         }
 
-        counters.connectFailed.getAsLong();
-        writer.doReset(sourceThrottle, streamId);
+        if (isInitial(streamId))
+        {
+            counters.resetsRead.getAsLong();
+        }
+
+        writer.doReset(sourceThrottle, routeId, streamId);
     }
 
     void setCorrelatedInput(
@@ -161,10 +169,20 @@ public final class WriteStream
 
     private void handleIOExceptionFromWrite()
     {
+        if (isInitial(streamId))
+        {
+            counters.resetsRead.getAsLong();
+        }
+
         // IOException from write implies channel input and output will no longer function
         if (correlatedInput != null)
         {
-            writer.doTcpAbort(correlatedInput, correlatedStreamId);
+            writer.doTcpAbort(correlatedInput, routeId, correlatedStreamId);
+        }
+
+        if (isInitial(streamId))
+        {
+            counters.abortsWritten.getAsLong();
         }
 
         CloseHelper.quietClose(channel::shutdownInput);
@@ -172,11 +190,14 @@ public final class WriteStream
         doFail();
     }
 
-    private void processAbort(
-        DirectBuffer buffer,
-        int offset,
-        int limit)
+    private void onAbort(
+        AbortFW abort)
     {
+        if (isInitial(streamId))
+        {
+            counters.abortsWritten.getAsLong();
+        }
+
         if (slot != NO_SLOT) // partial writes pending
         {
             bufferPool.release(slot);
@@ -184,76 +205,81 @@ public final class WriteStream
         doCleanup();
     }
 
-    private void processBegin(
-        DirectBuffer buffer,
-        int offset,
-        int limit)
+    private void onBegin(
+        BeginFW begin)
     {
         // No-op - doConnected() should be called instead once the connection has been established
     }
 
-    private void processData(
-        DirectBuffer buffer,
-        int offset,
-        int limit) throws IOException
+    private void onData(
+        DataFW data)
     {
-        final DataFW data = writer.dataRO.wrap(buffer, offset, limit);
         assert data.padding() == 0;
 
-        final OctetsFW payload = data.payload();
-        final int writableBytes = data.length();
-
-        counters.framesWritten.getAsLong();
-        counters.bytesWritten.accept(writableBytes);
-
-        if (reduceWindow(writableBytes))
+        try
         {
-            final ByteBuffer writeBuffer = getWriteBuffer(buffer, payload.offset(), writableBytes);
-            final int remainingBytes = writeBuffer.remaining();
+            final OctetsFW payload = data.payload();
+            final int writableBytes = data.length();
 
-            int bytesWritten = 0;
-
-            for (int i = WRITE_SPIN_COUNT; bytesWritten == 0 && i > 0; i--)
+            if (reduceWindow(writableBytes))
             {
-                bytesWritten = channel.write(writeBuffer);
-            }
+                final ByteBuffer writeBuffer = toWriteBuffer(payload.buffer(), payload.offset(), writableBytes);
+                final int remainingBytes = writeBuffer.remaining();
 
-            int originalSlot = slot;
-            if (handleUnwrittenData(writeBuffer, bytesWritten))
-            {
-                if (bytesWritten < remainingBytes)
+                int bytesWritten = 0;
+
+                for (int i = WRITE_SPIN_COUNT; bytesWritten == 0 && i > 0; i--)
                 {
-                    key.register(OP_WRITE);
+                    bytesWritten = channel.write(writeBuffer);
                 }
-                else if (originalSlot != NO_SLOT)
+
+                if (isInitial(streamId))
                 {
-                    // we just flushed out a pending write
-                    key.clear(OP_WRITE);
+                    counters.bytesWritten.accept(bytesWritten);
                 }
-            }
-        }
-        else
-        {
-            if (slot == NO_SLOT)
-            {
-                doFail();
+
+                int originalSlot = slot;
+                if (handleUnwrittenData(writeBuffer, bytesWritten))
+                {
+                    if (bytesWritten < remainingBytes)
+                    {
+                        key.register(OP_WRITE);
+                    }
+                    else if (originalSlot != NO_SLOT)
+                    {
+                        // we just flushed out a pending write
+                        key.clear(OP_WRITE);
+                    }
+                }
             }
             else
             {
-                // send reset but defer cleanup until pending writes are completed
-                writer.doReset(sourceThrottle, streamId);
+                if (slot == NO_SLOT)
+                {
+                    doFail();
+                }
+                else
+                {
+                    // send reset but defer cleanup until pending writes are completed
+                    writer.doReset(sourceThrottle, routeId, streamId);
+                }
             }
+        }
+        catch (IOException ex)
+        {
+            handleIOExceptionFromWrite();
         }
     }
 
-    private void processEnd(
-        DirectBuffer buffer,
-        int offset,
-        int limit)
+    private void onEnd(
+        EndFW end)
     {
         if (slot == NO_SLOT) // no partial writes pending
         {
-            writer.endRO.wrap(buffer, offset, limit);
+            if (isInitial(streamId))
+            {
+                counters.closesWritten.getAsLong();
+            }
             doCleanup();
         }
         else
@@ -265,7 +291,7 @@ public final class WriteStream
 
     private void doFail()
     {
-        writer.doReset(sourceThrottle, streamId);
+        writer.doReset(sourceThrottle, routeId, streamId);
         if (slot != NO_SLOT)
         {
             bufferPool.release(slot);
@@ -287,7 +313,10 @@ public final class WriteStream
         closeIfInputShutdown();
     }
 
-    private ByteBuffer getWriteBuffer(DirectBuffer data, int dataOffset, int dataLength)
+    private ByteBuffer toWriteBuffer(
+        DirectBuffer data,
+        int dataOffset,
+        int dataLength)
     {
         ByteBuffer result;
         if (slot == NO_SLOT)
@@ -311,7 +340,9 @@ public final class WriteStream
         return result;
     }
 
-    private boolean handleUnwrittenData(ByteBuffer written, int bytesWritten)
+    private boolean handleUnwrittenData(
+        ByteBuffer written,
+        int bytesWritten)
     {
         boolean result = true;
         if (slot == NO_SLOT)
@@ -377,6 +408,11 @@ public final class WriteStream
 
             bytesWritten = channel.write(writeBuffer);
 
+            if (isInitial(streamId))
+            {
+                counters.bytesWritten.accept(bytesWritten);
+            }
+
             handleUnwrittenData(writeBuffer, bytesWritten);
 
             if (slot == NO_SLOT)
@@ -417,7 +453,7 @@ public final class WriteStream
         if (pendingCredit >= windowThreshold && readableBytes > EOS_REQUESTED)
         {
             readableBytes += pendingCredit;
-            writer.doWindow(sourceThrottle, streamId, pendingCredit, 0, 0);
+            writer.doWindow(sourceThrottle, routeId, streamId, pendingCredit, 0, 0);
             pendingCredit = 0;
         }
     }
@@ -429,10 +465,14 @@ public final class WriteStream
             if (channel.isOpen())
             {
                 CloseHelper.quietClose(channel);
-                counters.connectionsClosed.getAsLong();
                 onConnectionClosed.run();
             }
         }
     }
 
+    private static boolean isInitial(
+        long streamId)
+    {
+        return (streamId & 0x8000_0000_0000_0000L) == 0L;
+    }
 }

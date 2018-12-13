@@ -42,6 +42,8 @@ import org.reaktivity.reaktor.test.ReaktorRule;
  */
 public class ClientIT
 {
+    private static final int CLIENT_ROUTE_ID = 0x10000001;
+
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
             .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
@@ -55,7 +57,7 @@ public class ClientIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(2048)
+        .counterValuesBufferCapacity(4096)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -215,7 +217,7 @@ public class ClientIT
     public void connnectionFailed() throws Exception
     {
         k3po.finish();
-        assertEquals(1, counters.connectFailed(0));
+        assertEquals(1, reaktor.resetsRead("tcp", CLIENT_ROUTE_ID));
     }
 
     @Test

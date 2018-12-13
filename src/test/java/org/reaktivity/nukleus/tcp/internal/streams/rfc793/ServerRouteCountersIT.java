@@ -28,11 +28,12 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.tcp.internal.TcpFrameAndBytesCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-public class ServerFrameAndByteCountersIT
+public class ServerRouteCountersIT
 {
+    private static final int SERVER_ROUTE_ID = 0x00000001;
+
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("control", "org/reaktivity/specification/nukleus/tcp/control")
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
@@ -47,13 +48,11 @@ public class ServerFrameAndByteCountersIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(2048)
+        .counterValuesBufferCapacity(4096)
         .clean();
 
-    private final TcpFrameAndBytesCountersRule counters = new TcpFrameAndBytesCountersRule(reaktor);
-
     @Rule
-    public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -64,11 +63,11 @@ public class ServerFrameAndByteCountersIT
     public void shouldSendAndReceiveData() throws Exception
     {
         k3po.finish();
-        final long routeId = 0;
-        assertThat(counters.bytesRead(routeId), equalTo(26L));
-        assertThat(counters.bytesWritten(routeId), equalTo(26L));
-        assertThat(counters.framesRead(routeId), greaterThanOrEqualTo(1L));
-        assertThat(counters.framesWritten(routeId), greaterThanOrEqualTo(1L));
+
+        assertThat(reaktor.bytesWritten("tcp", SERVER_ROUTE_ID), equalTo(26L));
+        assertThat(reaktor.bytesRead("tcp", SERVER_ROUTE_ID), equalTo(26L));
+        assertThat(reaktor.framesWritten("tcp", SERVER_ROUTE_ID), greaterThanOrEqualTo(1L));
+        assertThat(reaktor.framesRead("tcp", SERVER_ROUTE_ID), greaterThanOrEqualTo(1L));
     }
 
 }
