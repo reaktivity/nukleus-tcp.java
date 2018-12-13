@@ -42,6 +42,7 @@ final class MessageWriter
     final BeginFW beginRO = new BeginFW();
     final DataFW dataRO = new DataFW();
     final EndFW endRO = new EndFW();
+    final AbortFW abortRO = new AbortFW();
     final ResetFW resetRO = new ResetFW();
     final WindowFW windowRO = new WindowFW();
 
@@ -67,10 +68,12 @@ final class MessageWriter
     }
 
     public void doTcpAbort(
-            MessageConsumer stream,
-            long streamId)
+        MessageConsumer stream,
+        long routeId,
+        long streamId)
     {
         AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
                 .streamId(streamId)
                 .trace(supplyTrace.getAsLong())
                 .extension(b -> b.set((buf, off, len) -> 0))
@@ -81,6 +84,7 @@ final class MessageWriter
 
     public void doTcpBegin(
         MessageConsumer stream,
+        long routeId,
         long streamId,
         long referenceId,
         long correlationId,
@@ -88,6 +92,7 @@ final class MessageWriter
         InetSocketAddress remoteAddress)
     {
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
                 .streamId(streamId)
                 .trace(supplyTrace.getAsLong())
                 .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
@@ -101,6 +106,7 @@ final class MessageWriter
 
     public void doTcpData(
         MessageConsumer stream,
+        long routeId,
         long streamId,
         long groupId,
         int padding,
@@ -109,6 +115,7 @@ final class MessageWriter
         int length)
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
                 .streamId(streamId)
                 .trace(supplyTrace.getAsLong())
                 .groupId(groupId)
@@ -120,46 +127,52 @@ final class MessageWriter
     }
 
     public void doTcpEnd(
-        MessageConsumer stream,
+        MessageConsumer receiver,
+        long routeId,
         long streamId)
     {
         EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
                 .streamId(streamId)
                 .trace(supplyTrace.getAsLong())
                 .extension(b -> b.set((buf, off, len) -> 0))
                 .build();
 
-       stream.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
+       receiver.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
     }
 
     void doWindow(
-        final MessageConsumer throttle,
-        final long throttleId,
+        final MessageConsumer sender,
+        final long routeId,
+        final long streamId,
         final int credit,
         final int padding,
         final int groupId)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .streamId(throttleId)
+                .routeId(routeId)
+                .streamId(streamId)
                 .trace(supplyTrace.getAsLong())
                 .credit(credit)
                 .padding(padding)
                 .groupId(groupId)
                 .build();
 
-        throttle.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
+        sender.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
     }
 
     void doReset(
-        final MessageConsumer throttle,
-        final long throttleId)
+        final MessageConsumer sender,
+        final long routeId,
+        final long streamId)
     {
         final ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-               .streamId(throttleId)
+               .routeId(routeId)
+               .streamId(streamId)
                .trace(supplyTrace.getAsLong())
                .build();
 
-        throttle.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
+        sender.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
     }
 
     private Flyweight.Builder.Visitor visitBeginEx(

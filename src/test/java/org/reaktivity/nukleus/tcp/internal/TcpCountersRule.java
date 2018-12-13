@@ -36,7 +36,6 @@ public class TcpCountersRule implements TestRule
     {
         return new Statement()
         {
-
             @Override
             public void evaluate() throws Throwable
             {
@@ -45,7 +44,6 @@ public class TcpCountersRule implements TestRule
                 assertEquals(0, controller.overflows());
                 base.evaluate();
             }
-
         };
     }
 
@@ -62,11 +60,6 @@ public class TcpCountersRule implements TestRule
     public long connections()
     {
         return controller().connections();
-    }
-
-    public long connectFailed(long routeId)
-    {
-        return controller().connectFailed(routeId);
     }
 
     private TcpController controller()

@@ -22,13 +22,19 @@ import java.util.function.LongSupplier;
 public final class TcpRouteCounters
 {
     public final LongSupplier overflows;
-    public final LongSupplier connectionsOpened;
-    public final LongSupplier connectionsClosed;
-    public final LongSupplier framesWritten;
+
+    public final LongSupplier opensWritten;
     public final LongConsumer bytesWritten;
-    public final LongSupplier framesRead;
+    public final LongSupplier closesWritten;
+    public final LongSupplier abortsWritten;
+    public final LongSupplier resetsWritten;
+
+    public final LongSupplier opensRead;
     public final LongConsumer bytesRead;
-    public final LongSupplier connectFailed;
+    public final LongSupplier closesRead;
+    public final LongSupplier abortsRead;
+    public final LongSupplier resetsRead;
+
 
     TcpRouteCounters(
         long routeId,
@@ -36,12 +42,17 @@ public final class TcpRouteCounters
         Function<String, LongConsumer> supplyAccumulator)
     {
         this.overflows = supplyCounter.apply("overflows");
-        this.connectionsOpened = supplyCounter.apply(String.format("%d.connections.opened", routeId));
-        this.connectionsClosed = supplyCounter.apply(String.format("%d.connections.closed", routeId));
-        this.framesWritten = supplyCounter.apply(String.format("%d.frames.written", routeId));
+
+        this.opensWritten = supplyCounter.apply(String.format("%d.opens.written", routeId));
         this.bytesWritten = supplyAccumulator.apply(String.format("%d.bytes.written", routeId));
-        this.framesRead = supplyCounter.apply(String.format("%d.frames.read", routeId));
+        this.closesWritten = supplyCounter.apply(String.format("%d.closes.written", routeId));
+        this.abortsWritten = supplyCounter.apply(String.format("%d.aborts.written", routeId));
+        this.resetsWritten = supplyCounter.apply(String.format("%d.resets.written", routeId));
+
+        this.opensRead = supplyCounter.apply(String.format("%d.opens.read", routeId));
         this.bytesRead = supplyAccumulator.apply(String.format("%d.bytes.read", routeId));
-        this.connectFailed = supplyCounter.apply(String.format("%d.connect.failed", routeId));
+        this.closesRead = supplyCounter.apply(String.format("%d.closes.read", routeId));
+        this.abortsRead = supplyCounter.apply(String.format("%d.aborts.read", routeId));
+        this.resetsRead = supplyCounter.apply(String.format("%d.resets.read", routeId));
     }
 }

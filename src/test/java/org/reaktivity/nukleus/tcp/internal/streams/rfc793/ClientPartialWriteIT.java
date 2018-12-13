@@ -46,7 +46,7 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.HandleWriteHelper;
-import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ProcessDataHelper;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
@@ -67,7 +67,7 @@ public class ClientPartialWriteIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024)
+        .counterValuesBufferCapacity(4096)
         .clean();
 
     @Rule
@@ -81,7 +81,7 @@ public class ClientPartialWriteIT
     })
     public void shouldSpinWrite() throws Exception
     {
-        ProcessDataHelper.fragmentWrites(generate(() -> 0).limit(WRITE_SPIN_COUNT - 1));
+        OnDataHelper.fragmentWrites(generate(() -> 0).limit(WRITE_SPIN_COUNT - 1));
         HandleWriteHelper.fragmentWrites(generate(() -> 0));
         k3po.finish();
     }
@@ -94,7 +94,7 @@ public class ClientPartialWriteIT
     })
     public void shouldFinishWriteWhenSocketIsWritableAgain() throws Exception
     {
-        ProcessDataHelper.fragmentWrites(IntStream.of(5));
+        OnDataHelper.fragmentWrites(IntStream.of(5));
         k3po.finish();
     }
 
@@ -106,7 +106,7 @@ public class ClientPartialWriteIT
     })
     public void shouldHandleMultiplePartialWrites() throws Exception
     {
-        ProcessDataHelper.fragmentWrites(IntStream.of(2));
+        OnDataHelper.fragmentWrites(IntStream.of(2));
         HandleWriteHelper.fragmentWrites(IntStream.of(3, 1));
         k3po.finish();
     }
@@ -124,7 +124,7 @@ public class ClientPartialWriteIT
         // second processData call, when we write everything.
         AtomicBoolean finishWrite = new AtomicBoolean(false);
 
-        ProcessDataHelper.fragmentWrites(concat(of(5), generate(() -> finishWrite.getAndSet(true) ? 0 : 0)));
+        OnDataHelper.fragmentWrites(concat(of(5), generate(() -> finishWrite.getAndSet(true) ? 0 : 0)));
         HandleWriteHelper.fragmentWrites(generate(() -> finishWrite.get() ? ALL : 0));
         k3po.finish();
     }
@@ -137,7 +137,7 @@ public class ClientPartialWriteIT
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
     {
         AtomicBoolean endWritten = new AtomicBoolean(false);
-        ProcessDataHelper.fragmentWrites(concat(of(5), generate(() -> 0)));
+        OnDataHelper.fragmentWrites(concat(of(5), generate(() -> 0)));
         HandleWriteHelper.fragmentWrites(generate(() -> endWritten.get() ? ALL : 0));
 
         try (ServerSocketChannel server = ServerSocketChannel.open())

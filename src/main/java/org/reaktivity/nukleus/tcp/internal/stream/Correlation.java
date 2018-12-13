@@ -22,13 +22,12 @@ import java.util.Objects;
 
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
-import org.reaktivity.nukleus.tcp.internal.util.function.LongObjectBiConsumer;
 
 public class Correlation
 {
     private final String sourceName;
     private final SocketChannel channel;
-    private final LongObjectBiConsumer<MessageConsumer> setCorrelatedThrottle;
+    private final ReadStream readStream;
     private final TcpRouteCounters counters;
     private final Runnable onConnectionClosed;
 
@@ -38,7 +37,7 @@ public class Correlation
     public Correlation(
         String sourceName,
         SocketChannel channel,
-        LongObjectBiConsumer<MessageConsumer> setCorrelatedThrottle,
+        ReadStream readStream,
         MessageConsumer target,
         long targetId,
         TcpRouteCounters counters,
@@ -46,7 +45,7 @@ public class Correlation
     {
         this.sourceName = requireNonNull(sourceName, "sourceName");
         this.channel = requireNonNull(channel, "channel");
-        this.setCorrelatedThrottle = setCorrelatedThrottle;
+        this.readStream = readStream;
         this.correlatedStream = target;
         this.correlatedStreamId = targetId;
         this.counters = counters;
@@ -78,9 +77,11 @@ public class Correlation
         return onConnectionClosed;
     }
 
-    public void setCorrelatedThrottle(MessageConsumer throttle, long streamId)
+    public void setCorrelatedThrottle(
+        MessageConsumer throttle,
+        long streamId)
     {
-        setCorrelatedThrottle.accept(streamId, throttle);
+        readStream.setCorrelatedThrottle(streamId, throttle);
     }
 
     @Override

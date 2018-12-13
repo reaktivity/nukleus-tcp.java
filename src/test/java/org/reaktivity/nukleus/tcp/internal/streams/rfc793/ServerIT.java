@@ -55,7 +55,7 @@ public class ServerIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(2048)
+        .counterValuesBufferCapacity(4096)
         .configure(TCP_MAX_CONNECTIONS, 3)
         .clean();
 

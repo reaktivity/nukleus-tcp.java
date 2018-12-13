@@ -142,6 +142,7 @@ public class ClientStreamFactory implements StreamFactory
         MessageConsumer throttle)
     {
         MessageConsumer result = null;
+        final long routeId = begin.routeId();
         final long streamId = begin.streamId();
         final String sourceName = begin.source().asString();
         final long sourceRef = begin.sourceRef();
@@ -163,6 +164,7 @@ public class ClientStreamFactory implements StreamFactory
         if (route != null)
         {
             final SocketChannel channel = newSocketChannel();
+            final long targetRouteId = route.correlationId();
             String targetName = route.target().asString();
             long targetRef = route.targetRef();
 
@@ -170,11 +172,9 @@ public class ClientStreamFactory implements StreamFactory
                                                              new InetSocketAddress(targetName, (int)targetRef);
             assert remoteAddress != null;
 
-            final TcpRouteCounters routeCounters = counters.supplyRoute(route.correlationId());
+            final TcpRouteCounters routeCounters = counters.supplyRoute(targetRouteId);
 
-            routeCounters.connectionsOpened.getAsLong();
-
-            final WriteStream stream = new WriteStream(throttle, streamId, channel, poller,
+            final WriteStream stream = new WriteStream(throttle, routeId, streamId, channel, poller,
                     bufferPool, writeByteBuffer, writer, routeCounters, windowThreshold, () -> {});
             result = stream::handleStream;
 
@@ -184,9 +184,11 @@ public class ClientStreamFactory implements StreamFactory
                 remoteAddress,
                 sourceName,
                 correlationId,
+                routeId,
                 throttle,
                 streamId,
                 stream::setCorrelatedInput,
+                targetRouteId,
                 routeCounters);
         }
 
@@ -318,16 +320,19 @@ public class ClientStreamFactory implements StreamFactory
         InetSocketAddress remoteAddress,
         String acceptReplyName,
         long correlationId,
+        long outputRouteId,
         MessageConsumer outputThrottle,
         long outputStreamId,
         LongObjectBiConsumer<MessageConsumer> setCorrelatedInput,
+        long targetRouteId,
         TcpRouteCounters counters)
     {
         final Request request = new Request(channel, stream, acceptReplyName, correlationId,
-                outputThrottle, outputStreamId, setCorrelatedInput, counters);
+                outputRouteId, outputThrottle, outputStreamId, targetRouteId, setCorrelatedInput);
 
         try
         {
+            counters.opensWritten.getAsLong();
             if (channel.connect(remoteAddress))
             {
                 handleConnected(request);
@@ -343,37 +348,41 @@ public class ClientStreamFactory implements StreamFactory
         }
     }
 
-    private void handleConnected(Request request)
+    private void handleConnected(
+        Request request)
     {
-        request.stream.doConnected();
+        request.stream.onConnected();
         newConnectReplyStream(request);
     }
 
-    private void newConnectReplyStream(Request request)
+    private void newConnectReplyStream(
+        Request request)
     {
         final SocketChannel channel = request.channel;
-        final String targetName = request.acceptReplyName;
-        final long targetId = supplyReplyId.applyAsLong(request.outputStreamdId);
-        final long correlationId = request.correlationId;
-        final MessageConsumer correlatedThrottle = request.outputThrottle;
-        final long correlatedStreamId = request.outputStreamdId;
+        final MessageConsumer acceptThrottle = request.acceptThrottle;
+        final String acceptReplyName = request.acceptReplyName;
+        final long acceptRouteId = request.acceptRouteId;
+        final long acceptInitialId = request.acceptInitialId;
+        final long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
+        final long acceptCorrelationId = request.acceptCorrelationId;
 
         try
         {
             final InetSocketAddress localAddress = (InetSocketAddress) channel.getLocalAddress();
             final InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
-            final MessageConsumer target = router.supplyTarget(targetName);
-            request.setCorrelatedInput.accept(targetId, target);
-            writer.doTcpBegin(target, targetId, 0L, correlationId, localAddress, remoteAddress);
+            final MessageConsumer acceptReply = router.supplyTarget(acceptReplyName);
+            request.setCorrelatedInput.accept(acceptReplyId, acceptReply);
+            writer.doTcpBegin(acceptReply, acceptRouteId, acceptReplyId, 0L, acceptCorrelationId, localAddress, remoteAddress);
 
             final PollerKey key = poller.doRegister(channel, 0, null);
 
-            final TcpRouteCounters counters = request.counters;
-            final ReadStream stream = new ReadStream(target, targetId, key, channel,
-                    readByteBuffer, readBuffer, writer, counters, () -> {});
-            stream.setCorrelatedThrottle(correlatedStreamId, correlatedThrottle);
+            final TcpRouteCounters routeCounters = counters.supplyRoute(request.connectRouteId);
 
-            router.setThrottle(targetName, targetId, stream::handleThrottle);
+            final ReadStream stream = new ReadStream(acceptReply, acceptRouteId, acceptReplyId, key, channel,
+                    readByteBuffer, readBuffer, writer, routeCounters, () -> {});
+            stream.setCorrelatedThrottle(acceptInitialId, acceptThrottle);
+
+            router.setThrottle(acceptReplyName, acceptReplyId, stream::handleThrottle);
 
             final ToIntFunction<PollerKey> handler = stream::handleStream;
 
@@ -390,7 +399,7 @@ public class ClientStreamFactory implements StreamFactory
     private void handleConnectFailed(
         Request request)
     {
-        request.stream.doConnectFailed();
+        request.stream.onConnectFailed();
     }
 
     private final class Request implements ToIntFunction<PollerKey>
@@ -398,30 +407,33 @@ public class ClientStreamFactory implements StreamFactory
         private final WriteStream stream;
         private final SocketChannel channel;
         private final String acceptReplyName;
-        private final long correlationId;
-        private final MessageConsumer outputThrottle;
-        private final long outputStreamdId;
+        private final long acceptCorrelationId;
+        private final MessageConsumer acceptThrottle;
+        private final long acceptRouteId;
+        private final long acceptInitialId;
+        private final long connectRouteId;
         private final LongObjectBiConsumer<MessageConsumer> setCorrelatedInput;
-        private final TcpRouteCounters counters;
 
         private Request(
             SocketChannel channel,
             WriteStream stream,
             String acceptReplyName,
             long correlationId,
+            long outputRouteId,
             MessageConsumer outputThrottle,
             long outputStreamId,
-            LongObjectBiConsumer<MessageConsumer> setCorrelatedInput,
-            TcpRouteCounters counters)
+            long targetRouteId,
+            LongObjectBiConsumer<MessageConsumer> setCorrelatedInput)
         {
             this.channel = channel;
             this.stream = stream;
             this.acceptReplyName = acceptReplyName;
-            this.correlationId = correlationId;
-            this.outputThrottle = outputThrottle;
-            this.outputStreamdId = outputStreamId;
+            this.acceptCorrelationId = correlationId;
+            this.acceptRouteId = outputRouteId;
+            this.acceptThrottle = outputThrottle;
+            this.acceptInitialId = outputStreamId;
+            this.connectRouteId = targetRouteId;
             this.setCorrelatedInput = setCorrelatedInput;
-            this.counters = counters;
         }
 
         @Override
@@ -450,8 +462,5 @@ public class ClientStreamFactory implements StreamFactory
 
             return 1;
         }
-
     }
-
-
 }

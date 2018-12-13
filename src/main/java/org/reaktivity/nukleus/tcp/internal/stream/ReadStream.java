@@ -36,13 +36,13 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
 final class ReadStream
 {
     private final MessageConsumer target;
+    private final long routeId;
     private final long streamId;
     private final PollerKey key;
     private final SocketChannel channel;
     private final ByteBuffer readBuffer;
     private final MutableDirectBuffer atomicBuffer;
     private final MessageWriter writer;
-    private final TcpRouteCounters counters;
     private Runnable onConnectionClosed;
 
     private MessageConsumer correlatedThrottle;
@@ -51,9 +51,11 @@ final class ReadStream
     private int readPadding;
     private long readGroupId;
     private boolean resetRequired;
+    private final TcpRouteCounters counters;
 
     ReadStream(
         MessageConsumer target,
+        long routeId,
         long streamId,
         PollerKey key,
         SocketChannel channel,
@@ -64,6 +66,7 @@ final class ReadStream
         Runnable onConnectionClosed)
     {
         this.target = target;
+        this.routeId = routeId;
         this.streamId = streamId;
         this.key = key;
         this.channel = channel;
@@ -90,9 +93,14 @@ final class ReadStream
 
             if (bytesRead == -1)
             {
+                if (isReply(streamId))
+                {
+                    counters.closesRead.getAsLong();
+                }
+
                 // channel input closed
                 readableBytes = -1;
-                writer.doTcpEnd(target, streamId);
+                writer.doTcpEnd(target, routeId, streamId);
                 key.cancel(OP_READ);
 
                 shutdownInput();
@@ -100,10 +108,13 @@ final class ReadStream
             }
             else if (bytesRead != 0)
             {
-                counters.framesRead.getAsLong();
-                counters.bytesRead.accept(bytesRead);
+                if (isReply(streamId))
+                {
+                    counters.bytesRead.accept(bytesRead);
+                }
+
                 // atomic buffer is zero copy with read buffer
-                writer.doTcpData(target, streamId, readGroupId, readPadding, atomicBuffer, 0, bytesRead);
+                writer.doTcpData(target, routeId, streamId, readGroupId, readPadding, atomicBuffer, 0, bytesRead);
 
                 readableBytes -= bytesRead + readPadding;
 
@@ -125,13 +136,18 @@ final class ReadStream
     private void handleIOExceptionFromRead()
     {
         // IOException from read implies channel input and output will no longer function
+        if (isReply(streamId))
+        {
+            counters.abortsRead.getAsLong();
+        }
+
         readableBytes = -1;
-        writer.doTcpAbort(target, streamId);
+        writer.doTcpAbort(target, routeId, streamId);
         key.cancel(OP_READ);
 
         if (correlatedThrottle != null)
         {
-            writer.doReset(correlatedThrottle, correlatedStreamId);
+            writer.doReset(correlatedThrottle, routeId, correlatedStreamId);
         }
         else
         {
@@ -140,8 +156,12 @@ final class ReadStream
 
         if (channel.isOpen())
         {
+            if (isReply(streamId))
+            {
+                counters.resetsWritten.getAsLong();
+            }
+
             CloseHelper.quietClose(channel);
-            counters.connectionsClosed.getAsLong();
             onConnectionClosed.run();
         }
     }
@@ -156,11 +176,11 @@ final class ReadStream
         {
         case WindowFW.TYPE_ID:
             final WindowFW window = writer.windowRO.wrap(buffer, index, index + length);
-            processWindow(window);
+            onWindow(window);
             break;
         case ResetFW.TYPE_ID:
             final ResetFW reset = writer.resetRO.wrap(buffer, index, index + length);
-            processReset(reset);
+            onReset(reset);
             break;
         default:
             // ignore
@@ -176,11 +196,11 @@ final class ReadStream
         this.correlatedStreamId = correlatedStreamId;
         if (resetRequired)
         {
-            writer.doReset(correlatedThrottle, correlatedStreamId);
+            writer.doReset(correlatedThrottle, routeId, correlatedStreamId);
         }
     }
 
-    private void processWindow(
+    private void onWindow(
         WindowFW window)
     {
         if (readableBytes != -1)
@@ -205,7 +225,7 @@ final class ReadStream
         }
     }
 
-    private void processReset(
+    private void onReset(
         ResetFW reset)
     {
         if (correlatedThrottle != null)
@@ -239,7 +259,6 @@ final class ReadStream
             if (channel.isOpen())
             {
                 CloseHelper.quietClose(channel);
-                counters.connectionsClosed.getAsLong();
                 onConnectionClosed.run();
             }
         }
@@ -249,17 +268,28 @@ final class ReadStream
     {
         try
         {
+            if (isReply(streamId))
+            {
+                counters.abortsWritten.getAsLong();
+                counters.resetsWritten.getAsLong();
+            }
+
             // Force a hard reset (TCP RST), as documented in "Orderly Versus Abortive Connection Release in Java"
             // (https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html)
             channel.setOption(StandardSocketOptions.SO_LINGER, 0);
             channel.close();
 
-            counters.connectionsClosed.getAsLong();
             onConnectionClosed.run();
         }
         catch (IOException ex)
         {
             LangUtil.rethrowUnchecked(ex);
         }
+    }
+
+    private static boolean isReply(
+        long streamId)
+    {
+        return (streamId & 0x8000_0000_0000_0000L) != 0L;
     }
 }

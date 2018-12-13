@@ -32,29 +32,28 @@ public final class SocketChannelHelper
     public static final TestRule RULE = new Rule();
     public static final int ALL = -1;
 
-    public static class ProcessDataHelper extends Helper
+    public static class OnDataHelper extends Helper
     {
+        private static PrimitiveIterator.OfInt onData;
 
-        private static PrimitiveIterator.OfInt processData;
-
-        protected ProcessDataHelper(org.jboss.byteman.rule.Rule rule)
+        protected OnDataHelper(org.jboss.byteman.rule.Rule rule)
         {
             super(rule);
         }
 
         public static void fragmentWrites(IntStream stream)
         {
-            ProcessDataHelper.processData = stream.iterator();
+            OnDataHelper.onData = stream.iterator();
         }
 
         public int doWrite(SocketChannel channel, ByteBuffer buffer) throws IOException
         {
-            return write(channel, buffer, processData);
+            return write(channel, buffer, onData);
         }
 
         private static void reset()
         {
-            processData = IntStream.empty().iterator();
+            onData = IntStream.empty().iterator();
         }
     }
 
@@ -107,7 +106,6 @@ public final class SocketChannelHelper
 
     private static class Rule implements TestRule
     {
-
         @Override
         public Statement apply(Statement base, Description description)
         {
@@ -120,24 +118,24 @@ public final class SocketChannelHelper
                     reset();
                     base.evaluate();
                 }
-
             };
         }
-
     }
 
     private SocketChannelHelper()
     {
-
     }
 
     private static void reset()
     {
-        ProcessDataHelper.reset();
+        OnDataHelper.reset();
         HandleWriteHelper.reset();
     }
 
-    private static int write(SocketChannel channel, ByteBuffer b, PrimitiveIterator.OfInt iterator) throws IOException
+    private static int write(
+        SocketChannel channel,
+        ByteBuffer b,
+        PrimitiveIterator.OfInt iterator) throws IOException
     {
         int bytesToWrite = iterator.hasNext() ? iterator.nextInt() : ALL;
         bytesToWrite = bytesToWrite == ALL ? b.remaining() : bytesToWrite;

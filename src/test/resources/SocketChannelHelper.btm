@@ -1,8 +1,8 @@
-RULE processData
+RULE onData
 CLASS ^java.nio.channels.SocketChannel
 METHOD write(java.nio.ByteBuffer)
-HELPER org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$ProcessDataHelper
-IF callerEquals("org.reaktivity.nukleus.tcp.internal.stream.WriteStream.processData", true, true)
+HELPER org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$OnDataHelper
+IF callerEquals("org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onData", true, true)
 DO return doWrite($0, $1);
 ENDRULE
 

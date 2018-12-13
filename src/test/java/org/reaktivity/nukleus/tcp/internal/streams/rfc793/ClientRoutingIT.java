@@ -46,7 +46,7 @@ public class ClientRoutingIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024)
+        .counterValuesBufferCapacity(4096)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);

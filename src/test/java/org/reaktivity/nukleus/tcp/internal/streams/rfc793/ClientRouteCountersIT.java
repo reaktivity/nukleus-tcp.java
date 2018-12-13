@@ -17,7 +17,6 @@ package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.Assert.assertThat;
 import static org.junit.rules.RuleChain.outerRule;
 
@@ -28,14 +27,15 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.tcp.internal.TcpFrameAndBytesCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
  * Tests the TCP nukleus when acting as a client.
  */
-public class ClientFrameAndByteCountersIT
+public class ClientRouteCountersIT
 {
+    private static final int CLIENT_ROUTE_ID = 0x10000001;
+
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
             .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
@@ -49,13 +49,11 @@ public class ClientFrameAndByteCountersIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(2048)
+        .counterValuesBufferCapacity(4096)
         .clean();
 
-    private final TcpFrameAndBytesCountersRule counters = new TcpFrameAndBytesCountersRule(reaktor);
-
     @Rule
-    public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -66,10 +64,8 @@ public class ClientFrameAndByteCountersIT
     public void shouldSendAndReceiveData() throws Exception
     {
         k3po.finish();
-        final long routeId = 0;
-        assertThat(counters.bytesRead(routeId), equalTo(26L));
-        assertThat(counters.bytesWritten(routeId), equalTo(26L));
-        assertThat(counters.framesRead(routeId), greaterThanOrEqualTo(1L));
-        assertThat(counters.framesWritten(routeId), greaterThanOrEqualTo(1L));
+
+        assertThat(reaktor.bytesWritten("tcp", CLIENT_ROUTE_ID), equalTo(26L));
+        assertThat(reaktor.bytesRead("tcp", CLIENT_ROUTE_ID), equalTo(26L));
     }
 }
