@@ -22,6 +22,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
@@ -29,6 +30,9 @@ import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 
 public final class IpUtil
 {
+    public static final Pattern ACCEPT_HOST_AND_PORT_PATTERN = Pattern.compile("tcp#([^:]+):(\\d+)");
+    public static final Pattern CONNECT_HOST_AND_PORT_PATTERN = Pattern.compile("([^:]+):(\\d+)");
+
     private static final int FIELD_SIZE_IPV4_ADDRESS = 4;
     private static final int FIELD_SIZE_IPV6_ADDRESS = 16;
 

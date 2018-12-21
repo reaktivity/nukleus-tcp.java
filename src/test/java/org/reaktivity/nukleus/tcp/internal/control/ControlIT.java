@@ -16,7 +16,6 @@
 package org.reaktivity.nukleus.tcp.internal.control;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.TcpConfiguration.TCP_MAXIMUM_BACKLOG;
 
@@ -83,30 +82,11 @@ public class ControlIT
 
     @Test
     @Specification({
-        "${route}/server/error.invalid.port.0/controller"
-    })
-    public void shouldRefuseRouteServerPortZero() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
-        "${route}/server/error.invalid.port.negative/controller"
-    })
-    public void shouldRefuseRouteServerNegativePort() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
         "${route}/client.ip/controller"
     })
     public void shouldRouteClientIp() throws Exception
     {
         k3po.finish();
-        assertEquals(1, counters.routes());
     }
 
     @Test
@@ -116,7 +96,6 @@ public class ControlIT
     public void shouldRouteClientHost() throws Exception
     {
         k3po.finish();
-        assertEquals(1, counters.routes());
     }
 
     @Test
@@ -126,7 +105,6 @@ public class ControlIT
     public void shouldRouteClientSubnet() throws Exception
     {
         k3po.finish();
-        assertEquals(1, counters.routes());
     }
 
     @Test
@@ -147,7 +125,6 @@ public class ControlIT
     public void shouldUnrouteClient() throws Exception
     {
         k3po.finish();
-        assertEquals(1, counters.routes());
     }
 
     @Test

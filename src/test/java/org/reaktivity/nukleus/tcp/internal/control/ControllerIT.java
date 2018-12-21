@@ -18,7 +18,7 @@ package org.reaktivity.nukleus.tcp.internal.control;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -56,12 +56,10 @@ public class ControllerIT
     })
     public void shouldRouteServer() throws Exception
     {
-        long targetRef = new Random().nextLong();
-
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .routeServer("0.0.0.0", 8080, "target", targetRef)
+               .routeServer("tcp#0.0.0.0:8080", "target#0")
                .get();
 
         k3po.finish();
@@ -76,7 +74,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .routeClient("source", 0L, "127.0.0.1", 8080)
+               .routeClient("tcp#0", "127.0.0.1:8080")
                .get();
 
         k3po.finish();
@@ -91,7 +89,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-                .routeClient("source", 0L, "localhost", 8080)
+                .routeClient("tcp#0", "localhost:8080")
                 .get();
 
         k3po.finish();
@@ -106,7 +104,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-                .routeClient("source", 0L, "127.0.0.1/24", 8080)
+                .routeClient("tcp#0", "127.0.0.1/24:8080")
                 .get();
 
         k3po.finish();
@@ -118,12 +116,12 @@ public class ControllerIT
     })
     public void shouldUnrouteServer() throws Exception
     {
-        long targetRef = new Random().nextLong();
+        long routeId = ThreadLocalRandom.current().nextLong();
 
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .unrouteServer("0.0.0.0", 8080, "target", targetRef)
+               .unroute(routeId)
                .get();
 
         k3po.finish();
@@ -135,12 +133,12 @@ public class ControllerIT
     })
     public void shouldUnrouteClient() throws Exception
     {
-        long sourceRef = new Random().nextLong();
+        long routeId = ThreadLocalRandom.current().nextLong();
 
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .unrouteClient("source", sourceRef, "localhost", 8080)
+               .unroute(routeId)
                .get();
 
         k3po.finish();

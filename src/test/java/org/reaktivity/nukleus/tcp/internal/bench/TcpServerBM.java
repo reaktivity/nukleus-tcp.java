@@ -59,6 +59,7 @@ public class TcpServerBM
 {
     private final Reaktor reaktor;
     private final TcpController controller;
+    private long routeId;
 
     {
         Properties properties = new Properties();
@@ -82,13 +83,13 @@ public class TcpServerBM
     public void reinit() throws Exception
     {
         reaktor.start();
-        controller.routeServer("127.0.0.1", 8080, "tcp", 0L).get();
+        routeId = controller.routeServer("127.0.0.1:8080", "tcp#0").get();
     }
 
     @TearDown(Level.Trial)
     public void reset() throws Exception
     {
-        controller.unrouteServer("127.0.0.1", 8080, "tcp", 0L).get();
+        controller.unroute(routeId).get();
         reaktor.close();
     }
 

@@ -40,16 +40,10 @@ public class TcpCountersRule implements TestRule
             public void evaluate() throws Throwable
             {
                 TcpController controller = controller();
-                assertEquals(0, controller.routes());
                 assertEquals(0, controller.overflows());
                 base.evaluate();
             }
         };
-    }
-
-    public long routes()
-    {
-        return controller().routes();
     }
 
     public long overflows()

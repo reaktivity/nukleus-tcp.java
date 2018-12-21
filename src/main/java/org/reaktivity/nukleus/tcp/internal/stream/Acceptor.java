@@ -20,6 +20,7 @@ import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.net.StandardSocketOptions.SO_REUSEPORT;
 import static java.net.StandardSocketOptions.TCP_NODELAY;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.ACCEPT_HOST_AND_PORT_PATTERN;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
 
 import java.io.IOException;
@@ -29,16 +30,15 @@ import java.net.SocketAddress;
 import java.nio.channels.NetworkChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+import java.util.regex.Matcher;
 
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
+import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
@@ -46,10 +46,9 @@ import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
-import org.reaktivity.nukleus.tcp.internal.util.IpUtil;
 
 /**
- * The {@code Poller} nukleus accepts new socket connections and informs the {@code Router} nukleus.
+ * The {@code Acceptor} accepts new socket connections and informs the {@code Router}.
  */
 public final class Acceptor
 {
@@ -59,7 +58,7 @@ public final class Acceptor
     private final int backlog;
     private final int maxConnections;
     private final boolean keepalive;
-    private final Map<SocketAddress, String> sourcesByLocalAddress;
+    private final Long2ObjectHashMap<InetSocketAddress> localAddressByRouteId;
     private final Function<SocketAddress, PollerKey> registerHandler;
     private final ToIntFunction<PollerKey> acceptHandler;
     private int connections;
@@ -75,7 +74,7 @@ public final class Acceptor
         this.backlog = config.maximumBacklog();
         this.maxConnections = config.maxConnections();
         this.keepalive = config.keepalive();
-        this.sourcesByLocalAddress = new TreeMap<>(IpUtil::compareAddresses);
+        this.localAddressByRouteId = new Long2ObjectHashMap<>();
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
     }
@@ -95,26 +94,22 @@ public final class Acceptor
         boolean result = true;
         switch(msgTypeId)
         {
-        case RouteFW.TYPE_ID:
+            case RouteFW.TYPE_ID:
             {
                 final RouteFW route = routeRO.wrap(buffer, index, index + length);
                 assert route.role().get() == Role.SERVER;
-                final long correlationId = route.correlationId();
-                final String source = route.source().asString();
-                final long sourceRef = route.sourceRef();
-                result = sourceRef <= 0 ? false : doRegister(correlationId, source, sourceRef);
+                final long routeId = route.correlationId();
+                final String localAddress = route.localAddress().asString();
+                result = doRegister(routeId, localAddress);
+                break;
             }
-            break;
-        case UnrouteFW.TYPE_ID:
+            case UnrouteFW.TYPE_ID:
             {
                 final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
-                assert unroute.role().get() == Role.SERVER;
-                final String source = unroute.source().asString();
-                final long sourceRef = unroute.sourceRef();
-                result = doUnregister(source, sourceRef);
+                final long routeId = unroute.routeId();
+                result = doUnregister(routeId);
+                break;
             }
-            break;
-
         }
         return result;
     }
@@ -133,19 +128,25 @@ public final class Acceptor
     }
 
     private boolean doRegister(
-        long correlationId,
-        String sourceName,
-        long sourceRef)
+        long routeId,
+        String localAddressAndPort)
     {
         try
         {
-            final InetAddress address = InetAddress.getByName(sourceName);
-            final InetSocketAddress localAddress = new InetSocketAddress(address, (int)sourceRef);
+            final Matcher matcher = ACCEPT_HOST_AND_PORT_PATTERN.matcher(localAddressAndPort);
+            if (!matcher.matches())
+            {
+                return false;
+            }
+
+            final String hostname = matcher.group(1);
+            final int port = Integer.parseInt(matcher.group(2));
+            final InetAddress address = InetAddress.getByName(hostname);
+            final InetSocketAddress localAddress = new InetSocketAddress(address, port);
             findOrRegisterKey(localAddress);
 
-            // TODO: detect collision on different source name for same key
             // TODO: maintain register count
-            sourcesByLocalAddress.putIfAbsent(localAddress, sourceName);
+            localAddressByRouteId.putIfAbsent(routeId, localAddress);
         }
         catch (Exception ex)
         {
@@ -155,15 +156,13 @@ public final class Acceptor
     }
 
     private boolean doUnregister(
-        String sourceName,
-        long sourceRef)
+        long routeId)
     {
         boolean result = false;
         try
         {
-            InetAddress address = InetAddress.getByName(sourceName);
-            final InetSocketAddress localAddress = new InetSocketAddress(address, (int)sourceRef);
-            if (Objects.equals(sourceName, sourcesByLocalAddress.get(localAddress)))
+            final InetSocketAddress localAddress = localAddressByRouteId.remove(routeId);
+            if (localAddress != null)
             {
                 final PollerKey key = findRegisteredKey(localAddress);
 
@@ -193,10 +192,8 @@ public final class Acceptor
                 channel.setOption(SO_KEEPALIVE, keepalive);
 
                 final InetSocketAddress address = localAddress(channel);
-                final String sourceName = sourcesByLocalAddress.get(address);
-                final long sourceRef = address.getPort();
 
-                serverStreamFactory.onAccepted(sourceName, sourceRef, channel, address, this::connectionDone);
+                serverStreamFactory.onAccepted(channel, address, localAddressByRouteId::get, this::connectionDone);
             }
         }
         catch (Exception ex)
@@ -220,7 +217,7 @@ public final class Acceptor
                 RouteFW route = routeRO.wrap(buffer, index, index + length);
                 if (route.role().get() == Role.SERVER)
                 {
-                    doUnregister(routeRO.source().asString(), routeRO.sourceRef());
+                    doUnregister(route.correlationId());
                 }
             });
             unbound = true;
@@ -250,7 +247,7 @@ public final class Acceptor
                 RouteFW route = routeRO.wrap(buffer, index, index + length);
                 if (route.role().get() == Role.SERVER)
                 {
-                    doRegister(routeRO.correlationId(), routeRO.source().asString(), routeRO.sourceRef());
+                    doRegister(route.correlationId(), route.localAddress().asString());
                 }
             });
             unbound = false;
@@ -333,5 +330,4 @@ public final class Acceptor
     {
         return (InetSocketAddress) channel.getLocalAddress();
     }
-
 }

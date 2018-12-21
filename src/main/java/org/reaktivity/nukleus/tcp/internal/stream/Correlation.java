@@ -25,7 +25,6 @@ import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 
 public class Correlation
 {
-    private final String sourceName;
     private final SocketChannel channel;
     private final ReadStream readStream;
     private final TcpRouteCounters counters;
@@ -35,7 +34,6 @@ public class Correlation
     private long correlatedStreamId;
 
     public Correlation(
-        String sourceName,
         SocketChannel channel,
         ReadStream readStream,
         MessageConsumer target,
@@ -43,18 +41,12 @@ public class Correlation
         TcpRouteCounters counters,
         Runnable onConnectionClosed)
     {
-        this.sourceName = requireNonNull(sourceName, "sourceName");
         this.channel = requireNonNull(channel, "channel");
         this.readStream = readStream;
         this.correlatedStream = target;
         this.correlatedStreamId = targetId;
         this.counters = counters;
         this.onConnectionClosed = onConnectionClosed;
-    }
-
-    public String source()
-    {
-        return sourceName;
     }
 
     public MessageConsumer correlatedStream()
@@ -87,10 +79,7 @@ public class Correlation
     @Override
     public int hashCode()
     {
-        int result = sourceName.hashCode();
-        result = 31 * result + channel.hashCode();
-
-        return result;
+        return channel.hashCode();
     }
 
     @Override
@@ -103,14 +92,13 @@ public class Correlation
         }
 
         Correlation that = (Correlation) obj;
-        return Objects.equals(this.sourceName, that.sourceName) &&
-                Objects.equals(this.channel, that.channel);
+        return Objects.equals(this.channel, that.channel);
     }
 
     @Override
     public String toString()
     {
-        return String.format("[source=\"%s\", channel=%s]", sourceName, channel);
+        return String.format("[channel=%s]", channel);
     }
 
     public TcpRouteCounters counters()

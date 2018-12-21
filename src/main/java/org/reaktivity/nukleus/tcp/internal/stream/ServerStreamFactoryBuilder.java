@@ -163,7 +163,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
             case UnrouteFW.TYPE_ID:
             {
                 final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
-                final long routeId = unroute.correlationId();
+                final long routeId = unroute.routeId();
                 countersByRouteId.remove(routeId);
             }
             break;
