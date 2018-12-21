@@ -21,7 +21,6 @@ import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -56,7 +55,7 @@ public class ServerStreamFactory implements StreamFactory
     private final BeginFW beginRO = new BeginFW();
 
     private final RouteManager router;
-    private final LongSupplier supplyStreamId;
+    private final LongSupplier supplyInitialId;
     private final LongSupplier supplyCorrelationId;
     private final LongFunction<IntUnaryOperator> groupBudgetClaimer;
     private final LongFunction<IntUnaryOperator> groupBudgetReleaser;
@@ -77,7 +76,7 @@ public class ServerStreamFactory implements StreamFactory
         RouteManager router,
         MutableDirectBuffer writeBuffer,
         BufferPool bufferPool,
-        LongSupplier supplyStreamId,
+        LongSupplier supplyInitialId,
         LongSupplier supplyTrace,
         LongSupplier supplyCorrelationId,
         Long2ObjectHashMap<Correlation> correlations,
@@ -90,7 +89,7 @@ public class ServerStreamFactory implements StreamFactory
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
         this.writer = new MessageWriter(requireNonNull(writeBuffer), requireNonNull(supplyTrace));
         this.bufferPool = bufferPool;
-        this.supplyStreamId = requireNonNull(supplyStreamId);
+        this.supplyInitialId = requireNonNull(supplyInitialId);
         this.groupBudgetClaimer = requireNonNull(groupBudgetClaimer);
         this.groupBudgetReleaser = requireNonNull(groupBudgetReleaser);
         this.supplyCorrelationId = supplyCorrelationId;
@@ -110,66 +109,53 @@ public class ServerStreamFactory implements StreamFactory
 
     @Override
     public MessageConsumer newStream(
-            int msgTypeId,
-            DirectBuffer buffer,
-            int index,
-            int length,
-            MessageConsumer throttle)
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length,
+        MessageConsumer throttle)
     {
         final BeginFW begin = beginRO.wrap(buffer, index, index + length);
-        final long routeId = begin.routeId();
-        final long sourceRef = begin.sourceRef();
+        final long streamId = begin.streamId();
 
-        MessageConsumer newStream;
+        MessageConsumer newStream = null;
 
-        if (sourceRef == 0L)
+        if ((streamId & 0x8000_0000_0000_0000L) != 0L)
         {
             newStream = newConnectReplyStream(begin, throttle);
-        }
-        else
-        {
-            final long sourceId = begin.streamId();
-            writer.doReset(throttle, routeId, sourceId);
-            throw new IllegalArgumentException(String.format("Stream id %d is not a reply stream, sourceRef %d is non-zero",
-                    sourceId, sourceRef));
         }
 
         return newStream;
     }
 
     public void onAccepted(
-        String sourceName,
-        long sourceRef,
         SocketChannel channel,
         InetSocketAddress address,
+        LongFunction<InetSocketAddress> lookupAddress,
         Runnable onConnectionClosed)
     {
         final MessagePredicate filter = (t, b, o, l) ->
         {
             final RouteFW route = routeRO.wrap(b, o, o + l);
-            InetAddress inetAddress = null;
-            InetSocketAddress routedAddress = new InetSocketAddress(inetAddress, (int)sourceRef);
-            return sourceRef == route.sourceRef() &&
-                    sourceName.equals(route.source().asString()) &&
-                         compareAddresses(address, routedAddress) == 0;
+            final long routeId = route.correlationId();
+            final InetSocketAddress routedAddress = lookupAddress.apply(routeId);
+            return compareAddresses(address, routedAddress) == 0;
         };
 
-        final RouteFW route = router.resolve(0L, filter, this::wrapRoute);
+        final RouteFW route = router.resolveExternal(0L, filter, this::wrapRoute);
 
         if (route != null)
         {
             final long routeId = route.correlationId();
-            final long targetRef = route.targetRef();
-            final String targetName = route.target().asString();
-            final long targetId = supplyStreamId.getAsLong();
+            final long initialId = supplyInitialId.getAsLong();
             final long correlationId = supplyCorrelationId.getAsLong();
 
             try
             {
                 final InetSocketAddress localAddress = (InetSocketAddress) channel.getLocalAddress();
                 final InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
-                final MessageConsumer target = router.supplyTarget(targetName);
-                writer.doTcpBegin(target, routeId, targetId, targetRef, correlationId, localAddress, remoteAddress);
+                final MessageConsumer receiver = router.supplyReceiver(routeId);
+                writer.doTcpBegin(receiver, routeId, initialId, correlationId, localAddress, remoteAddress);
 
                 final PollerKey key = poller.doRegister(channel, 0, null);
 
@@ -184,13 +170,13 @@ public class ServerStreamFactory implements StreamFactory
                 routeCounters.opensRead.getAsLong();
                 routeCounters.opensWritten.getAsLong();
 
-                final ReadStream stream = new ReadStream(target, routeId, targetId, key, channel,
+                final ReadStream stream = new ReadStream(receiver, routeId, initialId, key, channel,
                         readByteBuffer, readBuffer, writer, routeCounters, doCleanupConnection);
-                final Correlation correlation = new Correlation(sourceName, channel, stream,
-                        target, targetId, routeCounters, onConnectionClosed);
+                final Correlation correlation = new Correlation(channel, stream,
+                        receiver, initialId, routeCounters, onConnectionClosed);
                 correlations.put(correlationId, correlation);
 
-                router.setThrottle(targetName, targetId, stream::handleThrottle);
+                router.setThrottle(initialId, stream::handleThrottle);
 
                 final ToIntFunction<PollerKey> handler = stream::handleStream;
 

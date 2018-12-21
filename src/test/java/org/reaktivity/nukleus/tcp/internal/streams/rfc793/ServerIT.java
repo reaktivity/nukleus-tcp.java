@@ -107,7 +107,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -122,7 +121,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -147,7 +145,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -208,7 +205,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -222,7 +218,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -237,7 +232,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -252,7 +246,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -281,7 +274,6 @@ public class ServerIT
             }
         }
 
-        assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -306,7 +298,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -350,7 +341,6 @@ public class ServerIT
     {
         k3po.finish();
 
-        assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
 

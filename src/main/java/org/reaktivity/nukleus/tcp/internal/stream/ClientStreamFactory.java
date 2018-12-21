@@ -15,12 +15,14 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
+import static java.lang.Integer.parseInt;
 import static java.net.StandardSocketOptions.TCP_NODELAY;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.util.Objects.requireNonNull;
 import static org.agrona.LangUtil.rethrowUnchecked;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.CONNECT_HOST_AND_PORT_PATTERN;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -39,6 +41,7 @@ import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
+import java.util.regex.Matcher;
 
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
@@ -125,11 +128,11 @@ public class ClientStreamFactory implements StreamFactory
             MessageConsumer throttle)
     {
         final BeginFW begin = beginRO.wrap(buffer, index, index + length);
-        final long sourceRef = begin.sourceRef();
+        final long streamId = begin.streamId();
 
         MessageConsumer result = null;
 
-        if (sourceRef != 0L)
+        if ((streamId & 0x8000_0000_0000_0000L) == 0L)
         {
             result = newAcceptStream(begin, throttle);
         }
@@ -144,8 +147,6 @@ public class ClientStreamFactory implements StreamFactory
         MessageConsumer result = null;
         final long routeId = begin.routeId();
         final long streamId = begin.streamId();
-        final String sourceName = begin.source().asString();
-        final long sourceRef = begin.sourceRef();
         final long correlationId = begin.correlationId();
         final OctetsFW extension = begin.extension();
         final boolean hasExtension = extension.sizeof() > 0;
@@ -153,23 +154,27 @@ public class ClientStreamFactory implements StreamFactory
         MessagePredicate filter = (t, b, o, l) ->
         {
             final RouteFW route = routeRO.wrap(b, o, o + l);
-            final String targetName = route.target().asString();
-            final long targetRef = route.targetRef();
-            return sourceRef == route.sourceRef() &&
-                   (!hasExtension || resolveRemoteAddressExt(extension, targetName, targetRef) != null);
+            final String remoteAddressAndPort = route.remoteAddress().asString();
+            final Matcher matcher = CONNECT_HOST_AND_PORT_PATTERN.matcher(remoteAddressAndPort);
+            return !hasExtension ||
+                    (matcher.matches() &&
+                            resolveRemoteAddressExt(extension, matcher.group(1),
+                                                               parseInt(matcher.group(2))) != null);
         };
 
-        final RouteFW route = router.resolve(begin.authorization(), filter, this::wrapRoute);
+        final RouteFW route = router.resolve(routeId, begin.authorization(), filter, this::wrapRoute);
 
         if (route != null)
         {
             final SocketChannel channel = newSocketChannel();
             final long targetRouteId = route.correlationId();
-            String targetName = route.target().asString();
-            long targetRef = route.targetRef();
-
-            InetSocketAddress remoteAddress = hasExtension ? resolveRemoteAddressExt(extension, targetName, targetRef) :
-                                                             new InetSocketAddress(targetName, (int)targetRef);
+            final String remoteAddressAndPort = route.remoteAddress().asString();
+            final Matcher matcher = CONNECT_HOST_AND_PORT_PATTERN.matcher(remoteAddressAndPort);
+            matcher.matches();
+            final String remoteHost = matcher.group(1);
+            final int remotePort = parseInt(matcher.group(2));
+            InetSocketAddress remoteAddress = hasExtension ? resolveRemoteAddressExt(extension, remoteHost, remotePort) :
+                                                             new InetSocketAddress(remoteHost, remotePort);
             assert remoteAddress != null;
 
             final TcpRouteCounters routeCounters = counters.supplyRoute(targetRouteId);
@@ -182,7 +187,6 @@ public class ClientStreamFactory implements StreamFactory
                 stream,
                 channel,
                 remoteAddress,
-                sourceName,
                 correlationId,
                 routeId,
                 throttle,
@@ -197,9 +201,9 @@ public class ClientStreamFactory implements StreamFactory
  }
 
     private InetSocketAddress resolveRemoteAddressExt(
-            OctetsFW extension,
-            String targetName,
-            long targetRef)
+        OctetsFW extension,
+        String targetName,
+        long targetRef)
     {
         InetSocketAddress result = null;
         InetAddress address = null;
@@ -255,7 +259,8 @@ public class ClientStreamFactory implements StreamFactory
         return result;
     }
 
-    private Predicate<? super InetAddress> extensionMatcher(String targetName) throws UnknownHostException
+    private Predicate<? super InetAddress> extensionMatcher(
+        String targetName) throws UnknownHostException
     {
         Predicate<? super InetAddress> result;
         if (targetName.contains("/"))
@@ -318,7 +323,6 @@ public class ClientStreamFactory implements StreamFactory
         WriteStream stream,
         SocketChannel channel,
         InetSocketAddress remoteAddress,
-        String acceptReplyName,
         long correlationId,
         long outputRouteId,
         MessageConsumer outputThrottle,
@@ -327,7 +331,7 @@ public class ClientStreamFactory implements StreamFactory
         long targetRouteId,
         TcpRouteCounters counters)
     {
-        final Request request = new Request(channel, stream, acceptReplyName, correlationId,
+        final Request request = new Request(channel, stream, correlationId,
                 outputRouteId, outputThrottle, outputStreamId, targetRouteId, setCorrelatedInput);
 
         try
@@ -360,7 +364,6 @@ public class ClientStreamFactory implements StreamFactory
     {
         final SocketChannel channel = request.channel;
         final MessageConsumer acceptThrottle = request.acceptThrottle;
-        final String acceptReplyName = request.acceptReplyName;
         final long acceptRouteId = request.acceptRouteId;
         final long acceptInitialId = request.acceptInitialId;
         final long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
@@ -370,9 +373,9 @@ public class ClientStreamFactory implements StreamFactory
         {
             final InetSocketAddress localAddress = (InetSocketAddress) channel.getLocalAddress();
             final InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
-            final MessageConsumer acceptReply = router.supplyTarget(acceptReplyName);
+            final MessageConsumer acceptReply = router.supplySender(acceptRouteId);
             request.setCorrelatedInput.accept(acceptReplyId, acceptReply);
-            writer.doTcpBegin(acceptReply, acceptRouteId, acceptReplyId, 0L, acceptCorrelationId, localAddress, remoteAddress);
+            writer.doTcpBegin(acceptReply, acceptRouteId, acceptReplyId, acceptCorrelationId, localAddress, remoteAddress);
 
             final PollerKey key = poller.doRegister(channel, 0, null);
 
@@ -382,7 +385,7 @@ public class ClientStreamFactory implements StreamFactory
                     readByteBuffer, readBuffer, writer, routeCounters, () -> {});
             stream.setCorrelatedThrottle(acceptInitialId, acceptThrottle);
 
-            router.setThrottle(acceptReplyName, acceptReplyId, stream::handleThrottle);
+            router.setThrottle(acceptReplyId, stream::handleThrottle);
 
             final ToIntFunction<PollerKey> handler = stream::handleStream;
 
@@ -406,7 +409,6 @@ public class ClientStreamFactory implements StreamFactory
     {
         private final WriteStream stream;
         private final SocketChannel channel;
-        private final String acceptReplyName;
         private final long acceptCorrelationId;
         private final MessageConsumer acceptThrottle;
         private final long acceptRouteId;
@@ -417,7 +419,6 @@ public class ClientStreamFactory implements StreamFactory
         private Request(
             SocketChannel channel,
             WriteStream stream,
-            String acceptReplyName,
             long correlationId,
             long outputRouteId,
             MessageConsumer outputThrottle,
@@ -427,7 +428,6 @@ public class ClientStreamFactory implements StreamFactory
         {
             this.channel = channel;
             this.stream = stream;
-            this.acceptReplyName = acceptReplyName;
             this.acceptCorrelationId = correlationId;
             this.acceptRouteId = outputRouteId;
             this.acceptThrottle = outputThrottle;

@@ -72,43 +72,31 @@ public final class TcpController implements Controller
     }
 
     public CompletableFuture<Long> routeServer(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef)
+        String localAddress,
+        String remoteAddress)
     {
-        if (sourceRef <= 0)
-        {
-            throw new IllegalArgumentException("Port to bind (sourceRef) must be positive");
-        }
-        return route(Role.SERVER, source, sourceRef, target, targetRef);
+        return route(Role.SERVER, localAddress, remoteAddress);
     }
 
     public CompletableFuture<Long> routeClient(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef)
+        String localAddress,
+        String remoteAddress)
     {
-        return route(Role.CLIENT, source, sourceRef, target, targetRef);
+        return route(Role.CLIENT, localAddress, remoteAddress);
     }
 
-    public CompletableFuture<Void> unrouteServer(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef)
+    public CompletableFuture<Void> unroute(
+        long routeId)
     {
-        return unroute(Role.SERVER, source, sourceRef, target, targetRef);
-    }
+        long correlationId = controllerSpi.nextCorrelationId();
 
-    public CompletableFuture<Void> unrouteClient(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef)
-    {
-        return unroute(Role.CLIENT, source, sourceRef, target, targetRef);
+        UnrouteFW unrouteRO = unrouteRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
+                                 .correlationId(correlationId)
+                                 .nukleus(name())
+                                 .routeId(routeId)
+                                 .build();
+
+        return controllerSpi.doUnroute(unrouteRO.typeId(), unrouteRO.buffer(), unrouteRO.offset(), unrouteRO.sizeof());
     }
 
     public CompletableFuture<Void> freeze()
@@ -117,14 +105,10 @@ public final class TcpController implements Controller
 
         FreezeFW freeze = freezeRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
                                   .correlationId(correlationId)
+                                  .nukleus(name())
                                   .build();
 
         return controllerSpi.doFreeze(freeze.typeId(), freeze.buffer(), freeze.offset(), freeze.sizeof());
-    }
-
-    public long routes()
-    {
-        return controllerSpi.doCount("routes");
     }
 
     public long overflows()
@@ -139,43 +123,19 @@ public final class TcpController implements Controller
 
     private CompletableFuture<Long> route(
         Role role,
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef)
+        String localAddress,
+        String remoteAddress)
     {
         long correlationId = controllerSpi.nextCorrelationId();
 
         RouteFW routeRO = routeRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
                                  .correlationId(correlationId)
+                                 .nukleus(name())
                                  .role(b -> b.set(role))
-                                 .source(source)
-                                 .sourceRef(sourceRef)
-                                 .target(target)
-                                 .targetRef(targetRef)
+                                 .localAddress(localAddress)
+                                 .remoteAddress(remoteAddress)
                                  .build();
 
         return controllerSpi.doRoute(routeRO.typeId(), routeRO.buffer(), routeRO.offset(), routeRO.sizeof());
-    }
-
-    private CompletableFuture<Void> unroute(
-        Role role,
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef)
-    {
-        long correlationId = controllerSpi.nextCorrelationId();
-
-        UnrouteFW unrouteRO = unrouteRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
-                                 .correlationId(correlationId)
-                                 .role(b -> b.set(role))
-                                 .source(source)
-                                 .sourceRef(sourceRef)
-                                 .target(target)
-                                 .targetRef(targetRef)
-                                 .build();
-
-        return controllerSpi.doUnroute(unrouteRO.typeId(), unrouteRO.buffer(), unrouteRO.offset(), unrouteRO.sizeof());
     }
 }

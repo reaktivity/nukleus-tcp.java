@@ -46,7 +46,6 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.internal.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
-import org.reaktivity.specification.nukleus.NukleusRule;
 
 /**
  * Tests the handling of capacity exceeded conditions in the context of incomplete writes
@@ -77,14 +76,9 @@ public class ServerPartialWriteLimitsIT
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
 
-    private final NukleusRule file = new NukleusRule()
-            .directory("target/nukleus-itests")
-            .streams("tcp", "target#partition")
-            .streams("target", "tcp#any");
-
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE)
-                                  .around(file).around(reaktor).around(counters).around(k3po).around(timeout);
+                                  .around(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
@@ -101,7 +95,6 @@ public class ServerPartialWriteLimitsIT
 
         k3po.finish();
 
-        assertEquals(0, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -159,7 +152,6 @@ public class ServerPartialWriteLimitsIT
             k3po.finish();
         }
 
-        assertEquals(0, counters.routes());
         assertEquals(1, counters.overflows());
     }
 }

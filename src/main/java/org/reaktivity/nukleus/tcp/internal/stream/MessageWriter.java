@@ -83,10 +83,9 @@ final class MessageWriter
     }
 
     public void doTcpBegin(
-        MessageConsumer stream,
+        MessageConsumer receiver,
         long routeId,
         long streamId,
-        long referenceId,
         long correlationId,
         InetSocketAddress localAddress,
         InetSocketAddress remoteAddress)
@@ -95,13 +94,11 @@ final class MessageWriter
                 .routeId(routeId)
                 .streamId(streamId)
                 .trace(supplyTrace.getAsLong())
-                .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
-                .sourceRef(referenceId)
                 .correlationId(correlationId)
                 .extension(b -> b.set(visitBeginEx(localAddress, remoteAddress)))
                 .build();
 
-        stream.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+        receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
     public void doTcpData(

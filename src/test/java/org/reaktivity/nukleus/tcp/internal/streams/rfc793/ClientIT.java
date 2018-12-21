@@ -42,7 +42,7 @@ import org.reaktivity.reaktor.test.ReaktorRule;
  */
 public class ClientIT
 {
-    private static final int CLIENT_ROUTE_ID = 0x10000001;
+    private static final long CLIENT_ROUTE_ID = 0x1000210000001L;
 
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
@@ -107,7 +107,6 @@ public class ClientIT
     public void shouldReceiveClientSentData() throws Exception
     {
        k3po.finish();
-       assertEquals(1, counters.routes());
        assertEquals(0, counters.overflows());
     }
 
@@ -131,7 +130,6 @@ public class ClientIT
     public void shouldReceiveClientSentDataMultipleStreams() throws Exception
     {
         k3po.finish();
-        assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -241,7 +239,6 @@ public class ClientIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -256,7 +253,6 @@ public class ClientIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
@@ -281,7 +277,6 @@ public class ClientIT
     {
         k3po.finish();
 
-        assertEquals(1, counters.routes());
         assertEquals(0, counters.overflows());
     }
 
