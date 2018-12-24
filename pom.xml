@@ -6,7 +6,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.reaktivity</groupId>
   <artifactId>nukleus-tcp</artifactId>
-  <version>0.66</version>
+  <version>0.67</version>
   <name>TCP Nukleus Implementation</name>
   <description>TCP Nukleus Implementation</description>
   <url>https://github.com/reaktivity/build-template.java</url>
@@ -42,7 +42,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <checkstyle.config.location>src/conf/checkstyle/configuration.xml</checkstyle.config.location>
     <checkstyle.suppressions.location>src/conf/checkstyle/suppressions.xml</checkstyle.suppressions.location>
-    <jacoco.coverage.ratio>0.49</jacoco.coverage.ratio>
+    <jacoco.coverage.ratio>0.48</jacoco.coverage.ratio>
     <jacoco.missed.count>47</jacoco.missed.count>
 
     <byteman.version>3.0.10</byteman.version>
@@ -53,10 +53,10 @@
 
     <k3po.version>3.0.0-alpha-97</k3po.version>
     <k3po.nukleus.ext.version>0.35</k3po.nukleus.ext.version>
-    <nukleus.plugin.version>0.32</nukleus.plugin.version>
+    <nukleus.plugin.version>0.33</nukleus.plugin.version>
 
-    <nukleus.tcp.spec.version>0.43</nukleus.tcp.spec.version>
-    <reaktor.version>0.69</reaktor.version>
+    <nukleus.tcp.spec.version>0.44</nukleus.tcp.spec.version>
+    <reaktor.version>0.71</reaktor.version>
   </properties>
 
   <dependencies>
