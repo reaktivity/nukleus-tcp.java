@@ -53,10 +53,10 @@
 
     <k3po.version>3.0.0-alpha-97</k3po.version>
     <k3po.nukleus.ext.version>0.35</k3po.nukleus.ext.version>
-    <nukleus.plugin.version>0.32</nukleus.plugin.version>
+    <nukleus.plugin.version>0.33</nukleus.plugin.version>
 
-    <nukleus.tcp.spec.version>0.43</nukleus.tcp.spec.version>
-    <reaktor.version>0.69</reaktor.version>
+    <nukleus.tcp.spec.version>0.44</nukleus.tcp.spec.version>
+    <reaktor.version>0.71</reaktor.version>
   </properties>
 
   <dependencies>
