@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.socketAddress;
 
 import java.net.InetSocketAddress;
@@ -23,9 +22,7 @@ import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.tcp.internal.TcpNukleusFactorySpi;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
@@ -37,8 +34,6 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
 
 final class MessageWriter
 {
-    private static final DirectBuffer SOURCE_NAME_BUFFER = new UnsafeBuffer(TcpNukleusFactorySpi.NAME.getBytes(UTF_8));
-
     final BeginFW beginRO = new BeginFW();
     final DataFW dataRO = new DataFW();
     final EndFW endRO = new EndFW();

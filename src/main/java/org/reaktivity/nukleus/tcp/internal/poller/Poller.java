@@ -24,10 +24,10 @@ import java.util.function.ToIntFunction;
 import java.util.stream.Stream;
 
 import org.agrona.LangUtil;
+import org.agrona.concurrent.Agent;
 import org.agrona.nio.TransportPoller;
-import org.reaktivity.nukleus.Nukleus;
 
-public final class Poller extends TransportPoller implements Nukleus
+public final class Poller extends TransportPoller implements Agent
 {
     private final ToIntFunction<SelectionKey> selectHandler;
 
@@ -37,7 +37,7 @@ public final class Poller extends TransportPoller implements Nukleus
     }
 
     @Override
-    public int process()
+    public int doWork()
     {
         int workDone = 0;
 
@@ -58,13 +58,13 @@ public final class Poller extends TransportPoller implements Nukleus
     }
 
     @Override
-    public String name()
+    public String roleName()
     {
         return "poller";
     }
 
     @Override
-    public void close()
+    public void onClose()
     {
         for (SelectionKey key : selector.keys())
         {
@@ -73,6 +73,8 @@ public final class Poller extends TransportPoller implements Nukleus
 
         // Allow proper cleanup on platforms like Windows
         selectNowWithoutProcessing();
+
+        super.close();
     }
 
     public PollerKey doRegister(

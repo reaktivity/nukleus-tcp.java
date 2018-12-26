@@ -23,7 +23,6 @@ import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 import java.util.function.Supplier;
 
-import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
@@ -34,12 +33,9 @@ import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.TcpCounters;
 import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
-import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
 
 public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
 {
-    private final UnrouteFW unrouteRO = new UnrouteFW();
-
     private final Acceptor acceptor;
     private final TcpConfiguration config;
     private final Poller poller;
@@ -59,14 +55,15 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
 
     public ServerStreamFactoryBuilder(
         TcpConfiguration config,
+        Long2ObjectHashMap<TcpRouteCounters> countersByRouteId,
         Acceptor acceptor,
         Poller poller)
     {
         this.config = config;
+        this.countersByRouteId = countersByRouteId;
         this.acceptor = acceptor;
         this.poller = poller;
         this.correlations = new Long2ObjectHashMap<>();
-        this.countersByRouteId = new Long2ObjectHashMap<>();
     }
 
     @Override
@@ -154,21 +151,6 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     {
         this.supplyAccumulator = supplyAccumulator;
         return this;
-    }
-
-    public boolean handleRoute(int msgTypeId, DirectBuffer buffer, int index, int length)
-    {
-        switch(msgTypeId)
-        {
-            case UnrouteFW.TYPE_ID:
-            {
-                final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
-                final long routeId = unroute.routeId();
-                countersByRouteId.remove(routeId);
-            }
-            break;
-        }
-        return true;
     }
 
     @Override
