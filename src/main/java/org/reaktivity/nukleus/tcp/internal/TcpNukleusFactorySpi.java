@@ -17,48 +17,20 @@ package org.reaktivity.nukleus.tcp.internal;
 
 import org.reaktivity.nukleus.Configuration;
 import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.NukleusBuilder;
 import org.reaktivity.nukleus.NukleusFactorySpi;
-import org.reaktivity.nukleus.function.MessagePredicate;
-import org.reaktivity.nukleus.route.RouteKind;
-import org.reaktivity.nukleus.tcp.internal.poller.Poller;
-import org.reaktivity.nukleus.tcp.internal.stream.Acceptor;
-import org.reaktivity.nukleus.tcp.internal.stream.ClientStreamFactoryBuilder;
-import org.reaktivity.nukleus.tcp.internal.stream.ServerStreamFactoryBuilder;
 
 public final class TcpNukleusFactorySpi implements NukleusFactorySpi
 {
-    public static final String NAME = "tcp";
-
     @Override
     public String name()
     {
-        return NAME;
+        return TcpNukleus.NAME;
     }
 
     @Override
     public Nukleus create(
-        Configuration config,
-        NukleusBuilder builder)
+        Configuration config)
     {
-        TcpConfiguration tcpConfig = new TcpConfiguration(config);
-        Acceptor acceptor = new Acceptor(tcpConfig);
-        Poller poller = new Poller();
-        acceptor.setPoller(poller);
-
-        ServerStreamFactoryBuilder serverStreamFactoryBuilder = new ServerStreamFactoryBuilder(tcpConfig, acceptor, poller);
-        ClientStreamFactoryBuilder clientStreamFactoryBuilder = new ClientStreamFactoryBuilder(tcpConfig, poller);
-
-        final MessagePredicate serverRouteHandler = (m, b, i, l) ->
-            acceptor.handleRoute(m, b, i, l) &&
-            serverStreamFactoryBuilder.handleRoute(m, b, i, l);
-
-        return builder.configure(tcpConfig)
-                      .streamFactory(RouteKind.CLIENT, clientStreamFactoryBuilder)
-                      .streamFactory(RouteKind.SERVER, serverStreamFactoryBuilder)
-                      .routeHandler(RouteKind.SERVER, serverRouteHandler)
-                      .routeHandler(RouteKind.CLIENT, clientStreamFactoryBuilder::handleRoute)
-                      .inject(poller)
-                      .build();
+        return new TcpNukleus(new TcpConfiguration(config));
     }
 }
