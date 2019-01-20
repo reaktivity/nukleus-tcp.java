@@ -19,6 +19,7 @@ import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -40,9 +41,6 @@ import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.CountDownHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-/**
- * Tests use of the nukleus as an HTTP client.
- */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 public class ClientResetAndAbortIT
 {
@@ -55,11 +53,11 @@ public class ClientResetAndAbortIT
 
     private final ReaktorRule reaktor = new ReaktorRule()
         .nukleus("tcp"::equals)
-        .controller("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(4096)
+        .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);

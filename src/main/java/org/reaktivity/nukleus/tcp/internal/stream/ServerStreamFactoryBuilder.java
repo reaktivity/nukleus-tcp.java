@@ -43,7 +43,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
 
     private RouteManager router;
-    private LongSupplier supplyInitialId;
+    private LongUnaryOperator supplyInitialId;
     private LongSupplier supplyTrace;
     private Supplier<BufferPool> supplyBufferPool;
     private LongSupplier supplyCorrelationId;
@@ -92,7 +92,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
 
     @Override
     public ServerStreamFactoryBuilder setInitialIdSupplier(
-        LongSupplier supplyInitialId)
+        LongUnaryOperator supplyInitialId)
     {
         this.supplyInitialId = supplyInitialId;
         return this;

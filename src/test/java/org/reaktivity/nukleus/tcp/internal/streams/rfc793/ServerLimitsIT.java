@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -54,6 +55,7 @@ public class ServerLimitsIT
         .counterValuesBufferCapacity(4096)
         // Initial window size for output to network:
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
+        .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
     @Rule

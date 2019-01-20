@@ -111,16 +111,6 @@ public final class TcpController implements Controller
         return controllerSpi.doFreeze(freeze.typeId(), freeze.buffer(), freeze.offset(), freeze.sizeof());
     }
 
-    public long overflows()
-    {
-        return controllerSpi.doCount("overflows");
-    }
-
-    public long connections()
-    {
-        return controllerSpi.doCount("connections");
-    }
-
     private CompletableFuture<Long> route(
         Role role,
         String localAddress,

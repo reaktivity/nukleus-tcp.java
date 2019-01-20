@@ -38,7 +38,7 @@ public final class TcpCounters
         this.supplyAccumulator = supplyAccumulator;
         this.countersByRouteId = countersByRouteId;
 
-        this.connections = supplyAccumulator.apply("connections");
+        this.connections = supplyAccumulator.apply("tcp.connections");
     }
 
     public TcpRouteCounters supplyRoute(

@@ -26,7 +26,8 @@ public class TcpCountersRule implements TestRule
 {
     private final ReaktorRule reaktor;
 
-    public TcpCountersRule(ReaktorRule reaktor)
+    public TcpCountersRule(
+        ReaktorRule reaktor)
     {
         this.reaktor = reaktor;
     }
@@ -39,8 +40,7 @@ public class TcpCountersRule implements TestRule
             @Override
             public void evaluate() throws Throwable
             {
-                TcpController controller = controller();
-                assertEquals(0, controller.overflows());
+                assertEquals(0, overflows());
                 base.evaluate();
             }
         };
@@ -48,17 +48,11 @@ public class TcpCountersRule implements TestRule
 
     public long overflows()
     {
-        return controller().overflows();
+        return reaktor.counter("tcp.overflows");
     }
 
     public long connections()
     {
-        return controller().connections();
+        return reaktor.counter("tcp.connections");
     }
-
-    private TcpController controller()
-    {
-        return reaktor.controller(TcpController.class);
-    }
-
 }

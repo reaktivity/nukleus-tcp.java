@@ -27,6 +27,7 @@ import java.nio.channels.SocketChannel;
 import java.util.function.IntUnaryOperator;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
+import java.util.function.LongUnaryOperator;
 import java.util.function.ToIntFunction;
 
 import org.agrona.CloseHelper;
@@ -55,7 +56,7 @@ public class ServerStreamFactory implements StreamFactory
     private final BeginFW beginRO = new BeginFW();
 
     private final RouteManager router;
-    private final LongSupplier supplyInitialId;
+    private final LongUnaryOperator supplyInitialId;
     private final LongSupplier supplyCorrelationId;
     private final LongFunction<IntUnaryOperator> groupBudgetClaimer;
     private final LongFunction<IntUnaryOperator> groupBudgetReleaser;
@@ -76,7 +77,7 @@ public class ServerStreamFactory implements StreamFactory
         RouteManager router,
         MutableDirectBuffer writeBuffer,
         BufferPool bufferPool,
-        LongSupplier supplyInitialId,
+        LongUnaryOperator supplyInitialId,
         LongSupplier supplyTrace,
         LongSupplier supplyCorrelationId,
         Long2ObjectHashMap<Correlation> correlations,
@@ -147,14 +148,14 @@ public class ServerStreamFactory implements StreamFactory
         if (route != null)
         {
             final long routeId = route.correlationId();
-            final long initialId = supplyInitialId.getAsLong();
+            final long initialId = supplyInitialId.applyAsLong(routeId);
             final long correlationId = supplyCorrelationId.getAsLong();
 
             try
             {
                 final InetSocketAddress localAddress = (InetSocketAddress) channel.getLocalAddress();
                 final InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
-                final MessageConsumer receiver = router.supplyReceiver(routeId);
+                final MessageConsumer receiver = router.supplyReceiver(initialId);
                 writer.doTcpBegin(receiver, routeId, initialId, correlationId, localAddress, remoteAddress);
 
                 final PollerKey key = poller.doRegister(channel, 0, null);

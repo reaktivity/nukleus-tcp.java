@@ -81,7 +81,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 
     @Override
     public ClientStreamFactoryBuilder setInitialIdSupplier(
-        LongSupplier supplyInitialId)
+        LongUnaryOperator supplyInitialId)
     {
         return this;
     }

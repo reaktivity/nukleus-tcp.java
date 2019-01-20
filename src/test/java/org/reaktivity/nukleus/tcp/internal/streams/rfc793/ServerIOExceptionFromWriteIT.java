@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.IntStream.generate;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
@@ -56,6 +57,7 @@ public class ServerIOExceptionFromWriteIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(4096)
+        .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
     @Rule
