@@ -41,18 +41,18 @@ public final class TcpRouteCounters
         Function<String, LongSupplier> supplyCounter,
         Function<String, LongConsumer> supplyAccumulator)
     {
-        this.overflows = supplyCounter.apply("overflows");
+        this.overflows = supplyCounter.apply("tcp.overflows");
 
-        this.opensWritten = supplyCounter.apply(String.format("%d.opens.written", routeId));
-        this.bytesWritten = supplyAccumulator.apply(String.format("%d.bytes.written", routeId));
-        this.closesWritten = supplyCounter.apply(String.format("%d.closes.written", routeId));
-        this.abortsWritten = supplyCounter.apply(String.format("%d.aborts.written", routeId));
-        this.resetsWritten = supplyCounter.apply(String.format("%d.resets.written", routeId));
+        this.opensWritten = supplyCounter.apply(String.format("tcp.%d.opens.written", routeId));
+        this.bytesWritten = supplyAccumulator.apply(String.format("tcp.%d.bytes.written", routeId));
+        this.closesWritten = supplyCounter.apply(String.format("tcp.%d.closes.written", routeId));
+        this.abortsWritten = supplyCounter.apply(String.format("tcp.%d.aborts.written", routeId));
+        this.resetsWritten = supplyCounter.apply(String.format("tcp.%d.resets.written", routeId));
 
-        this.opensRead = supplyCounter.apply(String.format("%d.opens.read", routeId));
-        this.bytesRead = supplyAccumulator.apply(String.format("%d.bytes.read", routeId));
-        this.closesRead = supplyCounter.apply(String.format("%d.closes.read", routeId));
-        this.abortsRead = supplyCounter.apply(String.format("%d.aborts.read", routeId));
-        this.resetsRead = supplyCounter.apply(String.format("%d.resets.read", routeId));
+        this.opensRead = supplyCounter.apply(String.format("tcp.%d.opens.read", routeId));
+        this.bytesRead = supplyAccumulator.apply(String.format("tcp.%d.bytes.read", routeId));
+        this.closesRead = supplyCounter.apply(String.format("tcp.%d.closes.read", routeId));
+        this.abortsRead = supplyCounter.apply(String.format("tcp.%d.aborts.read", routeId));
+        this.resetsRead = supplyCounter.apply(String.format("tcp.%d.resets.read", routeId));
     }
 }

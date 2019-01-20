@@ -38,9 +38,8 @@ public final class TcpControllerFactorySpi implements ControllerFactorySpi<TcpCo
         Configuration config,
         ControllerBuilder<TcpController> builder)
     {
-        return builder.setName(name())
-                .setFactory(TcpController::new)
-                .build();
+        return builder.setFactory(TcpController::new)
+                      .build();
     }
 
 }
