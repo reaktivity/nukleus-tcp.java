@@ -121,7 +121,7 @@ public class ServerStreamFactory implements StreamFactory
 
         MessageConsumer newStream = null;
 
-        if ((streamId & 0x8000_0000_0000_0000L) != 0L)
+        if ((streamId & 0x0000_0000_0000_0001L) == 0L)
         {
             newStream = newConnectReplyStream(begin, throttle);
         }
@@ -160,7 +160,7 @@ public class ServerStreamFactory implements StreamFactory
 
                 final PollerKey key = poller.doRegister(channel, 0, null);
 
-                final TcpRouteCounters routeCounters = counters.supplyRoute(route.correlationId());
+                final TcpRouteCounters routeCounters = counters.supplyRoute(routeId);
 
                 final Runnable doCleanupConnection = () ->
                 {
