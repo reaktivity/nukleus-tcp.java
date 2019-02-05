@@ -359,6 +359,8 @@ public final class WriteStream
                 }
                 else
                 {
+                    counters.partials.getAsLong();
+
                     ByteBuffer buffer = bufferPool.byteBuffer(slot);
                     slotOffset = buffer.position();
                     buffer.position(slotOffset);
@@ -473,6 +475,6 @@ public final class WriteStream
     private static boolean isInitial(
         long streamId)
     {
-        return (streamId & 0x8000_0000_0000_0000L) == 0L;
+        return (streamId & 0x0000_0000_0000_0001L) != 0L;
     }
 }

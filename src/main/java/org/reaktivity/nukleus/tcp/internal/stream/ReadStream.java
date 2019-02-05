@@ -290,6 +290,6 @@ final class ReadStream
     private static boolean isReply(
         long streamId)
     {
-        return (streamId & 0x8000_0000_0000_0000L) != 0L;
+        return (streamId & 0x0000_0000_0000_0001L) == 0L;
     }
 }
