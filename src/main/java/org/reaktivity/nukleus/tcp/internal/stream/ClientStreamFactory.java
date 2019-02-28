@@ -106,11 +106,8 @@ public class ClientStreamFactory implements StreamFactory
         this.groupBudgetClaimer = requireNonNull(groupBudgetClaimer);
         this.groupBudgetReleaser = requireNonNull(groupBudgetReleaser);
         this.writer = new MessageWriter(requireNonNull(writeBuffer), requireNonNull(supplyTrace));
+
         int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
-
-        // Data frame length must fit into a 2 byte unsigned integer
-        readBufferSize = Math.min(readBufferSize, (1 << Short.SIZE) - 1);
-
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
         this.targetToCidrMatch = new HashMap<>();

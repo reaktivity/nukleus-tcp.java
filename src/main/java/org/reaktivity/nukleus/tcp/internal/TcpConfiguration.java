@@ -23,6 +23,7 @@ public class TcpConfiguration extends Configuration
     public static final IntPropertyDef TCP_WINDOW_THRESHOLD;
     public static final IntPropertyDef TCP_MAX_CONNECTIONS;
     public static final BooleanPropertyDef TCP_KEEPALIVE;
+    public static final BooleanPropertyDef TCP_NODELAY;
 
     private static final ConfigurationDef TCP_CONFIG;
 
@@ -33,6 +34,7 @@ public class TcpConfiguration extends Configuration
         TCP_WINDOW_THRESHOLD = config.property("window.threshold", 0);
         TCP_MAX_CONNECTIONS = config.property("max.connections", Integer.MAX_VALUE);
         TCP_KEEPALIVE = config.property("keepalive", false);
+        TCP_NODELAY = config.property("nodelay", true);
         TCP_CONFIG = config;
     }
 
@@ -71,6 +73,11 @@ public class TcpConfiguration extends Configuration
     public boolean keepalive()
     {
         return TCP_KEEPALIVE.getAsBoolean(this);
+    }
+
+    public boolean nodelay()
+    {
+        return TCP_NODELAY.getAsBoolean(this);
     }
 
 }

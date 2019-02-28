@@ -98,10 +98,6 @@ public class ServerStreamFactory implements StreamFactory
         this.counters = counters;
 
         int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
-
-        // Data frame length must fit into a 2 byte unsigned integer
-        readBufferSize = Math.min(readBufferSize, (1 << Short.SIZE) - 1);
-
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
         this.poller = poller;

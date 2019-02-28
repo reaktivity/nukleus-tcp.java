@@ -42,8 +42,8 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <checkstyle.config.location>src/conf/checkstyle/configuration.xml</checkstyle.config.location>
     <checkstyle.suppressions.location>src/conf/checkstyle/suppressions.xml</checkstyle.suppressions.location>
-    <jacoco.coverage.ratio>0.48</jacoco.coverage.ratio>
-    <jacoco.missed.count>47</jacoco.missed.count>
+    <jacoco.coverage.ratio>0.92</jacoco.coverage.ratio>
+    <jacoco.missed.count>0</jacoco.missed.count>
 
     <byteman.version>3.0.10</byteman.version>
     <jmock.version>2.6.0</jmock.version>
@@ -236,6 +236,9 @@
         <artifactId>jacoco-maven-plugin</artifactId>
         <version>0.7.9</version>
         <configuration>
+          <excludes>
+            <exclude>org/reaktivity/nukleus/tcp/internal/types/**/*.class</exclude>
+          </excludes>
           <rules>
             <rule>
               <element>BUNDLE</element>
