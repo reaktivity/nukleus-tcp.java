@@ -89,7 +89,7 @@ final class ReadStream
 
         try
         {
-            int bytesRead = channel.read(readBuffer);
+            final int bytesRead = channel.read(readBuffer);
 
             if (bytesRead == -1)
             {
@@ -221,6 +221,7 @@ final class ReadStream
             if (readableBytes > readPadding)
             {
                 key.register(OP_READ);
+                counters.readops.getAsLong();
             }
         }
     }

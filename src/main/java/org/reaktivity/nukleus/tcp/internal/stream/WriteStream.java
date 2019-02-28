@@ -244,6 +244,7 @@ public final class WriteStream
                     if (bytesWritten < remainingBytes)
                     {
                         key.register(OP_WRITE);
+                        counters.writeops.getAsLong();
                     }
                     else if (originalSlot != NO_SLOT)
                     {
@@ -428,6 +429,7 @@ public final class WriteStream
             {
                 // incomplete write
                 key.register(OP_WRITE);
+                counters.writeops.getAsLong();
             }
         }
         catch (IOException | CancelledKeyException ex)

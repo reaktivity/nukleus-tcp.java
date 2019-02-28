@@ -58,6 +58,7 @@ public final class Acceptor
     private final int backlog;
     private final int maxConnections;
     private final boolean keepalive;
+    private final boolean nodelay;
     private final Long2ObjectHashMap<InetSocketAddress> localAddressByRouteId;
     private final Function<SocketAddress, PollerKey> registerHandler;
     private final ToIntFunction<PollerKey> acceptHandler;
@@ -74,6 +75,7 @@ public final class Acceptor
         this.backlog = config.maximumBacklog();
         this.maxConnections = config.maxConnections();
         this.keepalive = config.keepalive();
+        this.nodelay = config.nodelay();
         this.localAddressByRouteId = new Long2ObjectHashMap<>();
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
@@ -188,7 +190,7 @@ public final class Acceptor
             for (SocketChannel channel = accept(serverChannel); channel != null; channel = accept(serverChannel))
             {
                 channel.configureBlocking(false);
-                channel.setOption(TCP_NODELAY, true);
+                channel.setOption(TCP_NODELAY, nodelay);
                 channel.setOption(SO_KEEPALIVE, keepalive);
 
                 final InetSocketAddress address = localAddress(channel);
