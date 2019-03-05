@@ -31,6 +31,7 @@ import java.nio.channels.NetworkChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 import java.util.regex.Matcher;
@@ -56,13 +57,12 @@ public final class Acceptor
     private final UnrouteFW unrouteRO = new UnrouteFW();
 
     private final int backlog;
-    private final int maxConnections;
     private final boolean keepalive;
     private final boolean nodelay;
     private final Long2ObjectHashMap<InetSocketAddress> localAddressByRouteId;
     private final Function<SocketAddress, PollerKey> registerHandler;
     private final ToIntFunction<PollerKey> acceptHandler;
-    private int connections;
+    private final AtomicInteger remainingConnections;
 
     private Poller poller;
     private ServerStreamFactory serverStreamFactory;
@@ -70,12 +70,13 @@ public final class Acceptor
     private boolean unbound;
 
     public Acceptor(
-        TcpConfiguration config)
+        TcpConfiguration config,
+        AtomicInteger remainingConnections)
     {
         this.backlog = config.maximumBacklog();
-        this.maxConnections = config.maxConnections();
         this.keepalive = config.keepalive();
         this.nodelay = config.nodelay();
+        this.remainingConnections = remainingConnections;
         this.localAddressByRouteId = new Long2ObjectHashMap<>();
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
@@ -212,7 +213,7 @@ public final class Acceptor
     {
         SocketChannel channel = null;
 
-        if (!unbound && connections >= maxConnections)
+        if (!unbound && remainingConnections.get() <= 0)
         {
             router.forEach((id, buffer, index, length) ->
             {
@@ -226,11 +227,20 @@ public final class Acceptor
         }
         else
         {
-            channel = serverChannel.accept();
+            // claim capacity first
+            if (remainingConnections.decrementAndGet() >= 0)
+            {
+                channel = serverChannel.accept();
+            }
+
             if (channel != null)
             {
-                connections++;
                 serverStreamFactory.counters.connections.accept(1);
+            }
+            else
+            {
+                // channel not accepted, or claim failed
+                remainingConnections.incrementAndGet();
             }
         }
 
@@ -239,10 +249,10 @@ public final class Acceptor
 
     private void connectionDone()
     {
-        connections--;
-        assert connections >= 0;
+        remainingConnections.incrementAndGet();
+
         serverStreamFactory.counters.connections.accept(-1);
-        if (unbound && connections < maxConnections)
+        if (unbound && remainingConnections.get() > 0)
         {
             router.forEach((id, buffer, index, length) ->
             {
