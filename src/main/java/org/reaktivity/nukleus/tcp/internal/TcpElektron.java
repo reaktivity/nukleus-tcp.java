@@ -20,6 +20,7 @@ import static org.reaktivity.nukleus.route.RouteKind.SERVER;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.agrona.DirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -44,9 +45,10 @@ final class TcpElektron implements Elektron
     private final Map<RouteKind, MessagePredicate> routeHandlers;
 
     TcpElektron(
-        TcpConfiguration config)
+        TcpConfiguration config,
+        AtomicInteger remainingConnections)
     {
-        final Acceptor acceptor = new Acceptor(config);
+        final Acceptor acceptor = new Acceptor(config, remainingConnections);
         Poller poller = new Poller();
         acceptor.setPoller(poller);
 
