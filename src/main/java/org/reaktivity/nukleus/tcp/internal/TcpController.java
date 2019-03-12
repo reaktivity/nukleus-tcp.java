@@ -24,6 +24,9 @@ import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Controller;
 import org.reaktivity.nukleus.ControllerSpi;
+import org.reaktivity.nukleus.route.RouteKind;
+import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
+import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.FreezeFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
@@ -38,13 +41,15 @@ public final class TcpController implements Controller
     private final UnrouteFW.Builder unrouteRW = new UnrouteFW.Builder();
     private final FreezeFW.Builder freezeRW = new FreezeFW.Builder();
 
+    private final OctetsFW extensionRO = new OctetsFW().wrap(new UnsafeBuffer(new byte[0]), 0, 0);
+
     private final ControllerSpi controllerSpi;
-    private final AtomicBuffer atomicBuffer;
+    private final AtomicBuffer commandBuffer;
 
     public TcpController(ControllerSpi controllerSpi)
     {
         this.controllerSpi = controllerSpi;
-        this.atomicBuffer = new UnsafeBuffer(allocateDirect(MAX_SEND_LENGTH).order(nativeOrder()));
+        this.commandBuffer = new UnsafeBuffer(allocateDirect(MAX_SEND_LENGTH).order(nativeOrder()));
     }
 
     @Override
@@ -68,29 +73,48 @@ public final class TcpController implements Controller
     @Override
     public String name()
     {
-        return "tcp";
+        return TcpNukleus.NAME;
     }
 
+    @Deprecated
     public CompletableFuture<Long> routeServer(
         String localAddress,
         String remoteAddress)
     {
-        return route(Role.SERVER, localAddress, remoteAddress);
+        return route(RouteKind.SERVER, localAddress, remoteAddress);
     }
 
+    @Deprecated
     public CompletableFuture<Long> routeClient(
         String localAddress,
         String remoteAddress)
     {
-        return route(Role.CLIENT, localAddress, remoteAddress);
+        return route(RouteKind.CLIENT, localAddress, remoteAddress);
+    }
+
+    public CompletableFuture<Long> route(
+        RouteKind kind,
+        String localAddress,
+        String remoteAddress)
+    {
+        return route(kind, localAddress, remoteAddress, null);
+    }
+
+    public CompletableFuture<Long> route(
+        RouteKind kind,
+        String localAddress,
+        String remoteAddress,
+        String extension)
+    {
+        return doRoute(kind, localAddress, remoteAddress, extensionRO);
     }
 
     public CompletableFuture<Void> unroute(
         long routeId)
     {
-        long correlationId = controllerSpi.nextCorrelationId();
+        final long correlationId = controllerSpi.nextCorrelationId();
 
-        UnrouteFW unrouteRO = unrouteRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
+        final UnrouteFW unrouteRO = unrouteRW.wrap(commandBuffer, 0, commandBuffer.capacity())
                                  .correlationId(correlationId)
                                  .nukleus(name())
                                  .routeId(routeId)
@@ -103,7 +127,7 @@ public final class TcpController implements Controller
     {
         long correlationId = controllerSpi.nextCorrelationId();
 
-        FreezeFW freeze = freezeRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
+        FreezeFW freeze = freezeRW.wrap(commandBuffer, 0, commandBuffer.capacity())
                                   .correlationId(correlationId)
                                   .nukleus(name())
                                   .build();
@@ -111,19 +135,22 @@ public final class TcpController implements Controller
         return controllerSpi.doFreeze(freeze.typeId(), freeze.buffer(), freeze.offset(), freeze.sizeof());
     }
 
-    private CompletableFuture<Long> route(
-        Role role,
+    private CompletableFuture<Long> doRoute(
+        RouteKind kind,
         String localAddress,
-        String remoteAddress)
+        String remoteAddress,
+        Flyweight extension)
     {
-        long correlationId = controllerSpi.nextCorrelationId();
+        final long correlationId = controllerSpi.nextCorrelationId();
+        final Role role = Role.valueOf(kind.ordinal());
 
-        RouteFW routeRO = routeRW.wrap(atomicBuffer, 0, atomicBuffer.capacity())
+        final RouteFW routeRO = routeRW.wrap(commandBuffer, 0, commandBuffer.capacity())
                                  .correlationId(correlationId)
                                  .nukleus(name())
                                  .role(b -> b.set(role))
                                  .localAddress(localAddress)
                                  .remoteAddress(remoteAddress)
+                                 .extension(extension.buffer(), extension.offset(), extension.sizeof())
                                  .build();
 
         return controllerSpi.doRoute(routeRO.typeId(), routeRO.buffer(), routeRO.offset(), routeRO.sizeof());

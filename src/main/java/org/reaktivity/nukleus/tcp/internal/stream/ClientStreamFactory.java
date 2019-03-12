@@ -371,7 +371,6 @@ public class ClientStreamFactory implements StreamFactory
             final InetSocketAddress localAddress = (InetSocketAddress) channel.getLocalAddress();
             final InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
             request.setCorrelatedInput.accept(acceptReplyId, acceptReply);
-            writer.doTcpBegin(acceptReply, acceptRouteId, acceptReplyId, acceptCorrelationId, localAddress, remoteAddress);
 
             final PollerKey key = poller.doRegister(channel, 0, null);
 
@@ -382,6 +381,7 @@ public class ClientStreamFactory implements StreamFactory
             stream.setCorrelatedThrottle(acceptInitialId, acceptReply);
 
             router.setThrottle(acceptReplyId, stream::handleThrottle);
+            writer.doTcpBegin(acceptReply, acceptRouteId, acceptReplyId, acceptCorrelationId, localAddress, remoteAddress);
 
             final ToIntFunction<PollerKey> handler = stream::handleStream;
 
