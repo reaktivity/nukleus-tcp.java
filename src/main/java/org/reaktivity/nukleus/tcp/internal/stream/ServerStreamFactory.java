@@ -152,7 +152,6 @@ public class ServerStreamFactory implements StreamFactory
                 final InetSocketAddress localAddress = (InetSocketAddress) channel.getLocalAddress();
                 final InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
                 final MessageConsumer receiver = router.supplyReceiver(initialId);
-                writer.doTcpBegin(receiver, routeId, initialId, correlationId, localAddress, remoteAddress);
 
                 final PollerKey key = poller.doRegister(channel, 0, null);
 
@@ -174,6 +173,7 @@ public class ServerStreamFactory implements StreamFactory
                 correlations.put(correlationId, correlation);
 
                 router.setThrottle(initialId, stream::handleThrottle);
+                writer.doTcpBegin(receiver, routeId, initialId, correlationId, localAddress, remoteAddress);
 
                 final ToIntFunction<PollerKey> handler = stream::handleStream;
 
