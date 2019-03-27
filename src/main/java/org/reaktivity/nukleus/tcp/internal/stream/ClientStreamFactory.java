@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.tcp.internal.stream;
 
 import static java.lang.Integer.parseInt;
+import static java.net.StandardSocketOptions.SO_KEEPALIVE;
 import static java.net.StandardSocketOptions.TCP_NODELAY;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_CONNECT;
@@ -85,9 +86,10 @@ public class ClientStreamFactory implements StreamFactory
     private final Map<String, Predicate<? super InetAddress>> targetToCidrMatch;
     private final TcpCounters counters;
     private final int windowThreshold;
+    private final boolean keepalive;
 
     public ClientStreamFactory(
-        TcpConfiguration configuration,
+        TcpConfiguration config,
         RouteManager router,
         Poller poller,
         MutableDirectBuffer writeBuffer,
@@ -113,7 +115,8 @@ public class ClientStreamFactory implements StreamFactory
         this.targetToCidrMatch = new HashMap<>();
 
         this.counters = counters;
-        this.windowThreshold = (bufferPool.slotCapacity() * configuration.windowThreshold()) / 100;
+        this.windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
+        this.keepalive = config.keepalive();
     }
 
     @Override
@@ -334,6 +337,7 @@ public class ClientStreamFactory implements StreamFactory
         try
         {
             counters.opensWritten.getAsLong();
+            channel.setOption(SO_KEEPALIVE, keepalive);
             if (channel.connect(remoteAddress))
             {
                 handleConnected(request);
