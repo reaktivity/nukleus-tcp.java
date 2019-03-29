@@ -44,9 +44,9 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
 
     private RouteManager router;
     private LongUnaryOperator supplyInitialId;
+    private LongUnaryOperator supplyReplyId;
     private LongSupplier supplyTrace;
     private Supplier<BufferPool> supplyBufferPool;
-    private LongSupplier supplyCorrelationId;
     private MutableDirectBuffer writeBuffer;
     private LongFunction<IntUnaryOperator> groupBudgetClaimer;
     private LongFunction<IntUnaryOperator> groupBudgetReleaser;
@@ -75,14 +75,6 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ServerStreamFactoryBuilder setTargetCorrelationIdSupplier(
-        LongSupplier supplyCorrelationId)
-    {
-        this.supplyCorrelationId = supplyCorrelationId;
-        return this;
-    }
-
-    @Override
     public ServerStreamFactoryBuilder setRouteManager(
         RouteManager router)
     {
@@ -102,6 +94,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactoryBuilder setReplyIdSupplier(
         LongUnaryOperator supplyReplyId)
     {
+        this.supplyReplyId = supplyReplyId;
         return this;
     }
 
@@ -166,7 +159,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
             bufferPool,
             supplyInitialId,
             supplyTrace,
-            supplyCorrelationId,
+            supplyReplyId,
             correlations,
             poller,
             groupBudgetClaimer,

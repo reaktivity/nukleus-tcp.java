@@ -147,7 +147,6 @@ public class ClientStreamFactory implements StreamFactory
         MessageConsumer result = null;
         final long acceptRouteId = begin.routeId();
         final long acceptInitialId = begin.streamId();
-        final long acceptCorrelationId = begin.correlationId();
         final OctetsFW extension = begin.extension();
         final boolean hasExtension = extension.sizeof() > 0;
 
@@ -187,7 +186,6 @@ public class ClientStreamFactory implements StreamFactory
                 stream,
                 channel,
                 remoteAddress,
-                acceptCorrelationId,
                 acceptRouteId,
                 acceptReply,
                 acceptInitialId,
@@ -323,7 +321,6 @@ public class ClientStreamFactory implements StreamFactory
         WriteStream stream,
         SocketChannel channel,
         InetSocketAddress remoteAddress,
-        long acceptCorrelationId,
         long acceptRouteId,
         MessageConsumer acceptReply,
         long acceptInitialId,
@@ -331,8 +328,8 @@ public class ClientStreamFactory implements StreamFactory
         long connectRouteId,
         TcpRouteCounters counters)
     {
-        final Request request = new Request(channel, stream, acceptCorrelationId,
-                acceptRouteId, acceptReply, acceptInitialId, connectRouteId, setCorrelatedInput);
+        final Request request = new Request(channel, stream, acceptRouteId, acceptReply, acceptInitialId,
+                connectRouteId, setCorrelatedInput);
 
         try
         {
@@ -368,7 +365,6 @@ public class ClientStreamFactory implements StreamFactory
         final long acceptRouteId = request.acceptRouteId;
         final long acceptInitialId = request.acceptInitialId;
         final long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
-        final long acceptCorrelationId = request.acceptCorrelationId;
 
         try
         {
@@ -385,7 +381,7 @@ public class ClientStreamFactory implements StreamFactory
             stream.setCorrelatedThrottle(acceptInitialId, acceptReply);
 
             router.setThrottle(acceptReplyId, stream::handleThrottle);
-            writer.doTcpBegin(acceptReply, acceptRouteId, acceptReplyId, acceptCorrelationId, localAddress, remoteAddress);
+            writer.doTcpBegin(acceptReply, acceptRouteId, acceptReplyId, localAddress, remoteAddress);
 
             final ToIntFunction<PollerKey> handler = stream::handleStream;
 
@@ -409,7 +405,6 @@ public class ClientStreamFactory implements StreamFactory
     {
         private final WriteStream stream;
         private final SocketChannel channel;
-        private final long acceptCorrelationId;
         private final MessageConsumer acceptReply;
         private final long acceptRouteId;
         private final long acceptInitialId;
@@ -419,7 +414,6 @@ public class ClientStreamFactory implements StreamFactory
         private Request(
             SocketChannel channel,
             WriteStream stream,
-            long acceptCorrelationId,
             long acceptRouteId,
             MessageConsumer acceptReply,
             long acceptInitialId,
@@ -428,7 +422,6 @@ public class ClientStreamFactory implements StreamFactory
         {
             this.channel = channel;
             this.stream = stream;
-            this.acceptCorrelationId = acceptCorrelationId;
             this.acceptRouteId = acceptRouteId;
             this.acceptReply = acceptReply;
             this.acceptInitialId = acceptInitialId;

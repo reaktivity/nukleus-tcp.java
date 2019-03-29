@@ -57,7 +57,7 @@ public class ServerStreamFactory implements StreamFactory
 
     private final RouteManager router;
     private final LongUnaryOperator supplyInitialId;
-    private final LongSupplier supplyCorrelationId;
+    private final LongUnaryOperator supplyReplyId;
     private final LongFunction<IntUnaryOperator> groupBudgetClaimer;
     private final LongFunction<IntUnaryOperator> groupBudgetReleaser;
     private final Long2ObjectHashMap<Correlation> correlations;
@@ -79,7 +79,7 @@ public class ServerStreamFactory implements StreamFactory
         BufferPool bufferPool,
         LongUnaryOperator supplyInitialId,
         LongSupplier supplyTrace,
-        LongSupplier supplyCorrelationId,
+        LongUnaryOperator supplyReplyId,
         Long2ObjectHashMap<Correlation> correlations,
         Poller poller,
         LongFunction<IntUnaryOperator> groupBudgetClaimer,
@@ -93,7 +93,7 @@ public class ServerStreamFactory implements StreamFactory
         this.supplyInitialId = requireNonNull(supplyInitialId);
         this.groupBudgetClaimer = requireNonNull(groupBudgetClaimer);
         this.groupBudgetReleaser = requireNonNull(groupBudgetReleaser);
-        this.supplyCorrelationId = supplyCorrelationId;
+        this.supplyReplyId = supplyReplyId;
         this.correlations = requireNonNull(correlations);
         this.counters = counters;
 
@@ -145,7 +145,7 @@ public class ServerStreamFactory implements StreamFactory
         {
             final long routeId = route.correlationId();
             final long initialId = supplyInitialId.applyAsLong(routeId);
-            final long correlationId = supplyCorrelationId.getAsLong();
+            final long replyId = supplyReplyId.applyAsLong(initialId);
 
             try
             {
@@ -159,7 +159,7 @@ public class ServerStreamFactory implements StreamFactory
 
                 final Runnable doCleanupConnection = () ->
                 {
-                    correlations.remove(correlationId);
+                    correlations.remove(replyId);
                     onConnectionClosed.run();
                 };
 
@@ -170,10 +170,10 @@ public class ServerStreamFactory implements StreamFactory
                         readByteBuffer, readBuffer, writer, routeCounters, doCleanupConnection);
                 final Correlation correlation = new Correlation(channel, stream,
                         receiver, initialId, routeCounters, onConnectionClosed);
-                correlations.put(correlationId, correlation);
+                correlations.put(replyId, correlation);
 
                 router.setThrottle(initialId, stream::handleThrottle);
-                writer.doTcpBegin(receiver, routeId, initialId, correlationId, localAddress, remoteAddress);
+                writer.doTcpBegin(receiver, routeId, initialId, localAddress, remoteAddress);
 
                 final ToIntFunction<PollerKey> handler = stream::handleStream;
 
@@ -201,18 +201,17 @@ public class ServerStreamFactory implements StreamFactory
         MessageConsumer result = null;
 
         final long routeId = begin.routeId();
-        final long streamId = begin.streamId();
-        final long correlationId = begin.correlationId();
-        Correlation correlation = correlations.remove(correlationId);
+        final long replyId = begin.streamId();
+        Correlation correlation = correlations.remove(replyId);
 
         if (correlation != null)
         {
-            correlation.setCorrelatedThrottle(throttle, streamId);
+            correlation.setCorrelatedThrottle(throttle, replyId);
             final SocketChannel channel = correlation.channel();
 
             final TcpRouteCounters counters = correlation.counters();
             final Runnable onConnectionClosed = correlation.onConnectionClosed();
-            final WriteStream stream = new WriteStream(throttle, routeId, streamId, channel, poller,
+            final WriteStream stream = new WriteStream(throttle, routeId, replyId, channel, poller,
                     bufferPool, writeByteBuffer, writer, counters, windowThreshold, onConnectionClosed);
             stream.setCorrelatedInput(correlation.correlatedStreamId(), correlation.correlatedStream());
             stream.onConnected();
@@ -220,7 +219,7 @@ public class ServerStreamFactory implements StreamFactory
         }
         else
         {
-            writer.doReset(throttle, routeId, streamId);
+            writer.doReset(throttle, routeId, replyId);
         }
 
         return result;
