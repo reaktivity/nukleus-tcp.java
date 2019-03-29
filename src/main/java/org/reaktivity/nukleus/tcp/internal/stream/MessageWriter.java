@@ -81,7 +81,6 @@ final class MessageWriter
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long correlationId,
         InetSocketAddress localAddress,
         InetSocketAddress remoteAddress)
     {
@@ -89,7 +88,6 @@ final class MessageWriter
                 .routeId(routeId)
                 .streamId(streamId)
                 .trace(supplyTrace.getAsLong())
-                .correlationId(correlationId)
                 .extension(b -> b.set(visitBeginEx(localAddress, remoteAddress)))
                 .build();
 
