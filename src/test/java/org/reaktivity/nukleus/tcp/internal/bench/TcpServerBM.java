@@ -18,8 +18,8 @@ package org.reaktivity.nukleus.tcp.internal.bench;
 import static java.nio.ByteBuffer.allocateDirect;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.reaktivity.reaktor.internal.ReaktorConfiguration.REAKTOR_DIRECTORY;
-import static org.reaktivity.reaktor.internal.ReaktorConfiguration.REAKTOR_STREAMS_BUFFER_CAPACITY;
+import static org.reaktivity.reaktor.ReaktorConfiguration.REAKTOR_DIRECTORY;
+import static org.reaktivity.reaktor.ReaktorConfiguration.REAKTOR_STREAMS_BUFFER_CAPACITY;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;

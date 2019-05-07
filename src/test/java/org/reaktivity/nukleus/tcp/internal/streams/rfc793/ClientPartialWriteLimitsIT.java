@@ -47,7 +47,7 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.HandleWriteHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
-import org.reaktivity.reaktor.internal.ReaktorConfiguration;
+import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**

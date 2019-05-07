@@ -45,7 +45,7 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.HandleWriteHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
-import org.reaktivity.reaktor.internal.ReaktorConfiguration;
+import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
@@ -68,7 +68,7 @@ public class ServerPartialWriteLimitsIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(4096)
+        .counterValuesBufferCapacity(8192)
         // Initial window size for output to network:
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
         // Overall buffer pool size same as slot size so maximum concurrent streams with partial writes = 1
