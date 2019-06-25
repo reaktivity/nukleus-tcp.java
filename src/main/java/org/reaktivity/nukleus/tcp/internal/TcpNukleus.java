@@ -31,9 +31,9 @@ import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.route.RouteKind;
 
-final class TcpNukleus implements Nukleus
+public final class TcpNukleus implements Nukleus
 {
-    static final String NAME = "tcp";
+    public static final String NAME = "tcp";
 
     private final TcpConfiguration config;
     private final Map<RouteKind, MessagePredicate> routeHandlers;
