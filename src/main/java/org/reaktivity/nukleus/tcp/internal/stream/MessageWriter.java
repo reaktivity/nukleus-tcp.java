@@ -19,10 +19,12 @@ import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.socketAddress;
 
 import java.net.InetSocketAddress;
 import java.util.function.LongSupplier;
+import java.util.function.ToIntFunction;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.tcp.internal.TcpNukleus;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
@@ -51,13 +53,16 @@ final class MessageWriter
 
     private final TcpBeginExFW.Builder beginExRW = new TcpBeginExFW.Builder();
 
+    private final int tcpTypeId;
     private final MutableDirectBuffer writeBuffer;
     private final LongSupplier supplyTrace;
 
     MessageWriter(
+        ToIntFunction<String> supplyTypeId,
         MutableDirectBuffer writeBuffer,
         LongSupplier supplyTrace)
     {
+        this.tcpTypeId = supplyTypeId.applyAsInt(TcpNukleus.NAME);
         this.writeBuffer = writeBuffer;
         this.supplyTrace = supplyTrace;
     }
@@ -171,6 +176,7 @@ final class MessageWriter
     {
         return (buffer, offset, limit) ->
             beginExRW.wrap(buffer, offset, limit)
+                     .typeId(tcpTypeId)
                      .localAddress(a -> socketAddress(localAddress, a::ipv4Address, a::ipv6Address))
                      .localPort(localAddress.getPort())
                      .remoteAddress(a -> socketAddress(remoteAddress, a::ipv4Address, a::ipv6Address))

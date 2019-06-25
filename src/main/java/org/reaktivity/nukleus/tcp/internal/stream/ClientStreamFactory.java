@@ -96,6 +96,7 @@ public class ClientStreamFactory implements StreamFactory
         BufferPool bufferPool,
         LongUnaryOperator supplyReplyId,
         LongSupplier supplyTrace,
+        ToIntFunction<String> supplyTypeId,
         LongFunction<IntUnaryOperator> groupBudgetClaimer,
         LongFunction<IntUnaryOperator> groupBudgetReleaser,
         TcpCounters counters)
@@ -107,7 +108,7 @@ public class ClientStreamFactory implements StreamFactory
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.groupBudgetClaimer = requireNonNull(groupBudgetClaimer);
         this.groupBudgetReleaser = requireNonNull(groupBudgetReleaser);
-        this.writer = new MessageWriter(requireNonNull(writeBuffer), requireNonNull(supplyTrace));
+        this.writer = new MessageWriter(supplyTypeId, requireNonNull(writeBuffer), requireNonNull(supplyTrace));
 
         int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());

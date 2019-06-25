@@ -22,6 +22,7 @@ import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -44,6 +45,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     private Supplier<BufferPool> supplyBufferPool;
     private LongUnaryOperator supplyReplyId;
     private LongSupplier supplyTrace;
+    private ToIntFunction<String> supplyTypeId;
 
     private MutableDirectBuffer writeBuffer;
 
@@ -103,14 +105,24 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ClientStreamFactoryBuilder setGroupBudgetClaimer(LongFunction<IntUnaryOperator> groupBudgetClaimer)
+    public StreamFactoryBuilder setTypeIdSupplier(
+        ToIntFunction<String> supplyTypeId)
+    {
+        this.supplyTypeId = supplyTypeId;
+        return this;
+    }
+
+    @Override
+    public ClientStreamFactoryBuilder setGroupBudgetClaimer(
+        LongFunction<IntUnaryOperator> groupBudgetClaimer)
     {
         this.groupBudgetClaimer = groupBudgetClaimer;
         return this;
     }
 
     @Override
-    public ClientStreamFactoryBuilder setGroupBudgetReleaser(LongFunction<IntUnaryOperator> groupBudgetReleaser)
+    public ClientStreamFactoryBuilder setGroupBudgetReleaser(
+        LongFunction<IntUnaryOperator> groupBudgetReleaser)
     {
         this.groupBudgetReleaser = groupBudgetReleaser;
         return this;
@@ -134,7 +146,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
 
     @Override
     public StreamFactoryBuilder setAccumulatorSupplier(
-            Function<String, LongConsumer> supplyAccumulator)
+        Function<String, LongConsumer> supplyAccumulator)
     {
         this.supplyAccumulator = supplyAccumulator;
         return this;
@@ -154,6 +166,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
             bufferPool,
             supplyReplyId,
             supplyTrace,
+            supplyTypeId,
             groupBudgetClaimer,
             groupBudgetReleaser,
             counters);
