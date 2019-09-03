@@ -216,6 +216,7 @@ public class ClientIT
     public void connnectionFailed() throws Exception
     {
         k3po.finish();
+        Thread.sleep(250); // TODO: reaktor quiese instead of close
         assertEquals(1, reaktor.resetsRead("tcp", CLIENT_ROUTE_ID));
     }
 
