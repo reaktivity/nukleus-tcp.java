@@ -131,7 +131,7 @@ public class ClientPartialWriteLimitsIT
                 while (buf.position() < 13)
                 {
                     int len = channel1.read(buf);
-                    assert (len != -1);
+                    assert len != -1;
                 }
                 buf.flip();
                 assertEquals("client data 1", UTF_8.decode(buf).toString());

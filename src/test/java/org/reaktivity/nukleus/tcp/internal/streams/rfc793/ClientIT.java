@@ -107,8 +107,8 @@ public class ClientIT
     })
     public void shouldReceiveClientSentData() throws Exception
     {
-       k3po.finish();
-       assertEquals(0, counters.overflows());
+        k3po.finish();
+        assertEquals(0, counters.overflows());
     }
 
     @Test

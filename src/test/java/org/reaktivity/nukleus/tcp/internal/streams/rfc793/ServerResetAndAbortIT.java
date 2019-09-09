@@ -98,12 +98,11 @@ public class ServerResetAndAbortIT
         "${server}/server.sent.abort.and.reset/server"
     })
     @BMRule(name = "shutdownInput",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "shutdownInput()",
-    helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-    condition =
-      "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
-      action = "countDown()"
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "shutdownInput()",
+        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
+        condition = "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+        action = "countDown()"
     )
     public void shouldShutdownOutputAndInputWhenServerSendsAbortAndReset() throws Exception
     {
@@ -133,12 +132,11 @@ public class ServerResetAndAbortIT
         "${server}/server.sent.reset/server"
     })
     @BMRule(name = "shutdownInput",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "shutdownInput()",
-    helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-    condition =
-      "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
-      action = "countDown()"
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "shutdownInput()",
+        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
+        condition = "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+        action = "countDown()"
     )
     public void shouldShutdownInputWhenServerSendsReset() throws Exception
     {
@@ -177,12 +175,11 @@ public class ServerResetAndAbortIT
         "${server}/server.sent.reset.and.end/server"
     })
     @BMRule(name = "shutdownInput",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "shutdownInput()",
-    helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-    condition =
-      "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
-      action = "countDown()"
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "shutdownInput()",
+        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
+        condition = "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+        action = "countDown()"
     )
     public void shouldShutdownOutputAndInputWhenServerSendsResetAndEnd() throws Exception
     {

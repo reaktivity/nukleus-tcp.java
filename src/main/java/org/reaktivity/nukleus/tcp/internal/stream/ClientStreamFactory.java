@@ -196,8 +196,7 @@ public class ClientStreamFactory implements StreamFactory
         }
 
         return result;
-
- }
+    }
 
     private InetSocketAddress resolveRemoteAddressExt(
         OctetsFW extension,
@@ -220,31 +219,32 @@ public class ClientStreamFactory implements StreamFactory
 
                 switch(remoteAddressExt.kind())
                 {
-                    case TcpAddressFW.KIND_HOST:
-                        String requestedAddressName = remoteAddressExt.host().asString();
-                        Optional<InetAddress> optional = Arrays
-                                .stream(InetAddress.getAllByName(requestedAddressName))
-                                .filter(subnetFilter)
-                                .findFirst();
-                        address = optional.isPresent() ? optional.get() : null;
-                        break;
-                    case TcpAddressFW.KIND_IPV4_ADDRESS:
-                        OctetsFW ipRO = remoteAddressExt.ipv4Address();
-                        byte[] addr = new byte[ipRO.sizeof()];
-                        ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
-                        InetAddress candidate = InetAddress.getByAddress(addr);
-                        address =  subnetFilter.test(candidate) ? candidate: null;
-                        break;
-                    case TcpAddressFW.KIND_IPV6_ADDRESS:
-                        ipRO = remoteAddressExt.ipv6Address();
-                        addr = new byte[ipRO.sizeof()];
-                        ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
-                        candidate = InetAddress.getByAddress(addr);
-                        address =  subnetFilter.test(candidate) ? candidate: null;
-                        break;
-                    default:
-                        throw new RuntimeException("Unexpected address kind");
+                case TcpAddressFW.KIND_HOST:
+                    String requestedAddressName = remoteAddressExt.host().asString();
+                    Optional<InetAddress> optional = Arrays
+                            .stream(InetAddress.getAllByName(requestedAddressName))
+                            .filter(subnetFilter)
+                            .findFirst();
+                    address = optional.isPresent() ? optional.get() : null;
+                    break;
+                case TcpAddressFW.KIND_IPV4_ADDRESS:
+                    OctetsFW ipRO = remoteAddressExt.ipv4Address();
+                    byte[] addr = new byte[ipRO.sizeof()];
+                    ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
+                    InetAddress candidate = InetAddress.getByAddress(addr);
+                    address =  subnetFilter.test(candidate) ? candidate: null;
+                    break;
+                case TcpAddressFW.KIND_IPV6_ADDRESS:
+                    ipRO = remoteAddressExt.ipv6Address();
+                    addr = new byte[ipRO.sizeof()];
+                    ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
+                    candidate = InetAddress.getByAddress(addr);
+                    address =  subnetFilter.test(candidate) ? candidate: null;
+                    break;
+                default:
+                    throw new RuntimeException("Unexpected address kind");
                 }
+
                 if (address != null)
                 {
                     result = new InetSocketAddress(address, remotePort);
