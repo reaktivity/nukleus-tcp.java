@@ -105,7 +105,7 @@ public class TcpServerBM
         {
             final byte[] sendByteArray = new byte[512];
             final Random random = new Random();
-            for(int i=0; i < sendByteArray.length; i++)
+            for (int i=0; i < sendByteArray.length; i++)
             {
                 sendByteArray[i] = (byte) random.nextInt();
             }
