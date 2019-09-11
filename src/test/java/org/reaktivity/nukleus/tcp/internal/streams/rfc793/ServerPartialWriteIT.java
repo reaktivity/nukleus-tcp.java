@@ -194,7 +194,7 @@ public class ServerPartialWriteIT
             if (!closed)
             {
                 buf.rewind();
-                closed = (channel.read(buf) == -1);
+                closed = channel.read(buf) == -1;
             }
 
             assertTrue("Stream was not closed", closed);

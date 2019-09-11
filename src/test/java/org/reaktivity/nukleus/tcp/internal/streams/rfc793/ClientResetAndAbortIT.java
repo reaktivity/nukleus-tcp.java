@@ -37,8 +37,8 @@ import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
-import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.CountDownHelper;
+import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
@@ -100,12 +100,11 @@ public class ClientResetAndAbortIT
         "${client}/client.sent.abort.and.reset/client"
     })
     @BMRule(name = "shutdownInput",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "shutdownInput()",
-    helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-    condition =
-      "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
-      action = "countDown()"
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "shutdownInput()",
+        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
+        condition = "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+        action = "countDown()"
     )
     public void shouldShutdownOutputAndInputWhenClientSendsAbortAndReset() throws Exception
     {
@@ -140,12 +139,11 @@ public class ClientResetAndAbortIT
         "${client}/client.sent.reset/client"
     })
     @BMRule(name = "shutdownInput",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "shutdownInput()",
-    helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-    condition =
-      "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
-      action = "countDown()"
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "shutdownInput()",
+        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
+        condition = "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+        action = "countDown()"
     )
     public void shouldShutdownInputWhenClientSendsReset() throws Exception
     {
@@ -183,12 +181,11 @@ public class ClientResetAndAbortIT
         "${client}/client.sent.reset.and.end/client"
     })
     @BMRule(name = "shutdownInput",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "shutdownInput()",
-    helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-    condition =
-      "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
-      action = "countDown()"
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "shutdownInput()",
+        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
+        condition = "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+        action = "countDown()"
     )
     public void shouldShutdownOutputAndInputWhenClientSendsResetAndEnd() throws Exception
     {

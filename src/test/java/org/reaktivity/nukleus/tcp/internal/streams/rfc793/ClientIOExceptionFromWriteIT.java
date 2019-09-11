@@ -72,11 +72,10 @@ public class ClientIOExceptionFromWriteIT
         "${client}/client.sent.data.received.abort.and.reset/client"
     })
     @BMRule(name = "onData",
-    targetClass = "^java.nio.channels.SocketChannel",
-    targetMethod = "write(java.nio.ByteBuffer)",
-    condition =
-      "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onData\", true, true)",
-      action = "throw new IOException(\"Simulating an IOException from write\")"
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "write(java.nio.ByteBuffer)",
+        condition = "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onData\", true, true)",
+        action = "throw new IOException(\"Simulating an IOException from write\")"
     )
     public void shouldAbortAndResetWhenImmediateWriteThrowsIOException() throws Exception
     {

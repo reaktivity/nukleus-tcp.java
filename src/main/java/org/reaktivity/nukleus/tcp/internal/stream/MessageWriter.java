@@ -133,7 +133,7 @@ final class MessageWriter
                 .extension(b -> b.set((buf, off, len) -> 0))
                 .build();
 
-       receiver.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
+        receiver.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
     }
 
     void doWindow(

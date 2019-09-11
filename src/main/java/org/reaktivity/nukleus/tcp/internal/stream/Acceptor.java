@@ -97,22 +97,18 @@ public final class Acceptor
         boolean result = true;
         switch(msgTypeId)
         {
-            case RouteFW.TYPE_ID:
-            {
-                final RouteFW route = routeRO.wrap(buffer, index, index + length);
-                assert route.role().get() == Role.SERVER;
-                final long routeId = route.correlationId();
-                final String localAddress = route.localAddress().asString();
-                result = doRegister(routeId, localAddress);
-                break;
-            }
-            case UnrouteFW.TYPE_ID:
-            {
-                final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
-                final long routeId = unroute.routeId();
-                result = doUnregister(routeId);
-                break;
-            }
+        case RouteFW.TYPE_ID:
+            final RouteFW route = routeRO.wrap(buffer, index, index + length);
+            assert route.role().get() == Role.SERVER;
+            final long routeId = route.correlationId();
+            final String localAddress = route.localAddress().asString();
+            result = doRegister(routeId, localAddress);
+            break;
+        case UnrouteFW.TYPE_ID:
+            final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
+            final long unrouteId = unroute.routeId();
+            result = doUnregister(unrouteId);
+            break;
         }
         return result;
     }
