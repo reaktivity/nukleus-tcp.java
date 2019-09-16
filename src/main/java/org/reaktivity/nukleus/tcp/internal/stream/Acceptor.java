@@ -95,7 +95,7 @@ public final class Acceptor
         int length)
     {
         boolean result = true;
-        switch(msgTypeId)
+        switch (msgTypeId)
         {
         case RouteFW.TYPE_ID:
             final RouteFW route = routeRO.wrap(buffer, index, index + length);

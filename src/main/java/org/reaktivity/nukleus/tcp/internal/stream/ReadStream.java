@@ -124,7 +124,7 @@ final class ReadStream
                 }
             }
         }
-        catch(IOException ex)
+        catch (IOException ex)
         {
             // TCP reset
             handleIOExceptionFromRead();

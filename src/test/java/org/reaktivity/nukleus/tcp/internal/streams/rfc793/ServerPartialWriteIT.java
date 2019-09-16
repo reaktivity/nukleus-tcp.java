@@ -56,8 +56,8 @@ import org.reaktivity.reaktor.test.ReaktorRule;
  * incomplete writes.
  */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-@BMUnitConfig(loadDirectory="src/test/resources")
-@BMScript(value="SocketChannelHelper.btm")
+@BMUnitConfig(loadDirectory = "src/test/resources")
+@BMScript(value = "SocketChannelHelper.btm")
 public class ServerPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()

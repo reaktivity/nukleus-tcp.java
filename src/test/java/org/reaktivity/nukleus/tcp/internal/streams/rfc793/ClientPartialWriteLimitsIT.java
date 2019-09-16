@@ -54,8 +54,8 @@ import org.reaktivity.reaktor.test.ReaktorRule;
  * Tests the handling of capacity exceeded conditions in the context of incomplete writes
  */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-@BMUnitConfig(loadDirectory="src/test/resources")
-@BMScript(value="SocketChannelHelper.btm")
+@BMUnitConfig(loadDirectory = "src/test/resources")
+@BMScript(value = "SocketChannelHelper.btm")
 public class ClientPartialWriteLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
