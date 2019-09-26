@@ -51,8 +51,8 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-@BMUnitConfig(loadDirectory="src/test/resources")
-@BMScript(value="SocketChannelHelper.btm")
+@BMUnitConfig(loadDirectory = "src/test/resources")
+@BMScript(value = "SocketChannelHelper.btm")
 public class ClientPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()

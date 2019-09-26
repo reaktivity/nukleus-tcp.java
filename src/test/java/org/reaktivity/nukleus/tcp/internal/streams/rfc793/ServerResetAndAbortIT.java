@@ -158,7 +158,7 @@ public class ServerResetAndAbortIT
                 k3po.awaitBarrier("READ_ABORTED");
                 shutdownInputCalled.await();
             }
-            catch(IOException e)
+            catch (IOException e)
             {
                 throw e;
             }

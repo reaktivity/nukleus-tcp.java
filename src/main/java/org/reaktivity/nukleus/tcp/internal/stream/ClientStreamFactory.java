@@ -216,8 +216,7 @@ public class ClientStreamFactory implements StreamFactory
 
             if (targetRef == 0 || targetRef == remotePort)
             {
-
-                switch(remoteAddressExt.kind())
+                switch (remoteAddressExt.kind())
                 {
                 case TcpAddressFW.KIND_HOST:
                     String requestedAddressName = remoteAddressExt.host().asString();
@@ -232,14 +231,14 @@ public class ClientStreamFactory implements StreamFactory
                     byte[] addr = new byte[ipRO.sizeof()];
                     ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
                     InetAddress candidate = InetAddress.getByAddress(addr);
-                    address =  subnetFilter.test(candidate) ? candidate: null;
+                    address =  subnetFilter.test(candidate) ? candidate : null;
                     break;
                 case TcpAddressFW.KIND_IPV6_ADDRESS:
                     ipRO = remoteAddressExt.ipv6Address();
                     addr = new byte[ipRO.sizeof()];
                     ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
                     candidate = InetAddress.getByAddress(addr);
-                    address =  subnetFilter.test(candidate) ? candidate: null;
+                    address =  subnetFilter.test(candidate) ? candidate : null;
                     break;
                 default:
                     throw new RuntimeException("Unexpected address kind");

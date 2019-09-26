@@ -110,7 +110,7 @@ final class TcpElektron implements Elektron
         int index,
         int length)
     {
-        switch(msgTypeId)
+        switch (msgTypeId)
         {
         case UnrouteFW.TYPE_ID:
             final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);

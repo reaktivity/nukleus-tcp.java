@@ -312,7 +312,7 @@ public class ServerIT
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
 
-        try(Socket socket = new Socket("127.0.0.1", 0x1f90))
+        try (Socket socket = new Socket("127.0.0.1", 0x1f90))
         {
             socket.shutdownInput();
             Thread.sleep(500);
