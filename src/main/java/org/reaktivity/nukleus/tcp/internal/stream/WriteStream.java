@@ -214,8 +214,6 @@ public final class WriteStream
     private void onData(
         DataFW data)
     {
-        assert data.padding() == 0;
-
         try
         {
             final OctetsFW payload = data.payload();

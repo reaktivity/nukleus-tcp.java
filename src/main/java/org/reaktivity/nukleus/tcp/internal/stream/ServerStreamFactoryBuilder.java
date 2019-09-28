@@ -16,9 +16,7 @@
 package org.reaktivity.nukleus.tcp.internal.stream;
 
 import java.util.function.Function;
-import java.util.function.IntUnaryOperator;
 import java.util.function.LongConsumer;
-import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 import java.util.function.Supplier;
@@ -50,8 +48,6 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     private ToIntFunction<String> supplyTypeId;
     private Supplier<BufferPool> supplyBufferPool;
     private MutableDirectBuffer writeBuffer;
-    private LongFunction<IntUnaryOperator> groupBudgetClaimer;
-    private LongFunction<IntUnaryOperator> groupBudgetReleaser;
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
 
@@ -117,22 +113,6 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ServerStreamFactoryBuilder setGroupBudgetClaimer(
-        LongFunction<IntUnaryOperator> groupBudgetClaimer)
-    {
-        this.groupBudgetClaimer = groupBudgetClaimer;
-        return this;
-    }
-
-    @Override
-    public ServerStreamFactoryBuilder setGroupBudgetReleaser(
-        LongFunction<IntUnaryOperator> groupBudgetReleaser)
-    {
-        this.groupBudgetReleaser = groupBudgetReleaser;
-        return this;
-    }
-
-    @Override
     public ServerStreamFactoryBuilder setWriteBuffer(
         MutableDirectBuffer writeBuffer)
     {
@@ -173,8 +153,6 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
             supplyReplyId,
             correlations,
             poller,
-            groupBudgetClaimer,
-            groupBudgetReleaser,
             counters);
         acceptor.setServerStreamFactory(factory);
         acceptor.setRouter(router);

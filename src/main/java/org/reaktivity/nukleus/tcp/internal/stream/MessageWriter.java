@@ -114,7 +114,7 @@ final class MessageWriter
                 .streamId(streamId)
                 .trace(supplyTrace.getAsLong())
                 .groupId(groupId)
-                .padding(padding)
+                .reserved(length + padding)
                 .payload(payload, offset, length)
                 .build();
 
