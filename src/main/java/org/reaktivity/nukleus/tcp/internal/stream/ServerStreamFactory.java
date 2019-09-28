@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.function.IntUnaryOperator;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
@@ -58,8 +57,6 @@ public class ServerStreamFactory implements StreamFactory
     private final RouteManager router;
     private final LongUnaryOperator supplyInitialId;
     private final LongUnaryOperator supplyReplyId;
-    private final LongFunction<IntUnaryOperator> groupBudgetClaimer;
-    private final LongFunction<IntUnaryOperator> groupBudgetReleaser;
     private final Long2ObjectHashMap<Correlation> correlations;
     private final Poller poller;
 
@@ -83,8 +80,6 @@ public class ServerStreamFactory implements StreamFactory
         LongUnaryOperator supplyReplyId,
         Long2ObjectHashMap<Correlation> correlations,
         Poller poller,
-        LongFunction<IntUnaryOperator> groupBudgetClaimer,
-        LongFunction<IntUnaryOperator> groupBudgetReleaser,
         TcpCounters counters)
     {
         this.router = requireNonNull(router);
@@ -92,8 +87,6 @@ public class ServerStreamFactory implements StreamFactory
         this.writer = new MessageWriter(supplyTypeId, requireNonNull(writeBuffer), requireNonNull(supplyTrace));
         this.bufferPool = bufferPool;
         this.supplyInitialId = requireNonNull(supplyInitialId);
-        this.groupBudgetClaimer = requireNonNull(groupBudgetClaimer);
-        this.groupBudgetReleaser = requireNonNull(groupBudgetReleaser);
         this.supplyReplyId = supplyReplyId;
         this.correlations = requireNonNull(correlations);
         this.counters = counters;

@@ -36,8 +36,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.IntUnaryOperator;
-import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 import java.util.function.Predicate;
@@ -77,8 +75,6 @@ public class ClientStreamFactory implements StreamFactory
     private Poller poller;
     private final RouteManager router;
     private final LongUnaryOperator supplyReplyId;
-    private final LongFunction<IntUnaryOperator> groupBudgetClaimer;
-    private final LongFunction<IntUnaryOperator> groupBudgetReleaser;
     private final ByteBuffer readByteBuffer;
     private final MutableDirectBuffer readBuffer;
     private final ByteBuffer writeByteBuffer;
@@ -97,8 +93,6 @@ public class ClientStreamFactory implements StreamFactory
         LongUnaryOperator supplyReplyId,
         LongSupplier supplyTrace,
         ToIntFunction<String> supplyTypeId,
-        LongFunction<IntUnaryOperator> groupBudgetClaimer,
-        LongFunction<IntUnaryOperator> groupBudgetReleaser,
         TcpCounters counters)
     {
         this.router = requireNonNull(router);
@@ -106,8 +100,6 @@ public class ClientStreamFactory implements StreamFactory
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
         this.bufferPool = requireNonNull(bufferPool);
         this.supplyReplyId = requireNonNull(supplyReplyId);
-        this.groupBudgetClaimer = requireNonNull(groupBudgetClaimer);
-        this.groupBudgetReleaser = requireNonNull(groupBudgetReleaser);
         this.writer = new MessageWriter(supplyTypeId, requireNonNull(writeBuffer), requireNonNull(supplyTrace));
 
         int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
