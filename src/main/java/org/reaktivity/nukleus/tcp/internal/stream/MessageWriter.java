@@ -55,16 +55,16 @@ final class MessageWriter
 
     private final int tcpTypeId;
     private final MutableDirectBuffer writeBuffer;
-    private final LongSupplier supplyTrace;
+    private final LongSupplier supplyTraceId;
 
     MessageWriter(
         ToIntFunction<String> supplyTypeId,
         MutableDirectBuffer writeBuffer,
-        LongSupplier supplyTrace)
+        LongSupplier supplyTraceId)
     {
         this.tcpTypeId = supplyTypeId.applyAsInt(TcpNukleus.NAME);
         this.writeBuffer = writeBuffer;
-        this.supplyTrace = supplyTrace;
+        this.supplyTraceId = supplyTraceId;
     }
 
     public void doTcpAbort(
@@ -75,7 +75,7 @@ final class MessageWriter
         AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(supplyTrace.getAsLong())
+                .traceId(supplyTraceId.getAsLong())
                 .extension(b -> b.set((buf, off, len) -> 0))
                 .build();
 
@@ -92,7 +92,8 @@ final class MessageWriter
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(supplyTrace.getAsLong())
+                .traceId(supplyTraceId.getAsLong())
+                .affinity(streamId)
                 .extension(b -> b.set(visitBeginEx(localAddress, remoteAddress)))
                 .build();
 
@@ -103,7 +104,7 @@ final class MessageWriter
         MessageConsumer stream,
         long routeId,
         long streamId,
-        long groupId,
+        long budgetId,
         int padding,
         DirectBuffer payload,
         int offset,
@@ -112,8 +113,8 @@ final class MessageWriter
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(supplyTrace.getAsLong())
-                .groupId(groupId)
+                .traceId(supplyTraceId.getAsLong())
+                .budgetId(budgetId)
                 .reserved(length + padding)
                 .payload(payload, offset, length)
                 .build();
@@ -129,7 +130,7 @@ final class MessageWriter
         EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(supplyTrace.getAsLong())
+                .traceId(supplyTraceId.getAsLong())
                 .extension(b -> b.set((buf, off, len) -> 0))
                 .build();
 
@@ -140,17 +141,17 @@ final class MessageWriter
         final MessageConsumer sender,
         final long routeId,
         final long streamId,
+        final int budgetId,
         final int credit,
-        final int padding,
-        final int groupId)
+        final int padding)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(supplyTrace.getAsLong())
+                .traceId(supplyTraceId.getAsLong())
+                .budgetId(budgetId)
                 .credit(credit)
                 .padding(padding)
-                .groupId(groupId)
                 .build();
 
         sender.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
@@ -164,7 +165,7 @@ final class MessageWriter
         final ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                .routeId(routeId)
                .streamId(streamId)
-               .trace(supplyTrace.getAsLong())
+               .traceId(supplyTraceId.getAsLong())
                .build();
 
         sender.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());

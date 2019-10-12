@@ -49,7 +49,7 @@ final class ReadStream
     private long correlatedStreamId;
     private int readableBytes;
     private int readPadding;
-    private long readGroupId;
+    private long readBudgetId;
     private boolean resetRequired;
     private final TcpRouteCounters counters;
 
@@ -114,7 +114,7 @@ final class ReadStream
                 }
 
                 // atomic buffer is zero copy with read buffer
-                writer.doTcpData(target, routeId, streamId, readGroupId, readPadding, atomicBuffer, 0, bytesRead);
+                writer.doTcpData(target, routeId, streamId, readBudgetId, readPadding, atomicBuffer, 0, bytesRead);
 
                 readableBytes -= bytesRead + readPadding;
 
@@ -205,9 +205,9 @@ final class ReadStream
     {
         if (readableBytes != -1)
         {
+            readBudgetId = window.budgetId();
             readPadding = window.padding();
             readableBytes += window.credit();
-            readGroupId = window.groupId();
 
             if (readableBytes > readPadding)
             {
