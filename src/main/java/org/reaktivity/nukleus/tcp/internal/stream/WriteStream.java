@@ -455,7 +455,7 @@ public final class WriteStream
         if (pendingCredit >= windowThreshold && readableBytes > EOS_REQUESTED)
         {
             readableBytes += pendingCredit;
-            writer.doWindow(sourceThrottle, routeId, streamId, pendingCredit, 0, 0);
+            writer.doWindow(sourceThrottle, routeId, streamId, 0, pendingCredit, 0);
             pendingCredit = 0;
         }
     }
