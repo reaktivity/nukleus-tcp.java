@@ -31,6 +31,7 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
+import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 /**
@@ -52,6 +53,7 @@ public class ServerIOExceptionFromReadIT
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
         .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
+        .configure(ReaktorConfiguration.REAKTOR_DRAIN_ON_CLOSE, false)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);

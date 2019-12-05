@@ -13,3 +13,19 @@ HELPER org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$HandleWriteHelper
 IF callerEquals("org.reaktivity.nukleus.tcp.internal.stream.WriteStream.handleWrite", true, true)
 DO return doWrite($0, $1);
 ENDRULE
+
+RULE onServerData
+CLASS ^java.nio.channels.SocketChannel
+METHOD write(java.nio.ByteBuffer)
+HELPER org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$OnDataHelper
+IF callerEquals("TcpServerFactory$TcpServer.onApplicationData", true, 2)
+DO return doWrite($0, $1);
+ENDRULE
+
+RULE onServerWritable
+CLASS ^java.nio.channels.SocketChannel
+METHOD write(java.nio.ByteBuffer)
+HELPER org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$HandleWriteHelper
+IF callerEquals("TcpServerFactory$TcpServer.onNetworkWritable", true, 2)
+DO return doWrite($0, $1);
+ENDRULE
