@@ -65,7 +65,7 @@ public final class Acceptor
     private final AtomicInteger remainingConnections;
 
     private Poller poller;
-    private ServerStreamFactory serverStreamFactory;
+    private TcpServerFactory serverFactory;
     private RouteManager router;
     private boolean unbound;
 
@@ -113,11 +113,10 @@ public final class Acceptor
         return result;
     }
 
-    void setServerStreamFactory(
-        ServerStreamFactory serverStreamFactory)
+    void setServerFactory(
+        TcpServerFactory serverFactory)
     {
-        this.serverStreamFactory = serverStreamFactory;
-
+        this.serverFactory = serverFactory;
     }
 
     void setRouter(
@@ -192,7 +191,7 @@ public final class Acceptor
 
                 final InetSocketAddress address = localAddress(channel);
 
-                serverStreamFactory.onAccepted(channel, address, localAddressByRouteId::get, this::connectionDone);
+                serverFactory.onAccepted(channel, address, localAddressByRouteId::get);
             }
         }
         catch (Exception ex)
@@ -231,7 +230,7 @@ public final class Acceptor
 
             if (channel != null)
             {
-                serverStreamFactory.counters.connections.accept(1);
+                serverFactory.counters.connections.accept(1);
             }
             else
             {
@@ -243,11 +242,11 @@ public final class Acceptor
         return channel;
     }
 
-    private void connectionDone()
+    void onChannelClosed()
     {
         remainingConnections.incrementAndGet();
 
-        serverStreamFactory.counters.connections.accept(-1);
+        serverFactory.counters.connections.accept(-1);
         if (unbound && remainingConnections.get() > 0)
         {
             router.forEach((id, buffer, index, length) ->

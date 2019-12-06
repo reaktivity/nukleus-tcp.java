@@ -68,10 +68,10 @@ public class ServerIOExceptionFromWriteIT
         "${route}/server/controller",
         "${server}/server.sent.data.received.reset.and.abort/server"
     })
-    @BMRule(name = "onData",
+    @BMRule(name = "onApplicationData",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
-        condition = "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onData\", true, true)",
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onApplicationData\", true, 2)",
         action = "throw new IOException(\"Simulating an IOException from write\")"
     )
     public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
@@ -93,20 +93,18 @@ public class ServerIOExceptionFromWriteIT
         "${server}/server.sent.data.received.reset.and.abort/server"
     })
     @BMRules(rules = {
-        @BMRule(name = "onData",
+        @BMRule(name = "onApplicationData",
         helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$OnDataHelper",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
-        condition =
-          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onData\", true, true)",
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onApplicationData\", true, 2)",
         action = "return doWrite($0, $1);"
         ),
-        @BMRule(name = "handleWrite",
+        @BMRule(name = "onNetworkWritable",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
-        condition =
-          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.handleWrite\", true, true)",
-          action = "throw new IOException(\"Simulating an IOException from write\")"
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onNetworkWritable\", true, 2)",
+        action = "throw new IOException(\"Simulating an IOException from write\")"
         )
     })
     public void shouldResetWhenDeferredWriteThrowsIOException() throws Exception

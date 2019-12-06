@@ -33,12 +33,11 @@ import org.reaktivity.nukleus.tcp.internal.TcpCounters;
 import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 
-public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
+public class TcpServerFactoryBuilder implements StreamFactoryBuilder
 {
     private final Acceptor acceptor;
     private final TcpConfiguration config;
     private final Poller poller;
-    private final Long2ObjectHashMap<Correlation> correlations;
     private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
 
     private RouteManager router;
@@ -51,7 +50,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
 
-    public ServerStreamFactoryBuilder(
+    public TcpServerFactoryBuilder(
         TcpConfiguration config,
         Long2ObjectHashMap<TcpRouteCounters> countersByRouteId,
         Acceptor acceptor,
@@ -61,7 +60,6 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
         this.countersByRouteId = countersByRouteId;
         this.acceptor = acceptor;
         this.poller = poller;
-        this.correlations = new Long2ObjectHashMap<>();
     }
 
     @Override
@@ -73,7 +71,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ServerStreamFactoryBuilder setRouteManager(
+    public TcpServerFactoryBuilder setRouteManager(
         RouteManager router)
     {
         this.router = router;
@@ -81,7 +79,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ServerStreamFactoryBuilder setInitialIdSupplier(
+    public TcpServerFactoryBuilder setInitialIdSupplier(
         LongUnaryOperator supplyInitialId)
     {
         this.supplyInitialId = supplyInitialId;
@@ -97,7 +95,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ServerStreamFactoryBuilder setTraceIdSupplier(
+    public TcpServerFactoryBuilder setTraceIdSupplier(
         LongSupplier supplyTraceId)
     {
         this.supplyTraceId = supplyTraceId;
@@ -113,7 +111,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ServerStreamFactoryBuilder setWriteBuffer(
+    public TcpServerFactoryBuilder setWriteBuffer(
         MutableDirectBuffer writeBuffer)
     {
         this.writeBuffer = writeBuffer;
@@ -142,7 +140,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
         final BufferPool bufferPool = supplyBufferPool.get();
         final TcpCounters counters = new TcpCounters(supplyCounter, supplyAccumulator, countersByRouteId);
 
-        ServerStreamFactory factory = new ServerStreamFactory(
+        TcpServerFactory factory = new TcpServerFactory(
             config,
             router,
             writeBuffer,
@@ -151,14 +149,12 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
             supplyTraceId,
             supplyTypeId,
             supplyReplyId,
-            correlations,
             poller,
-            counters);
-        acceptor.setServerStreamFactory(factory);
+            counters,
+            acceptor::onChannelClosed);
+        acceptor.setServerFactory(factory);
         acceptor.setRouter(router);
         return factory;
 
     }
-
-
 }

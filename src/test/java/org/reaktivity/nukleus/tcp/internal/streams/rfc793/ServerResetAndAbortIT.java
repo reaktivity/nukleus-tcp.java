@@ -101,7 +101,7 @@ public class ServerResetAndAbortIT
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "shutdownInput()",
         helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-        condition = "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onApplicationReset\", true, 2)",
         action = "countDown()"
     )
     public void shouldShutdownOutputAndInputWhenServerSendsAbortAndReset() throws Exception
@@ -135,7 +135,7 @@ public class ServerResetAndAbortIT
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "shutdownInput()",
         helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-        condition = "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onApplicationReset\", true, 2)",
         action = "countDown()"
     )
     public void shouldShutdownInputWhenServerSendsReset() throws Exception
@@ -178,7 +178,7 @@ public class ServerResetAndAbortIT
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "shutdownInput()",
         helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-        condition = "callerMatches(\"org.reaktivity.nukleus.tcp.internal.stream.ReadStream..*\", true, true)",
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onApplicationReset\", true, 2)",
         action = "countDown()"
     )
     public void shouldShutdownOutputAndInputWhenServerSendsResetAndEnd() throws Exception
