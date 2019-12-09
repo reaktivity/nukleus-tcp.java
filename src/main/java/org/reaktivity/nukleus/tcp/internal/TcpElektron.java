@@ -30,7 +30,7 @@ import org.reaktivity.nukleus.route.RouteKind;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.stream.Acceptor;
-import org.reaktivity.nukleus.tcp.internal.stream.ClientStreamFactoryBuilder;
+import org.reaktivity.nukleus.tcp.internal.stream.TcpClientFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.stream.TcpServerFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
 
@@ -56,7 +56,7 @@ final class TcpElektron implements Elektron
 
         Map<RouteKind, StreamFactoryBuilder> streamFactoryBuilders = new HashMap<>();
         streamFactoryBuilders.put(SERVER, new TcpServerFactoryBuilder(config, countersByRouteId, acceptor, poller));
-        streamFactoryBuilders.put(CLIENT, new ClientStreamFactoryBuilder(config, countersByRouteId, poller));
+        streamFactoryBuilders.put(CLIENT, new TcpClientFactoryBuilder(config, countersByRouteId, poller));
 
         Map<RouteKind, MessagePredicate> routeHandlers = new HashMap<>();
         routeHandlers.put(SERVER, this::handleServerRoute);

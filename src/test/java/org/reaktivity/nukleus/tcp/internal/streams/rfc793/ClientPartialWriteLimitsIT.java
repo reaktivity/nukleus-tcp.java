@@ -71,9 +71,7 @@ public class ClientPartialWriteLimitsIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(4096)
-        // Initial window size for output to network:
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
-        // Overall buffer pool size same as slot size so maximum concurrent streams with partial writes = 1
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_POOL_CAPACITY, 16)
         .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
         .clean();

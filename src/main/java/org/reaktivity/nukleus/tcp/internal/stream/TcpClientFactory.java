@@ -15,31 +15,41 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
+import static java.lang.Integer.parseInt;
+import static java.net.StandardSocketOptions.SO_KEEPALIVE;
+import static java.net.StandardSocketOptions.TCP_NODELAY;
 import static java.nio.ByteOrder.nativeOrder;
+import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 import static java.util.Objects.requireNonNull;
+import static org.agrona.LangUtil.rethrowUnchecked;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.tcp.internal.TcpNukleus.WRITE_SPIN_COUNT;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.CONNECT_HOST_AND_PORT_PATTERN;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.socketAddress;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.StandardSocketOptions;
+import java.net.UnknownHostException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.function.LongFunction;
+import java.nio.channels.UnresolvedAddressException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
+import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
+import java.util.regex.Matcher;
 
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
-import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
@@ -55,6 +65,7 @@ import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
+import org.reaktivity.nukleus.tcp.internal.types.TcpAddressFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
@@ -63,8 +74,9 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.TcpBeginExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
+import org.reaktivity.nukleus.tcp.internal.util.CIDR;
 
-public class TcpServerFactory implements StreamFactory
+public class TcpClientFactory implements StreamFactory
 {
     private final RouteFW routeRO = new RouteFW();
 
@@ -84,58 +96,54 @@ public class TcpServerFactory implements StreamFactory
     private final ResetFW.Builder resetRW = new ResetFW.Builder();
     private final WindowFW.Builder windowRW = new WindowFW.Builder();
 
+    private final TcpBeginExFW beginExRO = new TcpBeginExFW();
     private final TcpBeginExFW.Builder beginExRW = new TcpBeginExFW.Builder();
 
     private final MessageFunction<RouteFW> wrapRoute = (t, b, i, l) -> routeRO.wrap(b, i, i + l);
 
-    private final RouteManager router;
-    private final LongUnaryOperator supplyInitialId;
-    private final LongUnaryOperator supplyReplyId;
-    private final LongSupplier supplyTraceId;
-    private final Long2ObjectHashMap<TcpServer> correlations;
-    private final Poller poller;
-    private final Runnable onNetworkClosed;
-
     private final BufferPool bufferPool;
+    private Poller poller;
+    private final RouteManager router;
     private final ByteBuffer readByteBuffer;
     private final MutableDirectBuffer readBuffer;
     private final MutableDirectBuffer writeBuffer;
     private final ByteBuffer writeByteBuffer;
-    private final int windowThreshold;
+    private final LongUnaryOperator supplyReplyId;
+    private final LongSupplier supplyTraceId;
     private final int tcpTypeId;
+    private final Map<String, Predicate<? super InetAddress>> targetToCidrMatch;
+    private final TcpCounters counters;
+    private final int windowThreshold;
+    private final boolean keepalive;
 
-    final TcpCounters counters;
-
-    public TcpServerFactory(
+    public TcpClientFactory(
         TcpConfiguration config,
         RouteManager router,
+        Poller poller,
         MutableDirectBuffer writeBuffer,
         BufferPool bufferPool,
-        LongUnaryOperator supplyInitialId,
+        LongUnaryOperator supplyReplyId,
         LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId,
-        LongUnaryOperator supplyReplyId,
-        Poller poller,
-        TcpCounters counters,
-        Runnable onChannelClosed)
+        TcpCounters counters)
     {
         this.router = requireNonNull(router);
+        this.poller = poller;
         this.writeBuffer = requireNonNull(writeBuffer);
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
         this.bufferPool = requireNonNull(bufferPool);
-        this.supplyInitialId = requireNonNull(supplyInitialId);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.supplyTraceId = requireNonNull(supplyTraceId);
-        this.poller = requireNonNull(poller);
-        this.counters = requireNonNull(counters);
-        this.onNetworkClosed = requireNonNull(onChannelClosed);
         this.tcpTypeId = supplyTypeId.applyAsInt(TcpNukleus.NAME);
 
-        final int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
+        int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
+        this.targetToCidrMatch = new HashMap<>();
+
+        this.counters = counters;
         this.windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
-        this.correlations = new Long2ObjectHashMap<>();
+        this.keepalive = config.keepalive();
     }
 
     @Override
@@ -149,124 +157,294 @@ public class TcpServerFactory implements StreamFactory
         final BeginFW begin = beginRO.wrap(buffer, index, index + length);
         final long streamId = begin.streamId();
 
-        MessageConsumer newStream = null;
+        MessageConsumer result = null;
 
-        if ((streamId & 0x0000_0000_0000_0001L) == 0L)
+        if ((streamId & 0x0000_0000_0000_0001L) != 0L)
         {
-            newStream = newReplyStream(begin, throttle);
+            result = newInitialStream(begin, throttle);
         }
 
-        return newStream;
+        return result;
     }
 
-    void onAccepted(
-        SocketChannel network,
-        InetSocketAddress address,
-        LongFunction<InetSocketAddress> lookupAddress)
+    private MessageConsumer newInitialStream(
+        BeginFW begin,
+        MessageConsumer application)
     {
-        final MessagePredicate filter = (t, b, i, l) ->
+        final long routeId = begin.routeId();
+        final long initialId = begin.streamId();
+        final OctetsFW extension = begin.extension();
+        final boolean hasExtension = extension.sizeof() > 0;
+
+        MessagePredicate filter = (t, b, o, l) ->
         {
-            final RouteFW route = wrapRoute.apply(t, b, i, l);
-            final long routeId = route.correlationId();
-            final InetSocketAddress routedAddress = lookupAddress.apply(routeId);
-            return compareAddresses(address, routedAddress) == 0;
+            final RouteFW route = routeRO.wrap(b, o, o + l);
+            final String remoteAddressAndPort = route.remoteAddress().asString();
+            final Matcher matcher = CONNECT_HOST_AND_PORT_PATTERN.matcher(remoteAddressAndPort);
+            return !hasExtension ||
+                    (matcher.matches() &&
+                            resolveRemoteAddressExt(extension, matcher.group(1),
+                                                               parseInt(matcher.group(2))) != null);
         };
 
-        final RouteFW route = router.resolveExternal(0L, filter, wrapRoute);
+        final RouteFW route = router.resolve(routeId, begin.authorization(), filter, wrapRoute);
+
+        MessageConsumer newStream = null;
 
         if (route != null)
         {
-            final long routeId = route.correlationId();
+            final String remoteAddressAndPort = route.remoteAddress().asString();
+            final Matcher matcher = CONNECT_HOST_AND_PORT_PATTERN.matcher(remoteAddressAndPort);
+            matcher.matches();
+            final String remoteHost = matcher.group(1);
+            final int remotePort = parseInt(matcher.group(2));
+            InetSocketAddress remoteAddress = hasExtension ? resolveRemoteAddressExt(extension, remoteHost, remotePort) :
+                                                             new InetSocketAddress(remoteHost, remotePort);
+            assert remoteAddress != null;
 
-            final TcpServer server = new TcpServer(routeId, network);
-            correlations.put(server.replyId, server);
+            final SocketChannel channel = newSocketChannel();
+            final TcpRouteCounters routeCounters = counters.supplyRoute(route.correlationId());
 
-            server.onNetworkAccepted();
-        }
-        else
-        {
-            doCloseNetwork(network);
-        }
-    }
-
-    private MessageConsumer newReplyStream(
-        BeginFW begin,
-        MessageConsumer throttle)
-    {
-        final long replyId = begin.streamId();
-        final TcpServer server = correlations.remove(replyId);
-
-        MessageConsumer newStream = null;
-        if (server != null)
-        {
-            newStream = server::onApplication;
+            final TcpClient client = new TcpClient(application, routeId, initialId, channel, routeCounters);
+            client.doNetworkConnect(remoteAddress);
+            newStream = client::onApplication;
         }
 
         return newStream;
+    }
+
+    private InetSocketAddress resolveRemoteAddressExt(
+        OctetsFW extension,
+        String targetName,
+        long targetRef)
+    {
+        final TcpBeginExFW beginEx = extension.get(beginExRO::wrap);
+        final TcpAddressFW remoteAddress = beginEx.remoteAddress();
+        final int remotePort = beginEx.remotePort();
+
+        InetAddress address = null;
+        try
+        {
+            Predicate<? super InetAddress> subnetFilter = extensionMatcher(targetName);
+
+            if (targetRef == 0 || targetRef == remotePort)
+            {
+                switch (remoteAddress.kind())
+                {
+                case TcpAddressFW.KIND_HOST:
+                    String requestedAddressName = remoteAddress.host().asString();
+                    Optional<InetAddress> optional = Arrays
+                            .stream(InetAddress.getAllByName(requestedAddressName))
+                            .filter(subnetFilter)
+                            .findFirst();
+                    address = optional.isPresent() ? optional.get() : null;
+                    break;
+                case TcpAddressFW.KIND_IPV4_ADDRESS:
+                    OctetsFW ipRO = remoteAddress.ipv4Address();
+                    byte[] addr = new byte[ipRO.sizeof()];
+                    ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
+                    InetAddress candidate = InetAddress.getByAddress(addr);
+                    address =  subnetFilter.test(candidate) ? candidate : null;
+                    break;
+                case TcpAddressFW.KIND_IPV6_ADDRESS:
+                    ipRO = remoteAddress.ipv6Address();
+                    addr = new byte[ipRO.sizeof()];
+                    ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
+                    candidate = InetAddress.getByAddress(addr);
+                    address =  subnetFilter.test(candidate) ? candidate : null;
+                    break;
+                default:
+                    throw new RuntimeException("Unexpected address kind");
+                }
+            }
+        }
+        catch (UnknownHostException ignore)
+        {
+           // NOOP
+        }
+
+        return address != null ? new InetSocketAddress(address, remotePort) : null;
+    }
+
+    private Predicate<? super InetAddress> extensionMatcher(
+        String targetName) throws UnknownHostException
+    {
+        Predicate<? super InetAddress> result;
+        if (targetName.contains("/"))
+        {
+            result = targetToCidrMatch.computeIfAbsent(targetName, this::inetMatchesCIDR);
+        }
+        else
+        {
+            InetAddress.getByName(targetName);
+            result = targetToCidrMatch.computeIfAbsent(targetName, this::inetMatchesInet);
+        }
+        return result;
+    }
+
+    private Predicate<InetAddress> inetMatchesCIDR(
+        String targetName)
+    {
+        final CIDR cidr = new CIDR(targetName);
+        return candidate -> cidr.isInRange(candidate.getHostAddress());
+    }
+
+    private Predicate<InetAddress> inetMatchesInet(
+        String targetName)
+    {
+        try
+        {
+            InetAddress toMatch = InetAddress.getByName(targetName);
+            return candidate -> toMatch.equals(candidate);
+        }
+        catch (UnknownHostException e)
+        {
+            rethrowUnchecked(e);
+        }
+        return candidate -> false;
+    }
+
+    private SocketChannel newSocketChannel()
+    {
+        try
+        {
+            final SocketChannel channel = SocketChannel.open();
+            channel.configureBlocking(false);
+            channel.setOption(TCP_NODELAY, true);
+            return channel;
+        }
+        catch (IOException ex)
+        {
+            rethrowUnchecked(ex);
+        }
+
+        // unreachable
+        return null;
     }
 
     private void doCloseNetwork(
         SocketChannel network)
     {
         CloseHelper.quietClose(network);
-        onNetworkClosed.run();
     }
 
-    private final class TcpServer
+    private final class TcpClient
     {
+        private final MessageConsumer application;
         private final long routeId;
         private final long initialId;
         private final long replyId;
-        private final MessageConsumer application;
         private final SocketChannel network;
-        private final PollerKey networkKey;
         private final TcpRouteCounters counters;
 
-        private long initialBudgetId;
-        private int initialBudget;
-        private int initialPadding;
+        private PollerKey networkKey;
 
+        private long replyBudgetId;
         private int replyBudget;
+        private int replyPadding;
+
+        private int initialBudget;
 
         private int state;
         private int networkSlot = NO_SLOT;
         private int networkSlotOffset;
         private int bytesFlushed;
 
-        private TcpServer(
+        private TcpClient(
+            MessageConsumer application,
             long routeId,
-            SocketChannel network)
+            long initialId,
+            SocketChannel network,
+            TcpRouteCounters counters)
         {
+            this.application = application;
             this.routeId = routeId;
-            this.initialId = supplyInitialId.applyAsLong(routeId);
+            this.initialId = initialId;
             this.replyId = supplyReplyId.applyAsLong(initialId);
-            this.application = router.supplyReceiver(initialId);
             this.network = network;
-            this.networkKey = poller.doRegister(network, 0, null);
-            this.counters = TcpServerFactory.this.counters.supplyRoute(routeId);
+            this.counters = counters;
         }
 
-        private void onNetworkAccepted()
+        private void doNetworkConnect(
+            InetSocketAddress remoteAddress)
         {
+            try
+            {
+                state = TcpState.openingInitial(state);
+                counters.opensWritten.getAsLong();
+                network.setOption(SO_KEEPALIVE, keepalive);
+
+                if (network.connect(remoteAddress))
+                {
+                    onNetworkConnected();
+                }
+                else
+                {
+                    networkKey = poller.doRegister(network, OP_CONNECT, this::onNetworkConnect);
+                }
+            }
+            catch (UnresolvedAddressException | IOException ex)
+            {
+                onNetworkRejected();
+            }
+        }
+
+        private int onNetworkConnect(
+            PollerKey key)
+        {
+            try
+            {
+                network.finishConnect();
+                onNetworkConnected();
+            }
+            catch (UnresolvedAddressException | IOException ex)
+            {
+                onNetworkRejected();
+            }
+            finally
+            {
+                key.cancel(OP_CONNECT);
+            }
+
+            return 1;
+        }
+
+        private void onNetworkConnected()
+        {
+            final long traceId = supplyTraceId.getAsLong();
+
+            state = TcpState.openInitial(state);
+            counters.opensRead.getAsLong();
+
             try
             {
                 networkKey.handler(OP_READ, this::onNetworkReadable);
                 networkKey.handler(OP_WRITE, this::onNetworkWritable);
 
-                doApplicationBegin();
+                doApplicationBegin(traceId);
+                doApplicationWindow(traceId, bufferPool.slotCapacity());
             }
             catch (IOException ex)
             {
-                doCleanup(supplyTraceId.getAsLong());
+                doCleanup(traceId);
             }
+        }
+
+        private void onNetworkRejected()
+        {
+            final long traceId = supplyTraceId.getAsLong();
+
+            counters.resetsRead.getAsLong();
+
+            doApplicationReset(traceId);
         }
 
         private int onNetworkReadable(
             PollerKey key)
         {
-            assert initialBudget > initialPadding;
+            assert replyBudget > replyPadding;
 
-            final int limit = Math.min(initialBudget - initialPadding, readBuffer.capacity());
+            final int limit = Math.min(replyBudget - replyPadding, readBuffer.capacity());
 
             ((Buffer) readByteBuffer).position(0);
             ((Buffer) readByteBuffer).limit(limit);
@@ -289,6 +467,7 @@ public class TcpServerFactory implements StreamFactory
                 }
                 else if (bytesRead != 0)
                 {
+                    counters.bytesRead.accept(bytesRead);
                     doApplicationData(readBuffer, 0, bytesRead);
                 }
             }
@@ -329,13 +508,15 @@ public class TcpServerFactory implements StreamFactory
                     bytesWritten = network.write(byteBuffer);
                 }
 
+                counters.bytesWritten.accept(bytesWritten);
+
                 bytesFlushed += bytesWritten;
 
                 if (bytesWritten < length)
                 {
                     if (networkSlot == NO_SLOT)
                     {
-                        networkSlot = bufferPool.acquire(replyId);
+                        networkSlot = bufferPool.acquire(initialId);
                     }
 
                     if (networkSlot == NO_SLOT)
@@ -365,7 +546,7 @@ public class TcpServerFactory implements StreamFactory
                         networkKey.clear(OP_WRITE);
                     }
 
-                    if (TcpState.replyClosing(state))
+                    if (TcpState.initialClosing(state))
                     {
                         doNetworkShutdownOutput(traceId);
                     }
@@ -397,7 +578,7 @@ public class TcpServerFactory implements StreamFactory
             {
                 networkKey.cancel(OP_WRITE);
                 network.shutdownOutput();
-                state = TcpState.closeReply(state);
+                state = TcpState.closeInitial(state);
 
                 if (network.socket().isInputShutdown())
                 {
@@ -448,13 +629,7 @@ public class TcpServerFactory implements StreamFactory
         private void onApplicationBegin(
             BeginFW begin)
         {
-            final long traceId = begin.traceId();
-            final int credit = bufferPool.slotCapacity();
-
-            state = TcpState.openReply(state);
-            counters.opensRead.getAsLong();
-
-            doApplicationWindow(traceId, credit);
+            assert TcpState.initialOpening(state);
         }
 
         private void onApplicationData(
@@ -463,12 +638,12 @@ public class TcpServerFactory implements StreamFactory
             final long traceId = data.traceId();
             final int reserved = data.reserved();
 
-            replyBudget -= reserved;
+            initialBudget -= reserved;
 
-            if (replyBudget < 0)
+            if (initialBudget < 0)
             {
                 doApplicationReset(traceId);
-                doCleanup(traceId, true);
+                doCleanup(traceId);
             }
             else
             {
@@ -514,7 +689,7 @@ public class TcpServerFactory implements StreamFactory
         {
             final long traceId = end.traceId();
 
-            state = TcpState.closingReply(state);
+            state = TcpState.closingInitial(state);
 
             if (networkSlot == NO_SLOT)
             {
@@ -533,13 +708,12 @@ public class TcpServerFactory implements StreamFactory
         private void onApplicationReset(
             ResetFW reset)
         {
-            state = TcpState.closeInitial(state);
+            state = TcpState.closeReply(state);
             CloseHelper.quietClose(network::shutdownInput);
 
-            final boolean abortiveRelease = correlations.containsKey(replyId);
             final long traceId = reset.traceId();
 
-            doCleanup(traceId, abortiveRelease);
+            doCleanup(traceId);
         }
 
         private void onApplicationWindow(
@@ -549,13 +723,13 @@ public class TcpServerFactory implements StreamFactory
             final int credit = window.credit();
             final int padding = window.padding();
 
-            initialBudgetId = budgetId;
-            initialBudget += credit;
-            initialPadding = padding;
+            replyBudgetId = budgetId;
+            replyBudget += credit;
+            replyPadding = padding;
 
-            state = TcpState.openInitial(state);
+            state = TcpState.openReply(state);
 
-            if (initialBudget > initialPadding)
+            if (replyBudget > replyPadding)
             {
                 onNetworkReadable(networkKey);
             }
@@ -564,23 +738,23 @@ public class TcpServerFactory implements StreamFactory
                 networkKey.clear(OP_READ);
             }
 
-            if (initialBudget > initialPadding && !TcpState.initialClosed(state))
+            if (replyBudget > replyPadding && !TcpState.replyClosed(state))
             {
                 networkKey.register(OP_READ);
                 counters.readops.getAsLong();
             }
         }
 
-        private void doApplicationBegin() throws IOException
+        private void doApplicationBegin(
+            long traceId) throws IOException
         {
-            final long traceId = supplyTraceId.getAsLong();
             final InetSocketAddress localAddress = (InetSocketAddress) network.getLocalAddress();
             final InetSocketAddress remoteAddress = (InetSocketAddress) network.getRemoteAddress();
 
-            router.setThrottle(initialId, this::onApplication);
-            doBegin(application, routeId, initialId, traceId, localAddress, remoteAddress);
+            router.setThrottle(replyId, this::onApplication);
+            doBegin(application, routeId, replyId, traceId, localAddress, remoteAddress);
             counters.opensWritten.getAsLong();
-            state = TcpState.openingInitial(state);
+            state = TcpState.openingReply(state);
         }
 
         private void doApplicationData(
@@ -589,13 +763,13 @@ public class TcpServerFactory implements StreamFactory
             int length)
         {
             final long traceId = supplyTraceId.getAsLong();
-            final int reserved = length + initialPadding;
+            final int reserved = length + replyPadding;
 
-            doData(application, routeId, initialId, traceId, initialBudgetId, reserved, buffer, offset, length);
+            doData(application, routeId, replyId, traceId, replyBudgetId, reserved, buffer, offset, length);
 
-            initialBudget -= reserved;
+            replyBudget -= reserved;
 
-            if (initialBudget <= initialPadding)
+            if (replyBudget <= replyPadding)
             {
                 networkKey.clear(OP_READ);
             }
@@ -604,79 +778,51 @@ public class TcpServerFactory implements StreamFactory
         private void doApplicationEnd(
             long traceId)
         {
-            doEnd(application, routeId, initialId, traceId);
+            doEnd(application, routeId, replyId, traceId);
             counters.closesWritten.getAsLong();
-            state = TcpState.closeInitial(state);
+            state = TcpState.closeReply(state);
         }
 
         private void doApplicationAbort(
             long traceId)
         {
-            doAbort(application, routeId, initialId, traceId);
+            doAbort(application, routeId, replyId, traceId);
             counters.abortsWritten.getAsLong();
-            state = TcpState.closeInitial(state);
+            state = TcpState.closeReply(state);
         }
 
         private void doApplicationReset(
             long traceId)
         {
-            doReset(application, routeId, replyId, traceId);
+            doReset(application, routeId, initialId, traceId);
             counters.resetsWritten.getAsLong();
-            state = TcpState.closeReply(state);
+            state = TcpState.closeInitial(state);
         }
 
         private void doApplicationWindow(
             long traceId,
             int credit)
         {
-            replyBudget += credit;
-            doWindow(application, routeId, replyId, traceId, 0, credit, 0);
+            initialBudget += credit;
+            doWindow(application, routeId, initialId, traceId, 0, credit, 0);
         }
 
         private void doApplicationResetIfNecessary(
             long traceId)
         {
-            if (!TcpState.replyClosing(state))
+            if (TcpState.initialOpened(state) && !TcpState.initialClosing(state))
             {
-                if (TcpState.replyOpened(state))
-                {
-                    assert !correlations.containsKey(replyId);
-                    doApplicationReset(traceId);
-                }
-                else
-                {
-                    correlations.remove(replyId);
-                }
+                doApplicationReset(traceId);
             }
         }
 
         private void doApplicationAbortIfNecessary(
             long traceId)
         {
-            if (TcpState.initialOpened(state) && !TcpState.initialClosed(state))
+            if (TcpState.replyOpened(state) && !TcpState.replyClosed(state))
             {
                 doApplicationAbort(traceId);
             }
-        }
-
-        private void doCleanup(
-            long traceId,
-            boolean abortiveRelease)
-        {
-            if (abortiveRelease)
-            {
-                try
-                {
-                    // forces TCP RST
-                    network.setOption(StandardSocketOptions.SO_LINGER, 0);
-                }
-                catch (IOException ex)
-                {
-                    LangUtil.rethrowUnchecked(ex);
-                }
-            }
-
-            doCleanup(traceId);
         }
 
         private void doCleanup(

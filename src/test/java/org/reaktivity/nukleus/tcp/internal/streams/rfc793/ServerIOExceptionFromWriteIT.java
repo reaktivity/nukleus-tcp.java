@@ -37,9 +37,6 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-/**
- * Tests the handling of IOException thrown from SocketChannel.read (see issue #9).
- */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 public class ServerIOExceptionFromWriteIT
 {

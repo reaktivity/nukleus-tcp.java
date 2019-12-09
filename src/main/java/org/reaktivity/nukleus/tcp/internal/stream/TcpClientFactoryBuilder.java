@@ -33,7 +33,7 @@ import org.reaktivity.nukleus.tcp.internal.TcpCounters;
 import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 
-public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
+public class TcpClientFactoryBuilder implements StreamFactoryBuilder
 {
     private final TcpConfiguration config;
     private final Poller poller;
@@ -50,7 +50,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
 
-    public ClientStreamFactoryBuilder(
+    public TcpClientFactoryBuilder(
         TcpConfiguration config,
         Long2ObjectHashMap<TcpRouteCounters> countersByRouteId,
         Poller poller)
@@ -69,7 +69,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ClientStreamFactoryBuilder setRouteManager(
+    public TcpClientFactoryBuilder setRouteManager(
         RouteManager router)
     {
         this.router = router;
@@ -77,14 +77,14 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ClientStreamFactoryBuilder setInitialIdSupplier(
+    public TcpClientFactoryBuilder setInitialIdSupplier(
         LongUnaryOperator supplyInitialId)
     {
         return this;
     }
 
     @Override
-    public ClientStreamFactoryBuilder setReplyIdSupplier(
+    public TcpClientFactoryBuilder setReplyIdSupplier(
         LongUnaryOperator supplyReplyId)
     {
         this.supplyReplyId = supplyReplyId;
@@ -92,7 +92,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ClientStreamFactoryBuilder setTraceIdSupplier(
+    public TcpClientFactoryBuilder setTraceIdSupplier(
         LongSupplier supplyTraceId)
     {
         this.supplyTraceId = supplyTraceId;
@@ -108,7 +108,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ClientStreamFactoryBuilder setWriteBuffer(
+    public TcpClientFactoryBuilder setWriteBuffer(
         MutableDirectBuffer writeBuffer)
     {
         this.writeBuffer = writeBuffer;
@@ -137,7 +137,7 @@ public class ClientStreamFactoryBuilder implements StreamFactoryBuilder
         final BufferPool bufferPool = supplyBufferPool.get();
         final TcpCounters counters = new TcpCounters(supplyCounter, supplyAccumulator, countersByRouteId);
 
-        return new ClientStreamFactory(
+        return new TcpClientFactory(
             config,
             router,
             poller,
