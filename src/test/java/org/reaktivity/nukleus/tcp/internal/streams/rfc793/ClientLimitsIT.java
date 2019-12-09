@@ -19,6 +19,7 @@ import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.reaktor.ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
@@ -34,7 +35,6 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
-import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 public class ClientLimitsIT
@@ -51,8 +51,7 @@ public class ClientLimitsIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(4096)
-        // Initial window size for output to network:
-        .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
+        .configure(REAKTOR_BUFFER_SLOT_CAPACITY, 16)
         .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
@@ -65,7 +64,6 @@ public class ClientLimitsIT
     @Specification({
         "${route}/client.host/controller",
         "${client}/client.sent.data.received.reset/client"
-        // No sup
     })
     public void shouldResetWhenWindowExceeded() throws Exception
     {

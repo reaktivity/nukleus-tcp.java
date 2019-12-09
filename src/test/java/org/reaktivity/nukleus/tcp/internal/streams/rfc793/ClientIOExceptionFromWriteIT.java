@@ -39,9 +39,6 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-/**
- * Tests the handling of IOException thrown from SocketChannel.write (issue #9).
- */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 public class ClientIOExceptionFromWriteIT
 {
@@ -71,10 +68,10 @@ public class ClientIOExceptionFromWriteIT
         "${route}/client.host/controller",
         "${client}/client.sent.data.received.abort.and.reset/client"
     })
-    @BMRule(name = "onData",
+    @BMRule(name = "onApplicationData",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
-        condition = "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onData\", true, true)",
+        condition = "callerEquals(\"TcpClientFactory$TcpClient.onApplicationData\", true, 2)",
         action = "throw new IOException(\"Simulating an IOException from write\")"
     )
     public void shouldAbortAndResetWhenImmediateWriteThrowsIOException() throws Exception
@@ -104,16 +101,14 @@ public class ClientIOExceptionFromWriteIT
         helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$OnDataHelper",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
-        condition =
-          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onData\", true, true)",
+        condition = "callerEquals(\"TcpClientFactory$TcpClient.onApplicationData\", true, 2)",
         action = "return doWrite($0, $1);"
         ),
         @BMRule(name = "handleWrite",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "write(java.nio.ByteBuffer)",
-        condition =
-          "callerEquals(\"org.reaktivity.nukleus.tcp.internal.stream.WriteStream.handleWrite\", true, true)",
-          action = "throw new IOException(\"Simulating an IOException from write\")"
+        condition = "callerEquals(\"TcpClientFactory$TcpClient.onNetworkWritable\", true, 2)",
+        action = "throw new IOException(\"Simulating an IOException from write\")"
         )
     })
     public void shouldAbortAndResetWhenDeferredWriteThrowsIOException() throws Exception
@@ -133,5 +128,4 @@ public class ClientIOExceptionFromWriteIT
             }
         }
     }
-
 }

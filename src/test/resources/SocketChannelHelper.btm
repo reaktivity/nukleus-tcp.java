@@ -1,16 +1,16 @@
-RULE onData
+RULE onClientData
 CLASS ^java.nio.channels.SocketChannel
 METHOD write(java.nio.ByteBuffer)
 HELPER org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$OnDataHelper
-IF callerEquals("org.reaktivity.nukleus.tcp.internal.stream.WriteStream.onData", true, true)
+IF callerEquals("TcpClientFactory$TcpClient.onApplicationData", true, 2)
 DO return doWrite($0, $1);
 ENDRULE
 
-RULE handleWrite
+RULE onClientWritable
 CLASS ^java.nio.channels.SocketChannel
 METHOD write(java.nio.ByteBuffer)
 HELPER org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$HandleWriteHelper
-IF callerEquals("org.reaktivity.nukleus.tcp.internal.stream.WriteStream.handleWrite", true, true)
+IF callerEquals("TcpClientFactory$TcpClient.onNetworkWritable", true, 2)
 DO return doWrite($0, $1);
 ENDRULE
 

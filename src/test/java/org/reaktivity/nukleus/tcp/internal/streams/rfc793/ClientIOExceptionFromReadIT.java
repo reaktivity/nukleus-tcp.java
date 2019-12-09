@@ -35,12 +35,6 @@ import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-/**
- * Tests the handling of IOException thrown from SocketChannel.read (see issue #9). This condition  is forced
- * in this test by causing the remote end to send a TCP reset (RST) by setting SO_LINGER to 0 then closing the socket,
- * as documented in <a href="https://docs.oracle.com/javase/8/docs/technotes/guides/net/articles/connection_release.html">
- * Orderly Versus Abortive Connection Release in Java</a>
- */
 public class ClientIOExceptionFromReadIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -117,5 +111,4 @@ public class ClientIOExceptionFromReadIT
             }
         }
     }
-
 }

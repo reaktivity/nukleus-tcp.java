@@ -35,6 +35,8 @@ public final class TcpNukleus implements Nukleus
 {
     public static final String NAME = "tcp";
 
+    public static final int WRITE_SPIN_COUNT = 16;
+
     private final TcpConfiguration config;
     private final Map<RouteKind, MessagePredicate> routeHandlers;
     private final List<TcpElektron> elektrons;

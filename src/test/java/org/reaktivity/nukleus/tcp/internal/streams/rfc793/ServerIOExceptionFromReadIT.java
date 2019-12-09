@@ -34,9 +34,6 @@ import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-/**
- * Tests the handling of IOException thrown from SocketChannel.read (see issue #9).
- */
 public class ServerIOExceptionFromReadIT
 {
     private final K3poRule k3po = new K3poRule()
