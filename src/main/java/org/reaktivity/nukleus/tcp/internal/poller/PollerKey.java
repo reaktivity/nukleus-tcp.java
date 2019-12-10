@@ -57,8 +57,15 @@ public final class PollerKey
         final int newInterestOps = interestOps | registerOps;
         if (newInterestOps != interestOps)
         {
-            key.interestOps(newInterestOps);
-            interestOps = newInterestOps;
+            if (key.isValid())
+            {
+                key.interestOps(newInterestOps);
+                interestOps = newInterestOps;
+            }
+            else
+            {
+                interestOps = 0;
+            }
         }
     }
 
@@ -68,8 +75,15 @@ public final class PollerKey
         final int newInterestOps = interestOps & ~clearOps;
         if (newInterestOps != interestOps)
         {
-            key.interestOps(newInterestOps);
-            interestOps = newInterestOps;
+            if (key.isValid())
+            {
+                key.interestOps(newInterestOps);
+                interestOps = newInterestOps;
+            }
+            else
+            {
+                interestOps = 0;
+            }
         }
     }
 

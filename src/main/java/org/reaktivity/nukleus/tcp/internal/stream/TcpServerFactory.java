@@ -356,14 +356,7 @@ public class TcpServerFactory implements StreamFactory
                 }
                 else
                 {
-                    if (networkSlot != NO_SLOT)
-                    {
-                        bufferPool.release(networkSlot);
-                        networkSlot = NO_SLOT;
-                        networkSlotOffset = 0;
-
-                        networkKey.clear(OP_WRITE);
-                    }
+                    cleanupNetworkSlotIfNecessary();
 
                     if (TcpState.replyClosing(state))
                     {
@@ -387,11 +380,7 @@ public class TcpServerFactory implements StreamFactory
         private void doNetworkShutdownOutput(
             long traceId)
         {
-            if (networkSlot != NO_SLOT)
-            {
-                bufferPool.release(networkSlot);
-                networkSlot = NO_SLOT;
-            }
+            cleanupNetworkSlotIfNecessary();
 
             try
             {
@@ -687,11 +676,18 @@ public class TcpServerFactory implements StreamFactory
 
             doCloseNetwork(network);
 
+            cleanupNetworkSlotIfNecessary();
+        }
+
+        private void cleanupNetworkSlotIfNecessary()
+        {
             if (networkSlot != NO_SLOT)
             {
                 bufferPool.release(networkSlot);
                 networkSlot = NO_SLOT;
                 networkSlotOffset = 0;
+
+                networkKey.clear(OP_WRITE);
             }
         }
     }
