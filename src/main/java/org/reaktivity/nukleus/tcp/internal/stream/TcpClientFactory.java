@@ -136,7 +136,7 @@ public class TcpClientFactory implements StreamFactory
         this.supplyTraceId = requireNonNull(supplyTraceId);
         this.tcpTypeId = supplyTypeId.applyAsInt(TcpNukleus.NAME);
 
-        final int readBufferSize = Math.min(writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD, bufferPool.slotCapacity());
+        final int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
         this.targetToCidrMatch = new HashMap<>();
