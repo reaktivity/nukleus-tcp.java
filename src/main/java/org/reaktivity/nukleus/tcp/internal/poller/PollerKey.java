@@ -62,10 +62,6 @@ public final class PollerKey
                 key.interestOps(newInterestOps);
                 interestOps = newInterestOps;
             }
-            else
-            {
-                interestOps = 0;
-            }
         }
     }
 
@@ -79,10 +75,6 @@ public final class PollerKey
             {
                 key.interestOps(newInterestOps);
                 interestOps = newInterestOps;
-            }
-            else
-            {
-                interestOps = 0;
             }
         }
     }
@@ -115,11 +107,8 @@ public final class PollerKey
     public void cancel(
         int cancelOps)
     {
-        if (key.isValid())
-        {
-            clear(cancelOps);
-            handler(cancelOps, null);
-        }
+        clear(cancelOps);
+        handler(cancelOps, null);
     }
 
     int handleSelect(

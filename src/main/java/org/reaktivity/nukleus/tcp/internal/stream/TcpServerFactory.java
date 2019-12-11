@@ -674,9 +674,9 @@ public class TcpServerFactory implements StreamFactory
             doApplicationAbortIfNecessary(traceId);
             doApplicationResetIfNecessary(traceId);
 
-            doCloseNetwork(network);
-
             cleanupNetworkSlotIfNecessary();
+
+            doCloseNetwork(network);
         }
 
         private void cleanupNetworkSlotIfNecessary()
