@@ -394,16 +394,13 @@ public class TcpClientFactory implements StreamFactory
         {
             try
             {
+                key.clear(OP_CONNECT);
                 network.finishConnect();
                 onNetworkConnected();
             }
             catch (UnresolvedAddressException | IOException ex)
             {
                 onNetworkRejected();
-            }
-            finally
-            {
-                key.cancel(OP_CONNECT);
             }
 
             return 1;
@@ -455,7 +452,7 @@ public class TcpClientFactory implements StreamFactory
 
                 if (bytesRead == -1)
                 {
-                    key.cancel(OP_READ);
+                    key.clear(OP_READ);
                     CloseHelper.close(network::shutdownInput);
 
                     doApplicationEnd(supplyTraceId.getAsLong());
@@ -482,14 +479,23 @@ public class TcpClientFactory implements StreamFactory
         private int onNetworkWritable(
             PollerKey key)
         {
-            assert networkSlot != NO_SLOT;
+            if (networkSlot == NO_SLOT)
+            {
+                counters.writeopsNoSlot.getAsLong();
+                assert key == networkKey;
+                return 0;
+            }
+            else
+            {
+                assert networkSlot != NO_SLOT;
 
-            long traceId = supplyTraceId.getAsLong();
-            DirectBuffer buffer = bufferPool.buffer(networkSlot);
-            ByteBuffer byteBuffer = bufferPool.byteBuffer(networkSlot);
-            byteBuffer.limit(byteBuffer.position() + networkSlotOffset);
+                long traceId = supplyTraceId.getAsLong();
+                DirectBuffer buffer = bufferPool.buffer(networkSlot);
+                ByteBuffer byteBuffer = bufferPool.byteBuffer(networkSlot);
+                byteBuffer.limit(byteBuffer.position() + networkSlotOffset);
 
-            return doNetworkWrite(buffer, 0, networkSlotOffset, byteBuffer, traceId);
+                return doNetworkWrite(buffer, 0, networkSlotOffset, byteBuffer, traceId);
+            }
         }
 
         private int doNetworkWrite(
@@ -538,6 +544,7 @@ public class TcpClientFactory implements StreamFactory
                 else
                 {
                     cleanupNetworkSlotIfNecessary();
+                    networkKey.clear(OP_WRITE);
 
                     if (TcpState.initialClosing(state))
                     {
@@ -569,12 +576,12 @@ public class TcpClientFactory implements StreamFactory
             {
                 if (network.isConnectionPending())
                 {
-                    networkKey.cancel(OP_CONNECT);
+                    networkKey.clear(OP_CONNECT);
                     doCloseNetwork(network);
                 }
                 else
                 {
-                    networkKey.cancel(OP_WRITE);
+                    networkKey.clear(OP_WRITE);
                     network.shutdownOutput();
 
                     if (network.socket().isInputShutdown())
@@ -596,8 +603,6 @@ public class TcpClientFactory implements StreamFactory
                 bufferPool.release(networkSlot);
                 networkSlot = NO_SLOT;
                 networkSlotOffset = 0;
-
-                networkKey.clear(OP_WRITE);
             }
         }
 

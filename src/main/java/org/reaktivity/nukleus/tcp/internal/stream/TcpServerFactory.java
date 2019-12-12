@@ -277,7 +277,7 @@ public class TcpServerFactory implements StreamFactory
 
                 if (bytesRead == -1)
                 {
-                    key.cancel(OP_READ);
+                    key.clear(OP_READ);
                     CloseHelper.close(network::shutdownInput);
 
                     doApplicationEnd(supplyTraceId.getAsLong());
@@ -303,14 +303,23 @@ public class TcpServerFactory implements StreamFactory
         private int onNetworkWritable(
             PollerKey key)
         {
-            assert networkSlot != NO_SLOT;
+            if (networkSlot == NO_SLOT)
+            {
+                counters.writeopsNoSlot.getAsLong();
+                assert key == networkKey;
+                return 0;
+            }
+            else
+            {
+                assert networkSlot != NO_SLOT;
 
-            long traceId = supplyTraceId.getAsLong();
-            DirectBuffer buffer = bufferPool.buffer(networkSlot);
-            ByteBuffer byteBuffer = bufferPool.byteBuffer(networkSlot);
-            byteBuffer.limit(byteBuffer.position() + networkSlotOffset);
+                long traceId = supplyTraceId.getAsLong();
+                DirectBuffer buffer = bufferPool.buffer(networkSlot);
+                ByteBuffer byteBuffer = bufferPool.byteBuffer(networkSlot);
+                byteBuffer.limit(byteBuffer.position() + networkSlotOffset);
 
-            return doNetworkWrite(buffer, 0, networkSlotOffset, byteBuffer, traceId);
+                return doNetworkWrite(buffer, 0, networkSlotOffset, byteBuffer, traceId);
+            }
         }
 
         private int doNetworkWrite(
@@ -357,6 +366,7 @@ public class TcpServerFactory implements StreamFactory
                 else
                 {
                     cleanupNetworkSlotIfNecessary();
+                    networkKey.clear(OP_WRITE);
 
                     if (TcpState.replyClosing(state))
                     {
@@ -384,7 +394,7 @@ public class TcpServerFactory implements StreamFactory
 
             try
             {
-                networkKey.cancel(OP_WRITE);
+                networkKey.clear(OP_WRITE);
                 network.shutdownOutput();
                 state = TcpState.closeReply(state);
 
@@ -686,8 +696,6 @@ public class TcpServerFactory implements StreamFactory
                 bufferPool.release(networkSlot);
                 networkSlot = NO_SLOT;
                 networkSlotOffset = 0;
-
-                networkKey.clear(OP_WRITE);
             }
         }
     }

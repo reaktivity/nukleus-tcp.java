@@ -25,6 +25,7 @@ public final class TcpRouteCounters
     public final LongSupplier partials;
 
     public final LongSupplier writeops;
+    public final LongSupplier writeopsNoSlot;
     public final LongSupplier readops;
 
     public final LongSupplier opensWritten;
@@ -48,6 +49,7 @@ public final class TcpRouteCounters
         this.overflows = supplyCounter.apply("tcp.overflows");
         this.partials = supplyCounter.apply("tcp.partial.writes");
 
+        this.writeopsNoSlot = supplyCounter.apply(String.format("tcp.%d.writeops.noslot", routeId));
         this.writeops = supplyCounter.apply(String.format("tcp.%d.writeops", routeId));
         this.readops = supplyCounter.apply(String.format("tcp.%d.readops", routeId));
 
