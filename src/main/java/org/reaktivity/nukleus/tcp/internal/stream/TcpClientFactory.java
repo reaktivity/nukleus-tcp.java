@@ -561,17 +561,26 @@ public class TcpClientFactory implements StreamFactory
         private void doNetworkShutdownOutput(
             long traceId)
         {
+            state = TcpState.closeInitial(state);
+
             cleanupNetworkSlotIfNecessary();
 
             try
             {
-                networkKey.cancel(OP_WRITE);
-                network.shutdownOutput();
-                state = TcpState.closeInitial(state);
-
-                if (network.socket().isInputShutdown())
+                if (network.isConnectionPending())
                 {
+                    networkKey.cancel(OP_CONNECT);
                     doCloseNetwork(network);
+                }
+                else
+                {
+                    networkKey.cancel(OP_WRITE);
+                    network.shutdownOutput();
+
+                    if (network.socket().isInputShutdown())
+                    {
+                        doCloseNetwork(network);
+                    }
                 }
             }
             catch (IOException ex)
