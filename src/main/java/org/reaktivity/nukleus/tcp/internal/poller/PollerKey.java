@@ -57,11 +57,8 @@ public final class PollerKey
         final int newInterestOps = interestOps | registerOps;
         if (newInterestOps != interestOps)
         {
-            if (key.isValid())
-            {
-                key.interestOps(newInterestOps);
-                interestOps = newInterestOps;
-            }
+            key.interestOps(newInterestOps);
+            interestOps = newInterestOps;
         }
     }
 
@@ -71,11 +68,8 @@ public final class PollerKey
         final int newInterestOps = interestOps & ~clearOps;
         if (newInterestOps != interestOps)
         {
-            if (key.isValid())
-            {
-                key.interestOps(newInterestOps);
-                interestOps = newInterestOps;
-            }
+            key.interestOps(newInterestOps);
+            interestOps = newInterestOps;
         }
     }
 
@@ -102,13 +96,6 @@ public final class PollerKey
         {
             writeHandler = (handler != null) ? handler : PollerKey::nop;
         }
-    }
-
-    public void cancel(
-        int cancelOps)
-    {
-        clear(cancelOps);
-        handler(cancelOps, null);
     }
 
     int handleSelect(
