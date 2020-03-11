@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2019 The Reaktivity Project
+ * Copyright 2016-2020 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -20,7 +20,6 @@ import static org.reaktivity.nukleus.route.RouteKind.SERVER;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.agrona.DirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -45,10 +44,9 @@ final class TcpElektron implements Elektron
     private final Map<RouteKind, MessagePredicate> routeHandlers;
 
     TcpElektron(
-        TcpConfiguration config,
-        AtomicInteger remainingConnections)
+        TcpConfiguration config)
     {
-        final Acceptor acceptor = new Acceptor(config, remainingConnections);
+        final Acceptor acceptor = new Acceptor(config);
         Poller poller = new Poller();
         acceptor.setPoller(poller);
 
