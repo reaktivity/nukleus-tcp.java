@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.Configuration;
@@ -40,14 +39,12 @@ public final class TcpNukleus implements Nukleus
     private final TcpConfiguration config;
     private final Map<RouteKind, MessagePredicate> routeHandlers;
     private final List<TcpElektron> elektrons;
-    private final AtomicInteger remainingConnections;
 
     TcpNukleus(
         TcpConfiguration config)
     {
         this.config = config;
         this.elektrons = new ArrayList<>();
-        this.remainingConnections = new AtomicInteger(config.maxConnections());
 
         Map<RouteKind, MessagePredicate> routeHandlers = new EnumMap<>(RouteKind.class);
         routeHandlers.put(SERVER, this::handleServerRoute);
@@ -77,7 +74,7 @@ public final class TcpNukleus implements Nukleus
     @Override
     public Elektron supplyElektron()
     {
-        final TcpElektron elektron = new TcpElektron(config, remainingConnections);
+        final TcpElektron elektron = new TcpElektron(config);
         elektrons.add(elektron);
         return elektron;
     }
