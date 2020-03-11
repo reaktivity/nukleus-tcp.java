@@ -31,7 +31,6 @@ import java.nio.channels.NetworkChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 import java.util.regex.Matcher;
@@ -40,6 +39,7 @@ import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.collections.Long2ObjectHashMap;
+import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
@@ -62,7 +62,7 @@ public final class Acceptor
     private final Long2ObjectHashMap<InetSocketAddress> localAddressByRouteId;
     private final Function<SocketAddress, PollerKey> registerHandler;
     private final ToIntFunction<PollerKey> acceptHandler;
-    private final AtomicInteger remainingConnections;
+    private final MutableInteger remainingConnections;
 
     private Poller poller;
     private TcpServerFactory serverFactory;
@@ -70,13 +70,12 @@ public final class Acceptor
     private boolean unbound;
 
     public Acceptor(
-        TcpConfiguration config,
-        AtomicInteger remainingConnections)
+        TcpConfiguration config)
     {
         this.backlog = config.maximumBacklog();
         this.keepalive = config.keepalive();
         this.nodelay = config.nodelay();
-        this.remainingConnections = remainingConnections;
+        this.remainingConnections = new MutableInteger(config.maxConnections());
         this.localAddressByRouteId = new Long2ObjectHashMap<>();
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
@@ -208,7 +207,7 @@ public final class Acceptor
     {
         SocketChannel channel = null;
 
-        if (!unbound && remainingConnections.get() <= 0)
+        if (!unbound && remainingConnections.value <= 0)
         {
             router.forEach((id, buffer, index, length) ->
             {
@@ -222,20 +221,15 @@ public final class Acceptor
         }
         else
         {
-            // claim capacity first
-            if (remainingConnections.decrementAndGet() >= 0)
+            if (remainingConnections.value > 0)
             {
                 channel = serverChannel.accept();
             }
 
             if (channel != null)
             {
+                remainingConnections.value--;
                 serverFactory.counters.connections.accept(1);
-            }
-            else
-            {
-                // channel not accepted, or claim failed
-                remainingConnections.incrementAndGet();
             }
         }
 
@@ -244,10 +238,10 @@ public final class Acceptor
 
     void onChannelClosed()
     {
-        remainingConnections.incrementAndGet();
+        remainingConnections.value++;
 
         serverFactory.counters.connections.accept(-1);
-        if (unbound && remainingConnections.get() > 0)
+        if (unbound && remainingConnections.value > 0)
         {
             router.forEach((id, buffer, index, length) ->
             {
