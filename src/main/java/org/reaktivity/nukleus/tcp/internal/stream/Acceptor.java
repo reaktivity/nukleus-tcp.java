@@ -87,13 +87,12 @@ public final class Acceptor
         this.poller = poller;
     }
 
-    public boolean handleRoute(
+    public void handleRouted(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
         int length)
     {
-        boolean result = true;
         switch (msgTypeId)
         {
         case RouteFW.TYPE_ID:
@@ -101,15 +100,14 @@ public final class Acceptor
             assert route.role().get() == Role.SERVER;
             final long routeId = route.correlationId();
             final String localAddress = route.localAddress().asString();
-            result = doRegister(routeId, localAddress);
+            doRegister(routeId, localAddress);
             break;
         case UnrouteFW.TYPE_ID:
             final UnrouteFW unroute = unrouteRO.wrap(buffer, index, index + length);
             final long unrouteId = unroute.routeId();
-            result = doUnregister(unrouteId);
+            doUnregister(unrouteId);
             break;
         }
-        return result;
     }
 
     void setServerFactory(
