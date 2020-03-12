@@ -13,41 +13,24 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal;
+package org.reaktivity.nukleus.tcp.internal.stream;
 
-import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.Elektron;
-import org.reaktivity.nukleus.Nukleus;
+import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.route.AddressFactoryBuilder;
 
-public final class TcpNukleus implements Nukleus
+public final class TcpAddressFactoryBuilder implements AddressFactoryBuilder
 {
-    public static final String NAME = "tcp";
+    private final MessageConsumer routeHandler;
 
-    public static final int WRITE_SPIN_COUNT = 16;
-
-    private final TcpConfiguration config;
-
-    TcpNukleus(
-        TcpConfiguration config)
+    public TcpAddressFactoryBuilder(
+        MessageConsumer routeHandler)
     {
-        this.config = config;
+        this.routeHandler = routeHandler;
     }
 
     @Override
-    public String name()
+    public TcpAddressFactory build()
     {
-        return TcpNukleus.NAME;
-    }
-
-    @Override
-    public Configuration config()
-    {
-        return config;
-    }
-
-    @Override
-    public Elektron supplyElektron()
-    {
-        return new TcpElektron(config);
+        return new TcpAddressFactory(routeHandler);
     }
 }
