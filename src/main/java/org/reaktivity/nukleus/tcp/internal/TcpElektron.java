@@ -24,11 +24,12 @@ import java.util.Map;
 import org.agrona.DirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.Elektron;
-import org.reaktivity.nukleus.function.MessagePredicate;
+import org.reaktivity.nukleus.route.AddressFactoryBuilder;
 import org.reaktivity.nukleus.route.RouteKind;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.stream.Acceptor;
+import org.reaktivity.nukleus.tcp.internal.stream.TcpAddressFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.stream.TcpClientFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.stream.TcpServerFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
@@ -41,7 +42,7 @@ final class TcpElektron implements Elektron
     private final Poller poller;
     private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
     private final Map<RouteKind, StreamFactoryBuilder> streamFactoryBuilders;
-    private final Map<RouteKind, MessagePredicate> routeHandlers;
+    private final Map<RouteKind, AddressFactoryBuilder> addressFactoryBuilders;
 
     TcpElektron(
         TcpConfiguration config)
@@ -56,14 +57,14 @@ final class TcpElektron implements Elektron
         streamFactoryBuilders.put(SERVER, new TcpServerFactoryBuilder(config, countersByRouteId, acceptor, poller));
         streamFactoryBuilders.put(CLIENT, new TcpClientFactoryBuilder(config, countersByRouteId, poller));
 
-        Map<RouteKind, MessagePredicate> routeHandlers = new HashMap<>();
-        routeHandlers.put(SERVER, this::handleServerRoute);
-        routeHandlers.put(CLIENT, this::handleRoute);
+        Map<RouteKind, AddressFactoryBuilder> addressFactoryBuilders = new HashMap<>();
+        addressFactoryBuilders.put(SERVER, new TcpAddressFactoryBuilder(this::handleServerRouted));
+        addressFactoryBuilders.put(CLIENT, new TcpAddressFactoryBuilder(this::handleRouted));
 
         this.acceptor = acceptor;
         this.poller = poller;
         this.streamFactoryBuilders = streamFactoryBuilders;
-        this.routeHandlers = routeHandlers;
+        this.addressFactoryBuilders = addressFactoryBuilders;
         this.countersByRouteId = countersByRouteId;
     }
 
@@ -72,6 +73,13 @@ final class TcpElektron implements Elektron
         RouteKind kind)
     {
         return streamFactoryBuilders.get(kind);
+    }
+
+    @Override
+    public AddressFactoryBuilder addressFactoryBuilder(
+        RouteKind kind)
+    {
+        return addressFactoryBuilders.get(kind);
     }
 
     @Override
@@ -86,23 +94,17 @@ final class TcpElektron implements Elektron
         return String.format("%s %s", getClass().getSimpleName(), streamFactoryBuilders);
     }
 
-    MessagePredicate routeHandler(
-        RouteKind kind)
-    {
-        return routeHandlers.get(kind);
-    }
-
-    private boolean handleServerRoute(
+    private void handleServerRouted(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
         int length)
     {
-        return acceptor.handleRoute(msgTypeId, buffer, index, length) &&
-                this.handleRoute(msgTypeId, buffer, index, length);
+        acceptor.handleRouted(msgTypeId, buffer, index, length);
+        handleRouted(msgTypeId, buffer, index, length);
     }
 
-    private boolean handleRoute(
+    private void handleRouted(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
@@ -116,7 +118,6 @@ final class TcpElektron implements Elektron
             countersByRouteId.remove(routeId);
             break;
         }
-        return true;
     }
 
 }
