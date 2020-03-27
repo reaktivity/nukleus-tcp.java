@@ -454,6 +454,7 @@ public class TcpClientFactory implements StreamFactory
                 {
                     key.clear(OP_READ);
                     CloseHelper.close(network::shutdownInput);
+                    counters.closesRead.getAsLong();
 
                     doApplicationEnd(supplyTraceId.getAsLong());
 
@@ -578,11 +579,13 @@ public class TcpClientFactory implements StreamFactory
                 {
                     networkKey.clear(OP_CONNECT);
                     doCloseNetwork(network);
+                    counters.closesWritten.getAsLong();
                 }
                 else
                 {
                     networkKey.clear(OP_WRITE);
                     network.shutdownOutput();
+                    counters.closesWritten.getAsLong();
 
                     if (network.socket().isInputShutdown())
                     {
@@ -768,7 +771,6 @@ public class TcpClientFactory implements StreamFactory
 
             router.setThrottle(replyId, this::onApplication);
             doBegin(application, routeId, replyId, traceId, localAddress, remoteAddress);
-            counters.opensWritten.getAsLong();
             state = TcpState.openingReply(state);
         }
 
@@ -794,7 +796,6 @@ public class TcpClientFactory implements StreamFactory
             long traceId)
         {
             doEnd(application, routeId, replyId, traceId);
-            counters.closesWritten.getAsLong();
             state = TcpState.closeReply(state);
         }
 
@@ -802,7 +803,6 @@ public class TcpClientFactory implements StreamFactory
             long traceId)
         {
             doAbort(application, routeId, replyId, traceId);
-            counters.abortsWritten.getAsLong();
             state = TcpState.closeReply(state);
         }
 
@@ -810,7 +810,6 @@ public class TcpClientFactory implements StreamFactory
             long traceId)
         {
             doReset(application, routeId, initialId, traceId);
-            counters.resetsWritten.getAsLong();
             state = TcpState.closeInitial(state);
         }
 
@@ -845,6 +844,16 @@ public class TcpClientFactory implements StreamFactory
         {
             doApplicationAbortIfNecessary(traceId);
             doApplicationResetIfNecessary(traceId);
+
+            if (!network.socket().isInputShutdown())
+            {
+                counters.resetsRead.getAsLong();
+            }
+
+            if (!network.socket().isOutputShutdown())
+            {
+                counters.abortsWritten.getAsLong();
+            }
 
             doCloseNetwork(network);
 
