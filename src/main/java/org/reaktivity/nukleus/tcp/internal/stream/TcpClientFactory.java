@@ -433,7 +433,7 @@ public class TcpClientFactory implements StreamFactory
 
             counters.resetsRead.getAsLong();
 
-            doApplicationReset(traceId);
+            doApplicationResetIfNecessary(traceId);
         }
 
         private int onNetworkReadable(
@@ -660,7 +660,7 @@ public class TcpClientFactory implements StreamFactory
 
             if (initialBudget < 0)
             {
-                doApplicationReset(traceId);
+                doApplicationResetIfNecessary(traceId);
                 doCleanup(traceId);
             }
             else
@@ -824,7 +824,7 @@ public class TcpClientFactory implements StreamFactory
         private void doApplicationResetIfNecessary(
             long traceId)
         {
-            if (TcpState.initialOpened(state) && !TcpState.initialClosing(state))
+            if (TcpState.initialOpening(state) && !TcpState.initialClosing(state))
             {
                 doApplicationReset(traceId);
             }
