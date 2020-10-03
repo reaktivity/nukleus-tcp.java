@@ -433,7 +433,7 @@ public class TcpClientFactory implements StreamFactory
 
             counters.resetsRead.getAsLong();
 
-            doApplicationResetIfNecessary(traceId);
+            doCleanup(traceId);
         }
 
         private int onNetworkReadable(
