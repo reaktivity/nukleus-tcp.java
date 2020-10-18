@@ -101,6 +101,7 @@ public class TcpServerFactory implements StreamFactory
     private final MutableDirectBuffer readBuffer;
     private final MutableDirectBuffer writeBuffer;
     private final ByteBuffer writeByteBuffer;
+    private final int replyWindowMax;
     private final int windowThreshold;
     private final int tcpTypeId;
 
@@ -134,6 +135,7 @@ public class TcpServerFactory implements StreamFactory
         final int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
+        this.replyWindowMax = bufferPool.slotCapacity();
         this.windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
         this.correlations = new Long2ObjectHashMap<>();
     }
@@ -222,11 +224,14 @@ public class TcpServerFactory implements StreamFactory
         private final PollerKey networkKey;
         private final TcpRouteCounters counters;
 
+        private long initialSeq;
+        private long initialAck;
+        private int initialWindowMax;
         private long initialBudgetId;
-        private int initialBudget;
         private int initialPadding;
 
-        private int replyBudget;
+        private int replySeq;
+        private int replyAck;
 
         private int state;
         private int networkSlot = NO_SLOT;
@@ -264,9 +269,9 @@ public class TcpServerFactory implements StreamFactory
         private int onNetworkReadable(
             PollerKey key)
         {
-            assert initialBudget > initialPadding;
+            assert initialWindowMax > initialPadding;
 
-            final int limit = Math.min(initialBudget - initialPadding, readBuffer.capacity());
+            final int limit = Math.min(initialWindowMax - initialPadding, readBuffer.capacity());
 
             ((Buffer) readByteBuffer).position(0);
             ((Buffer) readByteBuffer).limit(limit);
@@ -374,7 +379,8 @@ public class TcpServerFactory implements StreamFactory
                     }
                     else if (bytesFlushed >= windowThreshold)
                     {
-                        doApplicationWindow(traceId, bytesFlushed);
+                        replyAck += bytesFlushed;
+                        doApplicationWindow(traceId);
                         bytesFlushed = 0;
                     }
                 }
@@ -448,12 +454,11 @@ public class TcpServerFactory implements StreamFactory
             BeginFW begin)
         {
             final long traceId = begin.traceId();
-            final int credit = bufferPool.slotCapacity();
 
             state = TcpState.openReply(state);
             counters.opensRead.getAsLong();
 
-            doApplicationWindow(traceId, credit);
+            doApplicationWindow(traceId);
         }
 
         private void onApplicationData(
@@ -462,9 +467,9 @@ public class TcpServerFactory implements StreamFactory
             final long traceId = data.traceId();
             final int reserved = data.reserved();
 
-            replyBudget -= reserved;
+            replySeq += reserved;
 
-            if (replyBudget < 0)
+            if (replySeq > replyAck + replyWindowMax)
             {
                 doApplicationReset(traceId);
                 doCleanup(traceId, true);
@@ -544,17 +549,24 @@ public class TcpServerFactory implements StreamFactory
         private void onApplicationWindow(
             WindowFW window)
         {
+            final long sequence = window.sequence();
+            final long acknowledge = window.acknowledge();
             final long budgetId = window.budgetId();
-            final int credit = window.credit();
             final int padding = window.padding();
+            final int maximum = window.maximum();
 
+            assert acknowledge <= sequence;
+            assert sequence <= initialSeq;
+            assert maximum >= initialWindowMax;
+
+            initialAck = acknowledge;
+            initialWindowMax = maximum;
             initialBudgetId = budgetId;
-            initialBudget += credit;
             initialPadding = padding;
 
             state = TcpState.openInitial(state);
 
-            if (initialBudget > initialPadding)
+            if (initialSeq + initialPadding < initialAck + initialWindowMax)
             {
                 onNetworkReadable(networkKey);
             }
@@ -563,7 +575,7 @@ public class TcpServerFactory implements StreamFactory
                 networkKey.clear(OP_READ);
             }
 
-            if (initialBudget > initialPadding && !TcpState.initialClosed(state))
+            if (initialSeq + initialPadding < initialAck + initialWindowMax && !TcpState.initialClosed(state))
             {
                 networkKey.register(OP_READ);
                 counters.readops.getAsLong();
@@ -577,7 +589,7 @@ public class TcpServerFactory implements StreamFactory
             final InetSocketAddress remoteAddress = (InetSocketAddress) network.getRemoteAddress();
 
             router.setThrottle(initialId, this::onApplication);
-            doBegin(application, routeId, initialId, traceId, localAddress, remoteAddress);
+            doBegin(application, routeId, initialId, initialSeq, initialAck, traceId, localAddress, remoteAddress);
             counters.opensWritten.getAsLong();
             state = TcpState.openingInitial(state);
         }
@@ -590,11 +602,12 @@ public class TcpServerFactory implements StreamFactory
             final long traceId = supplyTraceId.getAsLong();
             final int reserved = length + initialPadding;
 
-            doData(application, routeId, initialId, traceId, initialBudgetId, reserved, buffer, offset, length);
+            doData(application, routeId, initialId, initialSeq, initialAck, traceId,
+                    initialBudgetId, reserved, buffer, offset, length);
 
-            initialBudget -= reserved;
+            initialSeq += reserved;
 
-            if (initialBudget <= initialPadding)
+            if (initialSeq + initialPadding >= initialAck + initialWindowMax)
             {
                 networkKey.clear(OP_READ);
             }
@@ -603,7 +616,7 @@ public class TcpServerFactory implements StreamFactory
         private void doApplicationEnd(
             long traceId)
         {
-            doEnd(application, routeId, initialId, traceId);
+            doEnd(application, routeId, initialId, initialSeq, initialAck, traceId);
             counters.closesWritten.getAsLong();
             state = TcpState.closeInitial(state);
         }
@@ -611,7 +624,7 @@ public class TcpServerFactory implements StreamFactory
         private void doApplicationAbort(
             long traceId)
         {
-            doAbort(application, routeId, initialId, traceId);
+            doAbort(application, routeId, initialId, initialSeq, initialAck, traceId);
             counters.abortsWritten.getAsLong();
             state = TcpState.closeInitial(state);
         }
@@ -619,17 +632,15 @@ public class TcpServerFactory implements StreamFactory
         private void doApplicationReset(
             long traceId)
         {
-            doReset(application, routeId, replyId, traceId);
+            doReset(application, routeId, replyId, replySeq, replyAck, traceId);
             counters.resetsWritten.getAsLong();
             state = TcpState.closeReply(state);
         }
 
         private void doApplicationWindow(
-            long traceId,
-            int credit)
+            long traceId)
         {
-            replyBudget += credit;
-            doWindow(application, routeId, replyId, traceId, 0, credit, 0);
+            doWindow(application, routeId, replyId, replySeq, replyAck, traceId, 0, replyWindowMax, 0);
         }
 
         private void doApplicationResetIfNecessary(
@@ -704,6 +715,8 @@ public class TcpServerFactory implements StreamFactory
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
         long traceId,
         InetSocketAddress localAddress,
         InetSocketAddress remoteAddress)
@@ -711,6 +724,8 @@ public class TcpServerFactory implements StreamFactory
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
                 .traceId(traceId)
                 .affinity(streamId)
                 .extension(b -> b.set(tcpBeginEx(localAddress, remoteAddress)))
@@ -723,6 +738,8 @@ public class TcpServerFactory implements StreamFactory
         MessageConsumer stream,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
         long traceId,
         long budgetId,
         int reserved,
@@ -733,6 +750,8 @@ public class TcpServerFactory implements StreamFactory
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
                 .traceId(traceId)
                 .budgetId(budgetId)
                 .reserved(reserved)
@@ -746,13 +765,17 @@ public class TcpServerFactory implements StreamFactory
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
         long traceId)
     {
-        final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                               .routeId(routeId)
-                               .streamId(streamId)
-                               .traceId(traceId)
-                               .build();
+        EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+               .routeId(routeId)
+               .streamId(streamId)
+               .sequence(sequence)
+               .acknowledge(acknowledge)
+               .traceId(traceId)
+               .build();
 
         receiver.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
     }
@@ -761,13 +784,17 @@ public class TcpServerFactory implements StreamFactory
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
         long traceId)
     {
-        final AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                                     .routeId(routeId)
-                                     .streamId(streamId)
-                                     .traceId(traceId)
-                                     .build();
+        AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                 .routeId(routeId)
+                 .streamId(streamId)
+                 .sequence(sequence)
+                 .acknowledge(acknowledge)
+                 .traceId(traceId)
+                 .build();
 
         receiver.accept(abort.typeId(), abort.buffer(), abort.offset(), abort.sizeof());
     }
@@ -776,13 +803,17 @@ public class TcpServerFactory implements StreamFactory
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
         long traceId)
     {
-        final ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                                     .routeId(routeId)
-                                     .streamId(streamId)
-                                     .traceId(traceId)
-                                     .build();
+        ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                 .routeId(routeId)
+                 .streamId(streamId)
+                 .sequence(sequence)
+                 .acknowledge(acknowledge)
+                 .traceId(traceId)
+                 .build();
 
         receiver.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
     }
@@ -791,18 +822,22 @@ public class TcpServerFactory implements StreamFactory
         MessageConsumer sender,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
         long traceId,
         int budgetId,
-        int credit,
+        int maximum,
         int padding)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
                 .traceId(traceId)
                 .budgetId(budgetId)
-                .credit(credit)
                 .padding(padding)
+                .maximum(maximum)
                 .build();
 
         sender.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
