@@ -833,7 +833,7 @@ public class TcpClientFactory implements StreamFactory
             final InetSocketAddress remoteAddress = (InetSocketAddress) network.getRemoteAddress();
 
             router.setThrottle(replyId, this::onApplication);
-            doBegin(application, routeId, replyId, replySeq, replyAck, traceId, replyWindowMax, localAddress, remoteAddress);
+            doBegin(application, routeId, replyId, replySeq, replyAck, replyWindowMax, traceId, localAddress, remoteAddress);
             state = TcpState.openingReply(state);
         }
 
@@ -845,7 +845,7 @@ public class TcpClientFactory implements StreamFactory
             final long traceId = supplyTraceId.getAsLong();
             final int reserved = length + replyPadding;
 
-            doData(application, routeId, replyId, replySeq, replyAck, traceId, replyWindowMax, replyBudgetId,
+            doData(application, routeId, replyId, replySeq, replyAck, replyWindowMax, traceId, replyBudgetId,
                     reserved, buffer, offset, length);
 
             replySeq += reserved;
@@ -859,28 +859,28 @@ public class TcpClientFactory implements StreamFactory
         private void doApplicationEnd(
             long traceId)
         {
-            doEnd(application, routeId, replyId, replySeq, replyAck, traceId, replyWindowMax);
+            doEnd(application, routeId, replyId, replySeq, replyAck, replyWindowMax, traceId);
             state = TcpState.closeReply(state);
         }
 
         private void doApplicationAbort(
             long traceId)
         {
-            doAbort(application, routeId, replyId, replySeq, replyAck, traceId, replyWindowMax);
+            doAbort(application, routeId, replyId, replySeq, replyAck, replyWindowMax, traceId);
             state = TcpState.closeReply(state);
         }
 
         private void doApplicationReset(
             long traceId)
         {
-            doReset(application, routeId, initialId, initialSeq, initialAck, traceId, initialWindowMax);
+            doReset(application, routeId, initialId, initialSeq, initialAck, initialWindowMax, traceId);
             state = TcpState.closeInitial(state);
         }
 
         private void doApplicationWindow(
             long traceId)
         {
-            doWindow(application, routeId, initialId, initialSeq, initialAck, traceId, 0, initialWindowMax, 0);
+            doWindow(application, routeId, initialId, initialSeq, initialAck, initialWindowMax, traceId, 0, 0);
         }
 
         private void doApplicationResetIfNecessary(
@@ -929,8 +929,8 @@ public class TcpClientFactory implements StreamFactory
         long streamId,
         long sequence,
         long acknowledge,
-        long traceId,
         int maximum,
+        long traceId,
         InetSocketAddress localAddress,
         InetSocketAddress remoteAddress)
     {
@@ -954,8 +954,8 @@ public class TcpClientFactory implements StreamFactory
         long streamId,
         long sequence,
         long acknowledge,
-        long traceId,
         int maximum,
+        long traceId,
         long budgetId,
         int reserved,
         DirectBuffer payload,
@@ -983,8 +983,8 @@ public class TcpClientFactory implements StreamFactory
         long streamId,
         long sequence,
         long acknowledge,
-        long traceId,
-        int maximum)
+        int maximum,
+        long traceId)
     {
         EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                .routeId(routeId)
@@ -1004,8 +1004,8 @@ public class TcpClientFactory implements StreamFactory
         long streamId,
         long sequence,
         long acknowledge,
-        long traceId,
-        int maximum)
+        int maximum,
+        long traceId)
     {
         AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                  .routeId(routeId)
@@ -1025,8 +1025,8 @@ public class TcpClientFactory implements StreamFactory
         long streamId,
         long sequence,
         long acknowledge,
-        long traceId,
-        int maximum)
+        int maximum,
+        long traceId)
     {
         ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                  .routeId(routeId)
@@ -1046,9 +1046,9 @@ public class TcpClientFactory implements StreamFactory
         long streamId,
         long sequence,
         long acknowledge,
+        int maximum,
         long traceId,
         int budgetId,
-        int maximum,
         int padding)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
