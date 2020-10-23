@@ -115,7 +115,7 @@ public class TcpClientFactory implements StreamFactory
     private final TcpCounters counters;
     private final int windowThreshold;
     private final boolean keepalive;
-    private final int initialWindowMax;
+    private final int initialMax;
 
     public TcpClientFactory(
         TcpConfiguration config,
@@ -143,7 +143,7 @@ public class TcpClientFactory implements StreamFactory
         this.targetToCidrMatch = new HashMap<>();
 
         this.counters = counters;
-        this.initialWindowMax = bufferPool.slotCapacity();
+        this.initialMax = bufferPool.slotCapacity();
         this.windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
         this.keepalive = config.keepalive();
     }
@@ -344,8 +344,8 @@ public class TcpClientFactory implements StreamFactory
         private long replySeq;
         private long replyAck;
         private long replyBudgetId;
-        private int replyWindowMax;
-        private int replyPadding;
+        private int replyMax;
+        private int replyPad;
 
         private long initialSeq;
         private long initialAck;
@@ -444,11 +444,11 @@ public class TcpClientFactory implements StreamFactory
         private int onNetworkReadable(
             PollerKey key)
         {
-            final int replyBudget = (int) Math.max(replyWindowMax - (replySeq - replyAck), 0L);
+            final int replyBudget = (int) Math.max(replyMax - (replySeq - replyAck), 0L);
 
-            assert replyBudget > replyPadding;
+            assert replyBudget > replyPad;
 
-            final int limit = Math.min(replyBudget - replyPadding, readBuffer.capacity());
+            final int limit = Math.min(replyBudget - replyPad, readBuffer.capacity());
 
             ((Buffer) readByteBuffer).position(0);
             ((Buffer) readByteBuffer).limit(limit);
@@ -685,7 +685,7 @@ public class TcpClientFactory implements StreamFactory
 
             assert initialAck <= initialSeq;
 
-            if (initialSeq > initialAck + initialWindowMax)
+            if (initialSeq > initialAck + initialMax)
             {
                 doApplicationResetIfNecessary(traceId);
                 doCleanup(traceId);
@@ -799,18 +799,18 @@ public class TcpClientFactory implements StreamFactory
 
             assert acknowledge <= sequence;
             assert acknowledge >= replyAck;
-            assert maximum >= replyWindowMax;
+            assert maximum >= replyMax;
 
             replyAck = acknowledge;
-            replyWindowMax = maximum;
+            replyMax = maximum;
             replyBudgetId = budgetId;
-            replyPadding = padding;
+            replyPad = padding;
 
             assert replyAck <= replySeq;
 
             state = TcpState.openReply(state);
 
-            if (replySeq + replyPadding < replyAck + replyWindowMax)
+            if (replySeq + replyPad < replyAck + replyMax)
             {
                 onNetworkReadable(networkKey);
             }
@@ -819,7 +819,7 @@ public class TcpClientFactory implements StreamFactory
                 networkKey.clear(OP_READ);
             }
 
-            if (replySeq + replyPadding < replyAck + replyWindowMax && !TcpState.replyClosed(state))
+            if (replySeq + replyPad < replyAck + replyMax && !TcpState.replyClosed(state))
             {
                 networkKey.register(OP_READ);
                 counters.readops.getAsLong();
@@ -833,7 +833,7 @@ public class TcpClientFactory implements StreamFactory
             final InetSocketAddress remoteAddress = (InetSocketAddress) network.getRemoteAddress();
 
             router.setThrottle(replyId, this::onApplication);
-            doBegin(application, routeId, replyId, replySeq, replyAck, replyWindowMax, traceId, localAddress, remoteAddress);
+            doBegin(application, routeId, replyId, replySeq, replyAck, replyMax, traceId, localAddress, remoteAddress);
             state = TcpState.openingReply(state);
         }
 
@@ -843,14 +843,14 @@ public class TcpClientFactory implements StreamFactory
             int length)
         {
             final long traceId = supplyTraceId.getAsLong();
-            final int reserved = length + replyPadding;
+            final int reserved = length + replyPad;
 
-            doData(application, routeId, replyId, replySeq, replyAck, replyWindowMax, traceId, replyBudgetId,
+            doData(application, routeId, replyId, replySeq, replyAck, replyMax, traceId, replyBudgetId,
                     reserved, buffer, offset, length);
 
             replySeq += reserved;
 
-            if (replySeq + replyPadding >= replyAck + replyWindowMax)
+            if (replySeq + replyPad >= replyAck + replyMax)
             {
                 networkKey.clear(OP_READ);
             }
@@ -859,28 +859,28 @@ public class TcpClientFactory implements StreamFactory
         private void doApplicationEnd(
             long traceId)
         {
-            doEnd(application, routeId, replyId, replySeq, replyAck, replyWindowMax, traceId);
+            doEnd(application, routeId, replyId, replySeq, replyAck, replyMax, traceId);
             state = TcpState.closeReply(state);
         }
 
         private void doApplicationAbort(
             long traceId)
         {
-            doAbort(application, routeId, replyId, replySeq, replyAck, replyWindowMax, traceId);
+            doAbort(application, routeId, replyId, replySeq, replyAck, replyMax, traceId);
             state = TcpState.closeReply(state);
         }
 
         private void doApplicationReset(
             long traceId)
         {
-            doReset(application, routeId, initialId, initialSeq, initialAck, initialWindowMax, traceId);
+            doReset(application, routeId, initialId, initialSeq, initialAck, initialMax, traceId);
             state = TcpState.closeInitial(state);
         }
 
         private void doApplicationWindow(
             long traceId)
         {
-            doWindow(application, routeId, initialId, initialSeq, initialAck, initialWindowMax, traceId, 0, 0);
+            doWindow(application, routeId, initialId, initialSeq, initialAck, initialMax, traceId, 0, 0);
         }
 
         private void doApplicationResetIfNecessary(
