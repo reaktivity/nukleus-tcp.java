@@ -13,11 +13,12 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
+package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
@@ -30,17 +31,15 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-/**
- * Tests the TCP nukleus when acting as a client.
- */
-public class ClientRouteCountersIT
+public class ServerRouteCountersIT
 {
-    private static final long CLIENT_ROUTE_ID = 0x0002000310000001L;
+    private static final long SERVER_ROUTE_ID = 0x0003000200000001L;
 
     private final K3poRule k3po = new K3poRule()
+            .addScriptRoot("control", "org/reaktivity/specification/nukleus/tcp/control")
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
-            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
+            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
+            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -59,15 +58,18 @@ public class ClientRouteCountersIT
 
     @Test
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.and.server.sent.data.multiple.frames/client",
-        "${server}/client.and.server.sent.data.multiple.frames/server"
+        "${route}/server/controller",
+        "${server}/client.and.server.sent.data.multiple.frames/server",
+        "${client}/client.and.server.sent.data.multiple.frames/client"
     })
     public void shouldSendAndReceiveData() throws Exception
     {
         k3po.finish();
 
-        assertThat(reaktor.bytesWritten("tcp", CLIENT_ROUTE_ID), equalTo(26L));
-        assertThat(reaktor.bytesRead("tcp", CLIENT_ROUTE_ID), equalTo(26L));
+        assertThat(reaktor.bytesWritten("tcp", SERVER_ROUTE_ID), equalTo(26L));
+        assertThat(reaktor.bytesRead("tcp", SERVER_ROUTE_ID), equalTo(26L));
+        assertThat(reaktor.framesWritten("tcp", SERVER_ROUTE_ID), greaterThanOrEqualTo(1L));
+        assertThat(reaktor.framesRead("tcp", SERVER_ROUTE_ID), greaterThanOrEqualTo(1L));
     }
+
 }

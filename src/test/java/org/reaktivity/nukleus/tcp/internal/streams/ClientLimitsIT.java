@@ -13,15 +13,17 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
+package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.reaktor.ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
-import java.net.StandardSocketOptions;
+import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
@@ -35,12 +37,11 @@ import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-public class ClientIOExceptionFromReadIT
+public class ClientLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
-            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -50,6 +51,7 @@ public class ClientIOExceptionFromReadIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(4096)
+        .configure(REAKTOR_BUFFER_SLOT_CAPACITY, 16)
         .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
@@ -61,9 +63,9 @@ public class ClientIOExceptionFromReadIT
     @Test
     @Specification({
         "${route}/client.host/controller",
-        "${client}/client.received.reset.and.abort/client"
+        "${client}/client.sent.data.received.reset/client"
     })
-    public void shouldReportIOExceptionFromReadAsAbortAndReset() throws Exception
+    public void shouldResetWhenWindowExceeded() throws Exception
     {
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
@@ -75,37 +77,12 @@ public class ClientIOExceptionFromReadIT
 
             try (SocketChannel channel = server.accept())
             {
-                k3po.awaitBarrier("CONNECTED");
+                int len;
+                ByteBuffer buf = ByteBuffer.allocate(256);
 
-                channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-                channel.close();
+                len = channel.read(buf);
 
-                k3po.finish();
-            }
-        }
-    }
-
-    @Test
-    @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.received.abort.sent.end/client"
-    })
-    public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
-    {
-        try (ServerSocketChannel server = ServerSocketChannel.open())
-        {
-            server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
-
-            k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
-
-            try (SocketChannel channel = server.accept())
-            {
-                k3po.awaitBarrier("CONNECTED");
-
-                channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-                channel.close();
+                assertEquals(-1, len);
 
                 k3po.finish();
             }

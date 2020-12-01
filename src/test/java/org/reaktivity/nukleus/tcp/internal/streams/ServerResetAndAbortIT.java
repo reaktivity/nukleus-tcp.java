@@ -13,17 +13,16 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
+package org.reaktivity.nukleus.tcp.internal.streams;
 
-import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.CountDownLatch;
 
@@ -41,13 +40,16 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.CountDownHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
+/**
+ * Tests use of the nukleus as an HTTP server.
+ */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
-public class ClientResetAndAbortIT
+public class ServerResetAndAbortIT
 {
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
-            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
+            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
+            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -56,7 +58,7 @@ public class ClientResetAndAbortIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(4096)
+        .counterValuesBufferCapacity(8192)
         .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
@@ -68,149 +70,137 @@ public class ClientResetAndAbortIT
 
     @Test
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.sent.abort/client"
+        "${route}/server/controller",
+        "${server}/server.sent.abort/server"
     })
-    public void shouldShutdownOutputWhenClientSendsAbort() throws Exception
+    public void shouldShutdownOutputWhenServerSendsAbort() throws Exception
     {
-        try (ServerSocketChannel server = ServerSocketChannel.open())
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_SERVER");
+
+        try (SocketChannel channel = SocketChannel.open())
         {
-            server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
-
-            try (SocketChannel channel = server.accept())
-            {
-                ByteBuffer buf = ByteBuffer.allocate(20);
-                int len = channel.read(buf);
-                assertEquals(-1, len);
-            }
-            finally
-            {
-                k3po.finish();
-            }
+            ByteBuffer buf = ByteBuffer.allocate(20);
+            int len = channel.read(buf);
+            assertEquals(-1, len);
+        }
+        finally
+        {
+            k3po.finish();
         }
     }
 
     @Test
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.sent.abort.and.reset/client"
+        "${route}/server/controller",
+        "${server}/server.sent.abort.and.reset/server"
     })
     @BMRule(name = "shutdownInput",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "shutdownInput()",
         helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-        condition = "callerEquals(\"TcpClientFactory$TcpClient.onApplicationReset\", true, 2)",
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onAppReset\", true, 2)",
         action = "countDown()"
     )
-    public void shouldShutdownOutputAndInputWhenClientSendsAbortAndReset() throws Exception
+    public void shouldShutdownOutputAndInputWhenServerSendsAbortAndReset() throws Exception
     {
         CountDownLatch shutdownInputCalled = new CountDownLatch(1);
         CountDownHelper.initialize(shutdownInputCalled);
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_SERVER");
 
-        try (ServerSocketChannel server = ServerSocketChannel.open())
+        try (SocketChannel channel = SocketChannel.open())
         {
-            server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
-
-            try (SocketChannel channel = server.accept())
-            {
-                ByteBuffer buf = ByteBuffer.allocate(20);
-                int len = channel.read(buf);
-                assertEquals(-1, len);
-                shutdownInputCalled.await();
-            }
-            finally
-            {
-                k3po.finish();
-            }
+            ByteBuffer buf = ByteBuffer.allocate(20);
+            int len = channel.read(buf);
+            assertEquals(-1, len);
+            shutdownInputCalled.await();
+        }
+        finally
+        {
+            k3po.finish();
         }
     }
 
     @Test
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.sent.reset/client"
+        "${route}/server/controller",
+        "${server}/server.sent.reset/server"
     })
     @BMRule(name = "shutdownInput",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "shutdownInput()",
         helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-        condition = "callerEquals(\"TcpClientFactory$TcpClient.onApplicationReset\", true, 2)",
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onAppReset\", true, 2)",
         action = "countDown()"
     )
-    public void shouldShutdownInputWhenClientSendsReset() throws Exception
+    public void shouldShutdownInputWhenServerSendsReset() throws Exception
     {
         CountDownLatch shutdownInputCalled = new CountDownLatch(1);
         CountDownHelper.initialize(shutdownInputCalled);
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_SERVER");
 
-        try (ServerSocketChannel server = ServerSocketChannel.open())
+        try (SocketChannel channel = SocketChannel.open())
         {
-            server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
+            channel.configureBlocking(false);
 
-            try (SocketChannel channel = server.accept())
+            channel.write(ByteBuffer.wrap("some data".getBytes()));
+
+            try
             {
-                channel.configureBlocking(false);
-
-                channel.write(ByteBuffer.wrap("some data".getBytes()));
-
                 k3po.awaitBarrier("READ_ABORTED");
-
                 shutdownInputCalled.await();
             }
-            finally
+            catch (IOException e)
             {
-                k3po.finish();
+                throw e;
             }
+        }
+        finally
+        {
+            k3po.finish();
         }
     }
 
     @Test
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.sent.reset.and.end/client"
+        "${route}/server/controller",
+        "${server}/server.sent.reset.and.end/server"
     })
     @BMRule(name = "shutdownInput",
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "shutdownInput()",
         helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-        condition = "callerEquals(\"TcpClientFactory$TcpClient.onApplicationReset\", true, 2)",
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onAppReset\", true, 2)",
         action = "countDown()"
     )
-    public void shouldShutdownOutputAndInputWhenClientSendsResetAndEnd() throws Exception
+    public void shouldShutdownOutputAndInputWhenServerSendsResetAndEnd() throws Exception
     {
         CountDownLatch shutdownInputCalled = new CountDownLatch(1);
         CountDownHelper.initialize(shutdownInputCalled);
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_SERVER");
 
-        try (ServerSocketChannel server = ServerSocketChannel.open())
+        try (SocketChannel channel = SocketChannel.open())
         {
-            server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
-
-            try (SocketChannel channel = server.accept())
-            {
-                ByteBuffer buf = ByteBuffer.allocate(20);
-                int len = channel.read(buf);
-                assertEquals(-1, len);
-                shutdownInputCalled.await();
-            }
-            finally
-            {
-                k3po.finish();
-            }
+            ByteBuffer buf = ByteBuffer.allocate(20);
+            int len = channel.read(buf);
+            assertEquals(-1, len);
+            shutdownInputCalled.await();
+        }
+        finally
+        {
+            k3po.finish();
         }
     }
+
 }
