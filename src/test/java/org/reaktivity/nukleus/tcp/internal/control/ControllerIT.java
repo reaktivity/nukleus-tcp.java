@@ -60,7 +60,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .route(RouteKind.SERVER, "tcp#0.0.0.0:8080", "target#0")
+               .route(RouteKind.SERVER, "tcp#0.0.0.0:8080", "app#0")
                .get();
 
         k3po.finish();
@@ -75,7 +75,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .route(RouteKind.CLIENT, "tcp#0", "127.0.0.1:8080")
+               .route(RouteKind.CLIENT, "app#0", "127.0.0.1:8080")
                .get();
 
         k3po.finish();
@@ -90,7 +90,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .route(RouteKind.CLIENT, "tcp#0", "localhost:8080")
+               .route(RouteKind.CLIENT, "app#0", "localhost:8080")
                .get();
 
         k3po.finish();
@@ -105,7 +105,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .route(RouteKind.CLIENT, "tcp#0", "127.0.0.1/24:8080")
+               .route(RouteKind.CLIENT, "app#0", "127.0.0.1/24:8080")
                .get();
 
         k3po.finish();
@@ -130,7 +130,7 @@ public class ControllerIT
 
     @Test
     @Specification({
-        "${unroute}/client.host/nukleus"
+        "${unroute}/client/nukleus"
     })
     public void shouldUnrouteClient() throws Exception
     {

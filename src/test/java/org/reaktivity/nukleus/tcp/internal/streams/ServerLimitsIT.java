@@ -55,7 +55,7 @@ public class ServerLimitsIT
         .counterValuesBufferCapacity(8192)
         // Initial window size for output to network:
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
-        .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
+        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
     @Rule

@@ -57,7 +57,7 @@ public class ServerIT
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
         .configure(TCP_MAX_CONNECTIONS, 3)
-        .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
+        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -404,13 +404,12 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/client.and.server/controller",
+        "${route}/server/controller",
         "${server}/max.connections/server"
     })
     public void shouldUnbindRebind() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_CLIENT");
         k3po.awaitBarrier("ROUTED_SERVER");
 
         SocketChannel channel1 = SocketChannel.open();
