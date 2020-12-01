@@ -13,8 +13,9 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
+package org.reaktivity.nukleus.tcp.internal.streams;
 
+import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.IntStream.concat;
@@ -27,6 +28,7 @@ import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,12 +56,12 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 @BMUnitConfig(loadDirectory = "src/test/resources")
 @BMScript(value = "SocketChannelHelper.btm")
-public class ServerPartialWriteLimitsIT
+public class ClientPartialWriteLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("client", "org/reaktivity/specification/tcp/rfc793")
-        .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
+        .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
+        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -68,10 +70,8 @@ public class ServerPartialWriteLimitsIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(8192)
-        // Initial window size for output to network:
+        .counterValuesBufferCapacity(4096)
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
-        // Overall buffer pool size same as slot size so maximum concurrent streams with partial writes = 1
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_POOL_CAPACITY, 16)
         .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
         .clean();
@@ -84,9 +84,9 @@ public class ServerPartialWriteLimitsIT
 
     @Test
     @Specification({
-        "${route}/server/controller",
-        "${server}/server.sent.data.multiple.frames/server",
-        "${client}/server.sent.data.multiple.frames/client"
+        "${route}/client.host/controller",
+        "${client}/client.sent.data.multiple.frames/client",
+        "${server}/client.sent.data.multiple.frames/server"
     })
     public void shouldWriteWhenMoreDataArrivesWhileAwaitingSocketWritableWithoutOverflowingSlot() throws Exception
     {
@@ -102,8 +102,8 @@ public class ServerPartialWriteLimitsIT
 
     @Test
     @Specification({
-        "${route}/server/controller",
-        "${server}/server.sent.data.multiple.streams.second.was.reset/server"
+        "${route}/client.host/controller",
+        "${client}/client.sent.data.multiple.streams.second.was.reset/client"
     })
     public void shouldResetStreamsExceedingPartialWriteStreamsLimit() throws Exception
     {
@@ -111,50 +111,48 @@ public class ServerPartialWriteLimitsIT
         AtomicBoolean resetReceived = new AtomicBoolean(false);
         HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? ALL : 0));
 
-        k3po.start();
-        k3po.awaitBarrier("ROUTED_SERVER");
-
-        try (SocketChannel channel1 = SocketChannel.open();
-             SocketChannel channel2 = SocketChannel.open())
+        try (ServerSocketChannel server = ServerSocketChannel.open())
         {
-            channel1.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-            channel2.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.setOption(SO_REUSEADDR, true);
+            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-            k3po.awaitBarrier("SECOND_STREAM_RESET_RECEIVED");
-            resetReceived.set(true);
+            k3po.start();
+            k3po.awaitBarrier("ROUTED_CLIENT");
 
-            ByteBuffer buf = ByteBuffer.allocate(256);
-            while (buf.position() < 13)
+            try (SocketChannel channel1 = server.accept();
+                 SocketChannel channel2 = server.accept())
             {
-                int len = channel1.read(buf);
-                if (len == -1)
+                k3po.awaitBarrier("CLIENT_TWO_RESET_RECEIVED");
+                resetReceived.set(true);
+
+                ByteBuffer buf = ByteBuffer.allocate(256);
+                while (buf.position() < 13)
                 {
-                    break;
+                    int len = channel1.read(buf);
+                    assert len != -1;
                 }
-            }
-            buf.flip();
+                buf.flip();
+                assertEquals("client data 1", UTF_8.decode(buf).toString());
 
-            assertEquals("server data 1", UTF_8.decode(buf).toString());
-
-            int len = 0;
-            buf.rewind();
-            while (buf.position() < 13)
-            {
-                len = channel2.read(buf);
-                if (len == -1)
+                buf.rewind();
+                int len = 0;
+                while (buf.position() < 13)
                 {
-                    break;
+                    len = channel2.read(buf);
+                    if (len == -1)
+                    {
+                        break;
+                    }
                 }
+                buf.flip();
+
+                assertEquals(0, buf.remaining());
+                assertEquals(-1, len);
+
+                k3po.finish();
             }
-            buf.flip();
-
-            assertEquals(0, buf.remaining());
-            assertEquals(-1, len);
-
-            k3po.finish();
         }
 
         assertEquals(1, counters.overflows());
     }
 }
-
