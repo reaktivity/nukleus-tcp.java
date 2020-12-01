@@ -76,22 +76,6 @@ public final class TcpController implements Controller
         return TcpNukleus.NAME;
     }
 
-    @Deprecated
-    public CompletableFuture<Long> routeServer(
-        String localAddress,
-        String remoteAddress)
-    {
-        return route(RouteKind.SERVER, localAddress, remoteAddress);
-    }
-
-    @Deprecated
-    public CompletableFuture<Long> routeClient(
-        String localAddress,
-        String remoteAddress)
-    {
-        return route(RouteKind.CLIENT, localAddress, remoteAddress);
-    }
-
     public CompletableFuture<Long> route(
         RouteKind kind,
         String localAddress,

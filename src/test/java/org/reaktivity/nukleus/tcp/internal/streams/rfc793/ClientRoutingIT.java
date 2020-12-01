@@ -36,8 +36,8 @@ public class ClientRoutingIT
 {
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/tcp/routing")
-            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/routing");
+            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/routing")
+            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/routing");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 

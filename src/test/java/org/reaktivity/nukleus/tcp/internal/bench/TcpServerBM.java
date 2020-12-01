@@ -46,6 +46,7 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.reaktivity.nukleus.Configuration;
+import org.reaktivity.nukleus.route.RouteKind;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.reaktor.Reaktor;
 
@@ -83,7 +84,7 @@ public class TcpServerBM
     public void reinit() throws Exception
     {
         reaktor.start();
-        routeId = controller.routeServer("127.0.0.1:8080", "tcp#0").get();
+        routeId = controller.route(RouteKind.SERVER, "127.0.0.1:8080", "tcp#0").get();
     }
 
     @TearDown(Level.Trial)

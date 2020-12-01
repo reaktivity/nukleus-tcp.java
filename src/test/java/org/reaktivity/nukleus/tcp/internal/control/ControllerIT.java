@@ -28,6 +28,7 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.ScriptProperty;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.route.RouteKind;
 import org.reaktivity.nukleus.tcp.internal.TcpController;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
@@ -59,7 +60,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .routeServer("tcp#0.0.0.0:8080", "target#0")
+               .route(RouteKind.SERVER, "tcp#0.0.0.0:8080", "target#0")
                .get();
 
         k3po.finish();
@@ -74,7 +75,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-               .routeClient("tcp#0", "127.0.0.1:8080")
+               .route(RouteKind.CLIENT, "tcp#0", "127.0.0.1:8080")
                .get();
 
         k3po.finish();
@@ -89,8 +90,8 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-                .routeClient("tcp#0", "localhost:8080")
-                .get();
+               .route(RouteKind.CLIENT, "tcp#0", "localhost:8080")
+               .get();
 
         k3po.finish();
     }
@@ -104,8 +105,8 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(TcpController.class)
-                .routeClient("tcp#0", "127.0.0.1/24:8080")
-                .get();
+               .route(RouteKind.CLIENT, "tcp#0", "127.0.0.1/24:8080")
+               .get();
 
         k3po.finish();
     }

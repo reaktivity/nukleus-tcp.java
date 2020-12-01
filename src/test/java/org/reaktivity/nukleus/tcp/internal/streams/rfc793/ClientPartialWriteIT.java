@@ -57,8 +57,8 @@ public class ClientPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
-        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
+        .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
+        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 
