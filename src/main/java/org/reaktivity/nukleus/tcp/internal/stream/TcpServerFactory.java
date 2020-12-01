@@ -183,11 +183,11 @@ public class TcpServerFactory implements StreamFactory
             final TcpServer server = new TcpServer(routeId, network);
             correlations.put(server.replyId, server);
 
-            server.onNetworkAccepted();
+            server.onNetAccepted();
         }
         else
         {
-            doCloseNetwork(network);
+            closeNet(network);
         }
     }
 
@@ -201,13 +201,13 @@ public class TcpServerFactory implements StreamFactory
         MessageConsumer newStream = null;
         if (server != null)
         {
-            newStream = server::onApplication;
+            newStream = server::onAppMessage;
         }
 
         return newStream;
     }
 
-    private void doCloseNetwork(
+    private void closeNet(
         SocketChannel network)
     {
         CloseHelper.quietClose(network);
@@ -219,9 +219,9 @@ public class TcpServerFactory implements StreamFactory
         private final long routeId;
         private final long initialId;
         private final long replyId;
-        private final MessageConsumer application;
-        private final SocketChannel network;
-        private final PollerKey networkKey;
+        private final MessageConsumer app;
+        private final SocketChannel net;
+        private final PollerKey key;
         private final TcpRouteCounters counters;
 
         private long initialSeq;
@@ -234,39 +234,39 @@ public class TcpServerFactory implements StreamFactory
         private long replyAck;
 
         private int state;
-        private int networkSlot = NO_SLOT;
-        private int networkSlotOffset;
+        private int writeSlot = NO_SLOT;
+        private int writeSlotOffset;
         private int bytesFlushed;
 
         private TcpServer(
             long routeId,
-            SocketChannel network)
+            SocketChannel net)
         {
             this.routeId = routeId;
             this.initialId = supplyInitialId.applyAsLong(routeId);
             this.replyId = supplyReplyId.applyAsLong(initialId);
-            this.application = router.supplyReceiver(initialId);
-            this.network = network;
-            this.networkKey = poller.doRegister(network, 0, null);
+            this.app = router.supplyReceiver(initialId);
+            this.net = net;
+            this.key = poller.doRegister(net, 0, null);
             this.counters = TcpServerFactory.this.counters.supplyRoute(routeId);
         }
 
-        private void onNetworkAccepted()
+        private void onNetAccepted()
         {
             try
             {
-                networkKey.handler(OP_READ, this::onNetworkReadable);
-                networkKey.handler(OP_WRITE, this::onNetworkWritable);
+                key.handler(OP_READ, this::onNetReadable);
+                key.handler(OP_WRITE, this::onNetWritable);
 
-                doApplicationBegin();
+                doAppBegin();
             }
             catch (IOException ex)
             {
-                doCleanup(supplyTraceId.getAsLong());
+                cleanup(supplyTraceId.getAsLong());
             }
         }
 
-        private int onNetworkReadable(
+        private int onNetReadable(
             PollerKey key)
         {
             assert initialMax > initialPad;
@@ -278,56 +278,56 @@ public class TcpServerFactory implements StreamFactory
 
             try
             {
-                final int bytesRead = network.read(readByteBuffer);
+                final int bytesRead = net.read(readByteBuffer);
 
                 if (bytesRead == -1)
                 {
                     key.clear(OP_READ);
-                    CloseHelper.close(network::shutdownInput);
+                    CloseHelper.close(net::shutdownInput);
 
-                    doApplicationEnd(supplyTraceId.getAsLong());
+                    doAppEnd(supplyTraceId.getAsLong());
 
-                    if (network.socket().isOutputShutdown())
+                    if (net.socket().isOutputShutdown())
                     {
-                        doCloseNetwork(network);
+                        closeNet(net);
                     }
                 }
                 else if (bytesRead != 0)
                 {
-                    doApplicationData(readBuffer, 0, bytesRead);
+                    doAppData(readBuffer, 0, bytesRead);
                 }
             }
             catch (IOException ex)
             {
-                doCleanup(supplyTraceId.getAsLong());
+                cleanup(supplyTraceId.getAsLong());
             }
 
             return 1;
         }
 
-        private int onNetworkWritable(
+        private int onNetWritable(
             PollerKey key)
         {
-            if (networkSlot == NO_SLOT)
+            if (writeSlot == NO_SLOT)
             {
                 counters.writeopsNoSlot.getAsLong();
-                assert key == networkKey;
+                assert key == this.key;
                 return 0;
             }
             else
             {
-                assert networkSlot != NO_SLOT;
+                assert writeSlot != NO_SLOT;
 
                 long traceId = supplyTraceId.getAsLong();
-                DirectBuffer buffer = bufferPool.buffer(networkSlot);
-                ByteBuffer byteBuffer = bufferPool.byteBuffer(networkSlot);
-                byteBuffer.limit(byteBuffer.position() + networkSlotOffset);
+                DirectBuffer buffer = bufferPool.buffer(writeSlot);
+                ByteBuffer byteBuffer = bufferPool.byteBuffer(writeSlot);
+                byteBuffer.limit(byteBuffer.position() + writeSlotOffset);
 
-                return doNetworkWrite(buffer, 0, networkSlotOffset, byteBuffer, traceId);
+                return doNetWrite(buffer, 0, writeSlotOffset, byteBuffer, traceId);
             }
         }
 
-        private int doNetworkWrite(
+        private int doNetWrite(
             DirectBuffer buffer,
             int offset,
             int length,
@@ -340,82 +340,82 @@ public class TcpServerFactory implements StreamFactory
             {
                 for (int i = WRITE_SPIN_COUNT; bytesWritten == 0 && i > 0; i--)
                 {
-                    bytesWritten = network.write(byteBuffer);
+                    bytesWritten = net.write(byteBuffer);
                 }
 
                 bytesFlushed += bytesWritten;
 
                 if (bytesWritten < length)
                 {
-                    if (networkSlot == NO_SLOT)
+                    if (writeSlot == NO_SLOT)
                     {
-                        networkSlot = bufferPool.acquire(replyId);
+                        writeSlot = bufferPool.acquire(replyId);
                     }
 
-                    if (networkSlot == NO_SLOT)
+                    if (writeSlot == NO_SLOT)
                     {
                         counters.overflows.getAsLong();
-                        doApplicationResetIfNecessary(traceId);
-                        doCleanup(traceId);
+                        doAppReset(traceId);
+                        cleanup(traceId);
                     }
                     else
                     {
-                        final MutableDirectBuffer slotBuffer = bufferPool.buffer(networkSlot);
+                        final MutableDirectBuffer slotBuffer = bufferPool.buffer(writeSlot);
                         slotBuffer.putBytes(0, buffer, offset + bytesWritten, length - bytesWritten);
-                        networkSlotOffset = length - bytesWritten;
+                        writeSlotOffset = length - bytesWritten;
 
-                        networkKey.register(OP_WRITE);
+                        key.register(OP_WRITE);
                         counters.writeops.getAsLong();
                     }
                 }
                 else
                 {
-                    cleanupNetworkSlotIfNecessary();
-                    networkKey.clear(OP_WRITE);
+                    cleanupWriteSlot();
+                    key.clear(OP_WRITE);
 
                     if (TcpState.replyClosing(state))
                     {
-                        doNetworkShutdownOutput(traceId);
+                        doNetShutdownOutput(traceId);
                     }
                     else if (bytesFlushed >= windowThreshold)
                     {
                         replyAck += bytesFlushed;
-                        doApplicationWindow(traceId);
+                        doAppWindow(traceId);
                         bytesFlushed = 0;
                     }
                 }
             }
             catch (IOException ex)
             {
-                doCleanup(traceId);
+                cleanup(traceId);
             }
 
             return bytesWritten;
         }
 
-        private void doNetworkShutdownOutput(
+        private void doNetShutdownOutput(
             long traceId)
         {
-            cleanupNetworkSlotIfNecessary();
+            cleanupWriteSlot();
 
             try
             {
-                networkKey.clear(OP_WRITE);
-                network.shutdownOutput();
+                key.clear(OP_WRITE);
+                net.shutdownOutput();
                 state = TcpState.closeReply(state);
 
-                if (network.socket().isInputShutdown())
+                if (net.socket().isInputShutdown())
                 {
-                    doCloseNetwork(network);
+                    closeNet(net);
                 }
             }
             catch (IOException ex)
             {
-                doCleanup(traceId);
+                cleanup(traceId);
             }
         }
 
-        private void onApplication(
+        private void onAppMessage(
             int msgTypeId,
             DirectBuffer buffer,
             int index,
@@ -425,32 +425,32 @@ public class TcpServerFactory implements StreamFactory
             {
             case BeginFW.TYPE_ID:
                 final BeginFW begin = beginRO.wrap(buffer, index, index + length);
-                onApplicationBegin(begin);
+                onAppBegin(begin);
                 break;
             case DataFW.TYPE_ID:
                 final DataFW data = dataRO.wrap(buffer, index, index + length);
-                onApplicationData(data);
+                onAppData(data);
                 break;
             case EndFW.TYPE_ID:
                 final EndFW end = endRO.wrap(buffer, index, index + length);
-                onApplicationEnd(end);
+                onAppEnd(end);
                 break;
             case AbortFW.TYPE_ID:
                 final AbortFW abort = abortRO.wrap(buffer, index, index + length);
-                onApplicationAbort(abort);
+                onAppAbort(abort);
                 break;
             case ResetFW.TYPE_ID:
                 final ResetFW reset = resetRO.wrap(buffer, index, index + length);
-                onApplicationReset(reset);
+                onAppReset(reset);
                 break;
             case WindowFW.TYPE_ID:
                 final WindowFW window = windowRO.wrap(buffer, index, index + length);
-                onApplicationWindow(window);
+                onAppWindow(window);
                 break;
             }
         }
 
-        private void onApplicationBegin(
+        private void onAppBegin(
             BeginFW begin)
         {
             final long sequence = begin.sequence();
@@ -469,10 +469,10 @@ public class TcpServerFactory implements StreamFactory
             state = TcpState.openReply(state);
             counters.opensRead.getAsLong();
 
-            doApplicationWindow(traceId);
+            doAppWindow(traceId);
         }
 
-        private void onApplicationData(
+        private void onAppData(
             DataFW data)
         {
             final long sequence = data.sequence();
@@ -490,8 +490,8 @@ public class TcpServerFactory implements StreamFactory
 
             if (replySeq > replyAck + replyMax)
             {
-                doApplicationReset(traceId);
-                doCleanup(traceId, true);
+                doAppReset(traceId);
+                cleanup(traceId, true);
             }
             else
             {
@@ -506,18 +506,18 @@ public class TcpServerFactory implements StreamFactory
 
                 ByteBuffer byteBuffer;
 
-                if (networkSlot != NO_SLOT)
+                if (writeSlot != NO_SLOT)
                 {
-                    final MutableDirectBuffer slotBuffer = bufferPool.buffer(networkSlot);
-                    slotBuffer.putBytes(networkSlotOffset, buffer, offset, length);
-                    networkSlotOffset += length;
+                    final MutableDirectBuffer slotBuffer = bufferPool.buffer(writeSlot);
+                    slotBuffer.putBytes(writeSlotOffset, buffer, offset, length);
+                    writeSlotOffset += length;
 
-                    final ByteBuffer slotByteBuffer = bufferPool.byteBuffer(networkSlot);
-                    slotByteBuffer.limit(slotByteBuffer.position() + networkSlotOffset);
+                    final ByteBuffer slotByteBuffer = bufferPool.byteBuffer(writeSlot);
+                    slotByteBuffer.limit(slotByteBuffer.position() + writeSlotOffset);
 
                     buffer = slotBuffer;
                     offset = 0;
-                    length = networkSlotOffset;
+                    length = writeSlotOffset;
                     byteBuffer = slotByteBuffer;
                 }
                 else
@@ -528,11 +528,11 @@ public class TcpServerFactory implements StreamFactory
                     byteBuffer = writeByteBuffer;
                 }
 
-                doNetworkWrite(buffer, offset, length, byteBuffer, traceId);
+                doNetWrite(buffer, offset, length, byteBuffer, traceId);
             }
         }
 
-        private void onApplicationEnd(
+        private void onAppEnd(
             EndFW end)
         {
             final long sequence = end.sequence();
@@ -549,13 +549,13 @@ public class TcpServerFactory implements StreamFactory
 
             state = TcpState.closingReply(state);
 
-            if (networkSlot == NO_SLOT)
+            if (writeSlot == NO_SLOT)
             {
-                doNetworkShutdownOutput(traceId);
+                doNetShutdownOutput(traceId);
             }
         }
 
-        private void onApplicationAbort(
+        private void onAppAbort(
             AbortFW abort)
         {
             final long sequence = abort.sequence();
@@ -570,10 +570,10 @@ public class TcpServerFactory implements StreamFactory
 
             assert replyAck <= replySeq;
 
-            doNetworkShutdownOutput(traceId);
+            doNetShutdownOutput(traceId);
         }
 
-        private void onApplicationReset(
+        private void onAppReset(
             ResetFW reset)
         {
             final long sequence = reset.sequence();
@@ -589,14 +589,14 @@ public class TcpServerFactory implements StreamFactory
             assert initialAck <= initialSeq;
 
             state = TcpState.closeInitial(state);
-            CloseHelper.quietClose(network::shutdownInput);
+            CloseHelper.quietClose(net::shutdownInput);
 
             final boolean abortiveRelease = correlations.containsKey(replyId);
 
-            doCleanup(traceId, abortiveRelease);
+            cleanup(traceId, abortiveRelease);
         }
 
-        private void onApplicationWindow(
+        private void onAppWindow(
             WindowFW window)
         {
             final long sequence = window.sequence();
@@ -622,34 +622,34 @@ public class TcpServerFactory implements StreamFactory
 
             if (initialSeq + initialPad < initialAck + initialMax)
             {
-                onNetworkReadable(networkKey);
+                onNetReadable(key);
             }
             else
             {
-                networkKey.clear(OP_READ);
+                key.clear(OP_READ);
             }
 
             if (initialSeq + initialPad < initialAck + initialMax && !TcpState.initialClosed(state))
             {
-                networkKey.register(OP_READ);
+                key.register(OP_READ);
                 counters.readops.getAsLong();
             }
         }
 
-        private void doApplicationBegin() throws IOException
+        private void doAppBegin() throws IOException
         {
             final long traceId = supplyTraceId.getAsLong();
-            final InetSocketAddress localAddress = (InetSocketAddress) network.getLocalAddress();
-            final InetSocketAddress remoteAddress = (InetSocketAddress) network.getRemoteAddress();
+            final InetSocketAddress localAddress = (InetSocketAddress) net.getLocalAddress();
+            final InetSocketAddress remoteAddress = (InetSocketAddress) net.getRemoteAddress();
 
-            router.setThrottle(initialId, this::onApplication);
-            doBegin(application, routeId, initialId, initialSeq, initialAck, initialMax, traceId,
+            router.setThrottle(initialId, this::onAppMessage);
+            doBegin(app, routeId, initialId, initialSeq, initialAck, initialMax, traceId,
                     localAddress, remoteAddress);
             counters.opensWritten.getAsLong();
             state = TcpState.openingInitial(state);
         }
 
-        private void doApplicationData(
+        private void doAppData(
             DirectBuffer buffer,
             int offset,
             int length)
@@ -657,48 +657,32 @@ public class TcpServerFactory implements StreamFactory
             final long traceId = supplyTraceId.getAsLong();
             final int reserved = length + initialPad;
 
-            doData(application, routeId, initialId, initialSeq, initialAck, initialMax, traceId,
+            doData(app, routeId, initialId, initialSeq, initialAck, initialMax, traceId,
                     initialBudgetId, reserved, buffer, offset, length);
 
             initialSeq += reserved;
 
             if (initialSeq + initialPad >= initialAck + initialMax)
             {
-                networkKey.clear(OP_READ);
+                key.clear(OP_READ);
             }
         }
 
-        private void doApplicationEnd(
+        private void doAppEnd(
             long traceId)
         {
-            doEnd(application, routeId, initialId, initialSeq, initialAck, initialMax, traceId);
+            doEnd(app, routeId, initialId, initialSeq, initialAck, initialMax, traceId);
             counters.closesWritten.getAsLong();
             state = TcpState.closeInitial(state);
         }
 
-        private void doApplicationAbort(
+        private void doAppWindow(
             long traceId)
         {
-            doAbort(application, routeId, initialId, initialSeq, initialAck, initialMax, traceId);
-            counters.abortsWritten.getAsLong();
-            state = TcpState.closeInitial(state);
+            doWindow(app, routeId, replyId, replySeq, replyAck, replyMax, traceId, 0, 0);
         }
 
-        private void doApplicationReset(
-            long traceId)
-        {
-            doReset(application, routeId, replyId, replySeq, replyAck, replyMax, traceId);
-            counters.resetsWritten.getAsLong();
-            state = TcpState.closeReply(state);
-        }
-
-        private void doApplicationWindow(
-            long traceId)
-        {
-            doWindow(application, routeId, replyId, replySeq, replyAck, replyMax, traceId, 0, 0);
-        }
-
-        private void doApplicationResetIfNecessary(
+        private void doAppReset(
             long traceId)
         {
             if (!TcpState.replyClosing(state))
@@ -706,7 +690,10 @@ public class TcpServerFactory implements StreamFactory
                 if (TcpState.replyOpened(state))
                 {
                     assert !correlations.containsKey(replyId);
-                    doApplicationReset(traceId);
+
+                    doReset(app, routeId, replyId, replySeq, replyAck, replyMax, traceId);
+                    counters.resetsWritten.getAsLong();
+                    state = TcpState.closeReply(state);
                 }
                 else
                 {
@@ -715,16 +702,18 @@ public class TcpServerFactory implements StreamFactory
             }
         }
 
-        private void doApplicationAbortIfNecessary(
+        private void doAppAbort(
             long traceId)
         {
             if (TcpState.initialOpened(state) && !TcpState.initialClosed(state))
             {
-                doApplicationAbort(traceId);
+                doAbort(app, routeId, initialId, initialSeq, initialAck, initialMax, traceId);
+                counters.abortsWritten.getAsLong();
+                state = TcpState.closeInitial(state);
             }
         }
 
-        private void doCleanup(
+        private void cleanup(
             long traceId,
             boolean abortiveRelease)
         {
@@ -733,7 +722,7 @@ public class TcpServerFactory implements StreamFactory
                 try
                 {
                     // forces TCP RST
-                    network.setOption(StandardSocketOptions.SO_LINGER, 0);
+                    net.setOption(StandardSocketOptions.SO_LINGER, 0);
                 }
                 catch (IOException ex)
                 {
@@ -741,27 +730,27 @@ public class TcpServerFactory implements StreamFactory
                 }
             }
 
-            doCleanup(traceId);
+            cleanup(traceId);
         }
 
-        private void doCleanup(
+        private void cleanup(
             long traceId)
         {
-            doApplicationAbortIfNecessary(traceId);
-            doApplicationResetIfNecessary(traceId);
+            doAppAbort(traceId);
+            doAppReset(traceId);
 
-            cleanupNetworkSlotIfNecessary();
+            cleanupWriteSlot();
 
-            doCloseNetwork(network);
+            closeNet(net);
         }
 
-        private void cleanupNetworkSlotIfNecessary()
+        private void cleanupWriteSlot()
         {
-            if (networkSlot != NO_SLOT)
+            if (writeSlot != NO_SLOT)
             {
-                bufferPool.release(networkSlot);
-                networkSlot = NO_SLOT;
-                networkSlotOffset = 0;
+                bufferPool.release(writeSlot);
+                writeSlot = NO_SLOT;
+                writeSlotOffset = 0;
             }
         }
     }

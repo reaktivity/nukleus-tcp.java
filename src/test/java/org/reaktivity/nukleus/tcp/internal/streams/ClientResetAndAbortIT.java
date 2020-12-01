@@ -13,13 +13,12 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
+package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -46,8 +45,7 @@ public class ClientResetAndAbortIT
 {
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
-            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
+            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -57,7 +55,6 @@ public class ClientResetAndAbortIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(4096)
-        .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -103,7 +100,7 @@ public class ClientResetAndAbortIT
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "shutdownInput()",
         helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-        condition = "callerEquals(\"TcpClientFactory$TcpClient.onApplicationReset\", true, 2)",
+        condition = "callerEquals(\"TcpClientFactory$TcpClient.onAppReset\", true, 2)",
         action = "countDown()"
     )
     public void shouldShutdownOutputAndInputWhenClientSendsAbortAndReset() throws Exception
@@ -142,7 +139,7 @@ public class ClientResetAndAbortIT
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "shutdownInput()",
         helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-        condition = "callerEquals(\"TcpClientFactory$TcpClient.onApplicationReset\", true, 2)",
+        condition = "callerEquals(\"TcpClientFactory$TcpClient.onAppReset\", true, 2)",
         action = "countDown()"
     )
     public void shouldShutdownInputWhenClientSendsReset() throws Exception
@@ -184,7 +181,7 @@ public class ClientResetAndAbortIT
         targetClass = "^java.nio.channels.SocketChannel",
         targetMethod = "shutdownInput()",
         helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$CountDownHelper",
-        condition = "callerEquals(\"TcpClientFactory$TcpClient.onApplicationReset\", true, 2)",
+        condition = "callerEquals(\"TcpClientFactory$TcpClient.onAppReset\", true, 2)",
         action = "countDown()"
     )
     public void shouldShutdownOutputAndInputWhenClientSendsResetAndEnd() throws Exception

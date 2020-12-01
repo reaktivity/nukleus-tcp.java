@@ -13,14 +13,17 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
+package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -32,15 +35,14 @@ import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-public class ServerRouteCountersIT
+/**
+ * Verifies behavior when capacity limits are exceeded
+ */
+public class ServerLimitsIT
 {
-    private static final long SERVER_ROUTE_ID = 0x0003000200000001L;
-
     private final K3poRule k3po = new K3poRule()
-            .addScriptRoot("control", "org/reaktivity/specification/nukleus/tcp/control")
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("client", "org/reaktivity/specification/tcp/rfc793")
-            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+        .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -51,8 +53,9 @@ public class ServerRouteCountersIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
-        .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
-        .configure(ReaktorConfiguration.REAKTOR_DRAIN_ON_CLOSE, false)
+        // Initial window size for output to network:
+        .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
+        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
     @Rule
@@ -61,17 +64,31 @@ public class ServerRouteCountersIT
     @Test
     @Specification({
         "${route}/server/controller",
-        "${server}/client.and.server.sent.data.multiple.frames/server",
-        "${client}/client.and.server.sent.data.multiple.frames/client"
+        "${server}/server.sent.data.received.reset/server"
     })
-    public void shouldSendAndReceiveData() throws Exception
+    public void shouldResetWhenWindowIsExceeded() throws Exception
     {
-        k3po.finish();
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_SERVER");
 
-        assertThat(reaktor.bytesWritten("tcp", SERVER_ROUTE_ID), equalTo(26L));
-        assertThat(reaktor.bytesRead("tcp", SERVER_ROUTE_ID), equalTo(26L));
-        assertThat(reaktor.framesWritten("tcp", SERVER_ROUTE_ID), greaterThanOrEqualTo(1L));
-        assertThat(reaktor.framesRead("tcp", SERVER_ROUTE_ID), greaterThanOrEqualTo(1L));
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            int len;
+            try
+            {
+                ByteBuffer buf = ByteBuffer.allocate(256);
+                len = channel.read(buf);
+            }
+            catch (IOException ex)
+            {
+                len = -1;
+            }
+
+            assertEquals(-1, len);
+
+            k3po.finish();
+        }
     }
-
 }

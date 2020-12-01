@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
+package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.net.StandardSocketOptions.SO_REUSEADDR;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -26,7 +26,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ALL;
 import static org.reaktivity.nukleus.tcp.internal.TcpNukleus.WRITE_SPIN_COUNT;
-import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -57,8 +56,8 @@ public class ClientPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("server", "org/reaktivity/specification/tcp/rfc793")
-        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
+        .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
+        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 
@@ -69,7 +68,6 @@ public class ClientPartialWriteIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(4096)
-        .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
     @Rule

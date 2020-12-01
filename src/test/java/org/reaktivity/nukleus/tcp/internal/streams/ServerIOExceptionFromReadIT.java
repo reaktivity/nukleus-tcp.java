@@ -13,11 +13,15 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
+package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
+
+import java.net.InetSocketAddress;
+import java.net.StandardSocketOptions;
+import java.nio.channels.SocketChannel;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -27,17 +31,14 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
+import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-/**
- * Tests the TCP nukleus when acting as a client.
- */
-public class ClientRoutingIT
+public class ServerIOExceptionFromReadIT
 {
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/tcp/routing")
-            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/routing");
+            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -47,7 +48,8 @@ public class ClientRoutingIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
-        .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
+        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
+        .configure(ReaktorConfiguration.REAKTOR_DRAIN_ON_CLOSE, false)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -57,56 +59,48 @@ public class ClientRoutingIT
 
     @Test
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.connect.with.host.extension/client",
-        "${server}/client.connect.with.host.extension/server"
+        "${route}/server/controller",
+        "${server}/server.received.reset.and.abort/server"
     })
-    public void clientConnectHostExtWhenRoutedViaHost() throws Exception
+    public void shouldReportIOExceptionFromReadAsAbortAndReset() throws Exception
     {
-        k3po.finish();
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_SERVER");
+
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+
+            k3po.awaitBarrier("CONNECTED");
+
+            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+            channel.close();
+
+            k3po.finish();
+        }
     }
 
     @Test
     @Specification({
-        "${route}/client.subnet/controller",
-        "${client}/client.connect.with.ip.extension/client",
-        "${server}/client.connect.with.ip.extension/server"
+        "${route}/server/controller",
+        "${server}/server.received.abort.sent.end/server"
     })
-    public void shouldConnectIpExtWhenRoutedViaSubnet() throws Exception
+    public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
     {
-        k3po.finish();
-    }
+        k3po.start();
+        k3po.awaitBarrier("ROUTED_SERVER");
 
-    @Test
-    @Specification({
-        "${route}/client.host.and.subnet/controller",
-        "${client}/client.connect.with.ip.extension/client",
-        "${server}/client.connect.with.ip.extension/server"
-    })
-    public void shouldConnectIpExtWhenRoutedViaSubnetMultipleRoutes() throws Exception
-    {
-        k3po.finish();
-    }
+        try (SocketChannel channel = SocketChannel.open())
+        {
+            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
 
-    @Test
-    @Specification({
-        "${route}/client.subnet/controller",
-        "${client}/client.connect.with.host.extension/client",
-        "${server}/client.connect.with.host.extension/server"
-    })
-    public void shouldConnectHostExtWhenRoutedViaSubnet() throws Exception
-    {
-        k3po.finish();
-    }
+            k3po.awaitBarrier("CONNECTED");
 
-    @Test
-    @Specification({
-        "${route}/client.subnet/controller",
-        "${client}/client.reset.with.no.subnet.match/client"
-    })
-    public void shouldResetClientWithNoSubnetMatch() throws Exception
-    {
-        k3po.finish();
+            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
+            channel.close();
+
+            k3po.finish();
+        }
     }
 
 }

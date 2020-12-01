@@ -82,6 +82,15 @@ public class ControlIT
 
     @Test
     @Specification({
+        "${route}/client/controller"
+    })
+    public void shouldRouteClient() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
         "${route}/client.ip/controller"
     })
     public void shouldRouteClientIp() throws Exception
@@ -119,8 +128,8 @@ public class ControlIT
 
     @Test
     @Specification({
-        "${route}/client.host/controller",
-        "${unroute}/client.host/controller"
+        "${route}/client/controller",
+        "${unroute}/client/controller"
     })
     public void shouldUnrouteClient() throws Exception
     {

@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
+package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -45,8 +45,8 @@ public class ServerIT
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("control", "org/reaktivity/specification/nukleus/tcp/control")
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("client", "org/reaktivity/specification/tcp/rfc793")
-            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
+            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
+            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -57,7 +57,7 @@ public class ServerIT
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
         .configure(TCP_MAX_CONNECTIONS, 3)
-        .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
+        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -404,13 +404,12 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/client.and.server/controller",
+        "${route}/server/controller",
         "${server}/max.connections/server"
     })
     public void shouldUnbindRebind() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_CLIENT");
         k3po.awaitBarrier("ROUTED_SERVER");
 
         SocketChannel channel1 = SocketChannel.open();

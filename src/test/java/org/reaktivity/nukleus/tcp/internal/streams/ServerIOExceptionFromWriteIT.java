@@ -13,57 +13,64 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.streams.rfc793;
+package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.IntStream.generate;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
-import java.net.StandardSocketOptions;
 import java.nio.channels.SocketChannel;
 
+import org.jboss.byteman.contrib.bmunit.BMRule;
+import org.jboss.byteman.contrib.bmunit.BMRules;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
-import org.reaktivity.reaktor.ReaktorConfiguration;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
+import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-public class ServerIOExceptionFromReadIT
+@RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
+public class ServerIOExceptionFromWriteIT
 {
     private final K3poRule k3po = new K3poRule()
             .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("client", "org/reaktivity/specification/tcp/rfc793")
-            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/rfc793");
+            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
         .nukleus("tcp"::equals)
+        .controller("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
-        .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
-        .configure(ReaktorConfiguration.REAKTOR_DRAIN_ON_CLOSE, false)
+        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
-    private final TcpCountersRule counters = new TcpCountersRule(reaktor);
-
     @Rule
-    public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(reaktor).around(k3po).around(timeout);
 
     @Test
     @Specification({
         "${route}/server/controller",
-        "${server}/server.received.reset.and.abort/server"
+        "${server}/server.sent.data.received.reset.and.abort/server"
     })
-    public void shouldReportIOExceptionFromReadAsAbortAndReset() throws Exception
+    @BMRule(name = "onApplicationData",
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "write(java.nio.ByteBuffer)",
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onAppData\", true, 2)",
+        action = "throw new IOException(\"Simulating an IOException from write\")"
+    )
+    public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
@@ -71,11 +78,6 @@ public class ServerIOExceptionFromReadIT
         try (SocketChannel channel = SocketChannel.open())
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-
-            k3po.awaitBarrier("CONNECTED");
-
-            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-            channel.close();
 
             k3po.finish();
         }
@@ -84,21 +86,32 @@ public class ServerIOExceptionFromReadIT
     @Test
     @Specification({
         "${route}/server/controller",
-        "${server}/server.received.abort.sent.end/server"
+        "${server}/server.sent.data.received.reset.and.abort/server"
     })
-    public void shouldNotResetWhenProcessingEndAfterIOExceptionFromRead() throws Exception
+    @BMRules(rules = {
+        @BMRule(name = "onApplicationData",
+        helper = "org.reaktivity.nukleus.tcp.internal.SocketChannelHelper$OnDataHelper",
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "write(java.nio.ByteBuffer)",
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onAppData\", true, 2)",
+        action = "return doWrite($0, $1);"
+        ),
+        @BMRule(name = "onNetworkWritable",
+        targetClass = "^java.nio.channels.SocketChannel",
+        targetMethod = "write(java.nio.ByteBuffer)",
+        condition = "callerEquals(\"TcpServerFactory$TcpServer.onNetWritable\", true, 2)",
+        action = "throw new IOException(\"Simulating an IOException from write\")"
+        )
+    })
+    public void shouldResetWhenDeferredWriteThrowsIOException() throws Exception
     {
+        OnDataHelper.fragmentWrites(generate(() -> 0));
         k3po.start();
         k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
             channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-
-            k3po.awaitBarrier("CONNECTED");
-
-            channel.setOption(StandardSocketOptions.SO_LINGER, 0);
-            channel.close();
 
             k3po.finish();
         }
