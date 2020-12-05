@@ -45,9 +45,9 @@ public class ClientIT
     private static final long CLIENT_ROUTE_ID = 0x0002000310000001L;
 
     private final K3poRule k3po = new K3poRule()
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
-            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
+        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
+        .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
+        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -77,7 +77,7 @@ public class ClientIT
 
     @Test
     @Specification({
-            "${route}client.host/controller",
+            "${route}/client.host/controller",
             "${client}/client.and.server.sent.data.with.padding/client",
             "${server}/client.and.server.sent.data.with.padding/server"
     })
@@ -88,7 +88,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/client.close/client",
         "${server}/client.close/server"
     })
@@ -99,7 +99,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data/client",
         "${server}/client.sent.data/server"
     })
@@ -111,7 +111,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data.multiple.frames/client",
         "${server}/client.sent.data.multiple.frames/server"
     })
@@ -122,7 +122,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data.multiple.streams/client",
         "${server}/client.sent.data.multiple.streams/server"
     })
@@ -134,7 +134,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.data.then.end/client"
         // No support for "read closed" in k3po tcp
     })
@@ -167,7 +167,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/client.sent.end.then.received.data/client"
         // No support for "read closed" in k3po tcp
     })
@@ -197,7 +197,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/connection.established/client",
         "${server}/connection.established/server"
     })
@@ -208,7 +208,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/connection.failed/client"
     })
     public void connnectionFailed() throws Exception
@@ -220,7 +220,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/server.close/client",
         "${server}/server.close/server"
     })
@@ -231,7 +231,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/server.sent.data/client",
         "${server}/server.sent.data/server"
     })
@@ -244,7 +244,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/server.sent.data/client",
         "${server}/server.sent.data/server"
     })
@@ -258,7 +258,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/server.sent.data.multiple.frames/client",
         "${server}/server.sent.data.multiple.frames/server"
     })
@@ -269,7 +269,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/server.sent.data.multiple.streams/client",
         "${server}/server.sent.data.multiple.streams/server"
     })
@@ -282,7 +282,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/server.sent.data.then.end/client"
         // No support for half close output in k3po tcp
     })
@@ -309,7 +309,7 @@ public class ClientIT
 
     @Test
     @Specification({
-        "${route}client.host/controller",
+        "${route}/client.host/controller",
         "${client}/server.sent.end.then.received.data/client"
         // No support for "write close" in k3po tcp
     })

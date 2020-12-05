@@ -27,7 +27,7 @@ import static org.agrona.LangUtil.rethrowUnchecked;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.tcp.internal.TcpNukleus.WRITE_SPIN_COUNT;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.CONNECT_HOST_AND_PORT_PATTERN;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.socketAddress;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.proxyAddress;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -41,6 +41,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 import java.util.function.Predicate;
@@ -59,22 +60,24 @@ import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.TcpCounters;
-import org.reaktivity.nukleus.tcp.internal.TcpNukleus;
 import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
-import org.reaktivity.nukleus.tcp.internal.types.TcpAddressFW;
+import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressFW;
+import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressInet4FW;
+import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressInet6FW;
+import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressInetFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
+import org.reaktivity.nukleus.tcp.internal.types.stream.ProxyBeginExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
-import org.reaktivity.nukleus.tcp.internal.types.stream.TcpBeginExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
-import org.reaktivity.nukleus.tcp.internal.util.CIDR;
+import org.reaktivity.nukleus.tcp.internal.util.Cidr;
 
 public class TcpClientFactory implements StreamFactory
 {
@@ -96,8 +99,8 @@ public class TcpClientFactory implements StreamFactory
     private final ResetFW.Builder resetRW = new ResetFW.Builder();
     private final WindowFW.Builder windowRW = new WindowFW.Builder();
 
-    private final TcpBeginExFW beginExRO = new TcpBeginExFW();
-    private final TcpBeginExFW.Builder beginExRW = new TcpBeginExFW.Builder();
+    private final ProxyBeginExFW beginExRO = new ProxyBeginExFW();
+    private final ProxyBeginExFW.Builder beginExRW = new ProxyBeginExFW.Builder();
 
     private final MessageFunction<RouteFW> wrapRoute = (t, b, i, l) -> routeRO.wrap(b, i, i + l);
 
@@ -110,7 +113,8 @@ public class TcpClientFactory implements StreamFactory
     private final ByteBuffer writeByteBuffer;
     private final LongUnaryOperator supplyReplyId;
     private final LongSupplier supplyTraceId;
-    private final int tcpTypeId;
+    private final Function<String, InetAddress[]> resolveHost;
+    private final int proxyTypeId;
     private final Map<String, Predicate<? super InetAddress>> targetToCidrMatch;
     private final TcpCounters counters;
     private final int windowThreshold;
@@ -125,6 +129,7 @@ public class TcpClientFactory implements StreamFactory
         LongUnaryOperator supplyReplyId,
         LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId,
+        Function<String, InetAddress[]> resolveHost,
         TcpCounters counters)
     {
         this.router = requireNonNull(router);
@@ -134,7 +139,8 @@ public class TcpClientFactory implements StreamFactory
         this.bufferPool = requireNonNull(bufferPool);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.supplyTraceId = requireNonNull(supplyTraceId);
-        this.tcpTypeId = supplyTypeId.applyAsInt(TcpNukleus.NAME);
+        this.resolveHost = requireNonNull(resolveHost);
+        this.proxyTypeId = supplyTypeId.applyAsInt("proxy");
 
         final int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
@@ -218,44 +224,51 @@ public class TcpClientFactory implements StreamFactory
         String targetName,
         long targetRef)
     {
-        final TcpBeginExFW beginEx = extension.get(beginExRO::wrap);
-        final TcpAddressFW remoteAddress = beginEx.remoteAddress();
-        final int remotePort = beginEx.remotePort();
+        final ProxyBeginExFW beginEx = extension.get(beginExRO::wrap);
+        final ProxyAddressFW address = beginEx.address();
 
-        InetAddress address = null;
+        InetSocketAddress resolved = null;
         try
         {
-            Predicate<? super InetAddress> subnetFilter = extensionMatcher(targetName);
+            Predicate<? super InetAddress> matchSubnet = extensionMatcher(targetName);
 
-            if (targetRef == 0 || targetRef == remotePort)
+            switch (address.kind())
             {
-                switch (remoteAddress.kind())
-                {
-                case TcpAddressFW.KIND_HOST:
-                    String requestedAddressName = remoteAddress.host().asString();
-                    Optional<InetAddress> optional = Arrays
-                            .stream(InetAddress.getAllByName(requestedAddressName))
-                            .filter(subnetFilter)
-                            .findFirst();
-                    address = optional.isPresent() ? optional.get() : null;
-                    break;
-                case TcpAddressFW.KIND_IPV4_ADDRESS:
-                    OctetsFW ipRO = remoteAddress.ipv4Address();
-                    byte[] addr = new byte[ipRO.sizeof()];
-                    ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
-                    InetAddress candidate = InetAddress.getByAddress(addr);
-                    address =  subnetFilter.test(candidate) ? candidate : null;
-                    break;
-                case TcpAddressFW.KIND_IPV6_ADDRESS:
-                    ipRO = remoteAddress.ipv6Address();
-                    addr = new byte[ipRO.sizeof()];
-                    ipRO.buffer().getBytes(ipRO.offset(), addr, 0, ipRO.sizeof());
-                    candidate = InetAddress.getByAddress(addr);
-                    address =  subnetFilter.test(candidate) ? candidate : null;
-                    break;
-                default:
-                    throw new RuntimeException("Unexpected address kind");
-                }
+            case INET:
+                ProxyAddressInetFW addressInet = address.inet();
+                resolved = Arrays
+                        .stream(resolveHost.apply(addressInet.destination().asString()))
+                        .filter(matchSubnet)
+                        .findFirst()
+                        .map(a -> new InetSocketAddress(a, addressInet.destinationPort()))
+                        .orElse(null);
+                break;
+            case INET4:
+                ProxyAddressInet4FW addressInet4 = address.inet4();
+                OctetsFW destinationInet4 = addressInet4.destination();
+                int destinationPortInet4 = addressInet4.destinationPort();
+                byte[] ipv4 = new byte[4];
+                destinationInet4.buffer().getBytes(destinationInet4.offset(), ipv4);
+                resolved = Optional
+                        .of(InetAddress.getByAddress(ipv4))
+                        .filter(matchSubnet)
+                        .map(a -> new InetSocketAddress(a, destinationPortInet4))
+                        .orElse(null);
+                break;
+            case INET6:
+                ProxyAddressInet6FW addressInet6 = address.inet6();
+                OctetsFW destinationInet6 = addressInet6.destination();
+                int destinationPortInet6 = addressInet6.destinationPort();
+                byte[] ipv6 = new byte[16];
+                destinationInet6.buffer().getBytes(destinationInet6.offset(), ipv6);
+                resolved = Optional
+                        .of(InetAddress.getByAddress(ipv6))
+                        .filter(matchSubnet)
+                        .map(a -> new InetSocketAddress(a, destinationPortInet6))
+                        .orElse(null);
+                break;
+            default:
+                throw new RuntimeException("Unexpected address kind");
             }
         }
         catch (UnknownHostException ignore)
@@ -263,7 +276,7 @@ public class TcpClientFactory implements StreamFactory
            // NOOP
         }
 
-        return address != null ? new InetSocketAddress(address, remotePort) : null;
+        return resolved;
     }
 
     private Predicate<? super InetAddress> extensionMatcher(
@@ -272,7 +285,7 @@ public class TcpClientFactory implements StreamFactory
         Predicate<? super InetAddress> result;
         if (targetName.contains("/"))
         {
-            result = targetToCidrMatch.computeIfAbsent(targetName, this::inetMatchesCIDR);
+            result = targetToCidrMatch.computeIfAbsent(targetName, this::inetMatchesCidr);
         }
         else
         {
@@ -282,11 +295,10 @@ public class TcpClientFactory implements StreamFactory
         return result;
     }
 
-    private Predicate<InetAddress> inetMatchesCIDR(
+    private Predicate<InetAddress> inetMatchesCidr(
         String targetName)
     {
-        final CIDR cidr = new CIDR(targetName);
-        return candidate -> cidr.isInRange(candidate.getHostAddress());
+        return new Cidr(targetName)::matches;
     }
 
     private Predicate<InetAddress> inetMatchesInet(
@@ -294,8 +306,7 @@ public class TcpClientFactory implements StreamFactory
     {
         try
         {
-            InetAddress toMatch = InetAddress.getByName(targetName);
-            return candidate -> toMatch.equals(candidate);
+            return InetAddress.getByName(targetName)::equals;
         }
         catch (UnknownHostException e)
         {
@@ -862,7 +873,7 @@ public class TcpClientFactory implements StreamFactory
                 .streamId(streamId)
                 .traceId(traceId)
                 .affinity(streamId)
-                .extension(b -> b.set(tcpBeginEx(localAddress, remoteAddress)))
+                .extension(b -> b.set(proxyBeginEx(localAddress, remoteAddress)))
                 .build();
 
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -957,17 +968,14 @@ public class TcpClientFactory implements StreamFactory
         sender.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
     }
 
-    private Flyweight.Builder.Visitor tcpBeginEx(
+    private Flyweight.Builder.Visitor proxyBeginEx(
         InetSocketAddress localAddress,
         InetSocketAddress remoteAddress)
     {
         return (buffer, offset, limit) ->
             beginExRW.wrap(buffer, offset, limit)
-                     .typeId(tcpTypeId)
-                     .localAddress(a -> socketAddress(localAddress, a::ipv4Address, a::ipv6Address))
-                     .localPort(localAddress.getPort())
-                     .remoteAddress(a -> socketAddress(remoteAddress, a::ipv4Address, a::ipv6Address))
-                     .remotePort(remoteAddress.getPort())
+                     .typeId(proxyTypeId)
+                     .address(a -> proxyAddress(a, localAddress, remoteAddress))
                      .build()
                      .sizeof();
     }
