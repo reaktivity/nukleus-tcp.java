@@ -22,7 +22,7 @@ import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.tcp.internal.TcpNukleus.WRITE_SPIN_COUNT;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.socketAddress;
+import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.proxyAddress;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -49,7 +49,6 @@ import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.TcpCounters;
-import org.reaktivity.nukleus.tcp.internal.TcpNukleus;
 import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
 import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
@@ -60,8 +59,8 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
+import org.reaktivity.nukleus.tcp.internal.types.stream.ProxyBeginExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
-import org.reaktivity.nukleus.tcp.internal.types.stream.TcpBeginExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
 
 public class TcpServerFactory implements StreamFactory
@@ -84,7 +83,7 @@ public class TcpServerFactory implements StreamFactory
     private final ResetFW.Builder resetRW = new ResetFW.Builder();
     private final WindowFW.Builder windowRW = new WindowFW.Builder();
 
-    private final TcpBeginExFW.Builder beginExRW = new TcpBeginExFW.Builder();
+    private final ProxyBeginExFW.Builder beginExRW = new ProxyBeginExFW.Builder();
 
     private final MessageFunction<RouteFW> wrapRoute = (t, b, i, l) -> routeRO.wrap(b, i, i + l);
 
@@ -103,7 +102,7 @@ public class TcpServerFactory implements StreamFactory
     private final ByteBuffer writeByteBuffer;
     private final int replyMax;
     private final int windowThreshold;
-    private final int tcpTypeId;
+    private final int proxyTypeId;
 
     final TcpCounters counters;
 
@@ -130,7 +129,7 @@ public class TcpServerFactory implements StreamFactory
         this.poller = requireNonNull(poller);
         this.counters = requireNonNull(counters);
         this.onNetworkClosed = requireNonNull(onChannelClosed);
-        this.tcpTypeId = supplyTypeId.applyAsInt(TcpNukleus.NAME);
+        this.proxyTypeId = supplyTypeId.applyAsInt("proxy");
 
         final int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
@@ -774,7 +773,7 @@ public class TcpServerFactory implements StreamFactory
                 .maximum(maximum)
                 .traceId(traceId)
                 .affinity(streamId)
-                .extension(b -> b.set(tcpBeginEx(localAddress, remoteAddress)))
+                .extension(b -> b.set(proxyBeginEx(localAddress, remoteAddress)))
                 .build();
 
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -897,17 +896,14 @@ public class TcpServerFactory implements StreamFactory
         sender.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
     }
 
-    private Flyweight.Builder.Visitor tcpBeginEx(
+    private Flyweight.Builder.Visitor proxyBeginEx(
         InetSocketAddress localAddress,
         InetSocketAddress remoteAddress)
     {
         return (buffer, offset, limit) ->
             beginExRW.wrap(buffer, offset, limit)
-                     .typeId(tcpTypeId)
-                     .localAddress(a -> socketAddress(localAddress, a::ipv4Address, a::ipv6Address))
-                     .localPort(localAddress.getPort())
-                     .remoteAddress(a -> socketAddress(remoteAddress, a::ipv4Address, a::ipv6Address))
-                     .remotePort(remoteAddress.getPort())
+                     .typeId(proxyTypeId)
+                     .address(a -> proxyAddress(a, localAddress, remoteAddress))
                      .build()
                      .sizeof();
     }
