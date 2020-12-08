@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
+import java.net.InetAddress;
 import java.util.function.Function;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
@@ -49,6 +50,7 @@ public class TcpClientFactoryBuilder implements StreamFactoryBuilder
 
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
+    private Function<String, InetAddress[]> resolveHost;
 
     public TcpClientFactoryBuilder(
         TcpConfiguration config,
@@ -58,6 +60,14 @@ public class TcpClientFactoryBuilder implements StreamFactoryBuilder
         this.config = config;
         this.countersByRouteId = countersByRouteId;
         this.poller = poller;
+    }
+
+    @Override
+    public StreamFactoryBuilder setHostResolver(
+        Function<String, InetAddress[]> resolveHost)
+    {
+        this.resolveHost = resolveHost;
+        return this;
     }
 
     @Override
@@ -146,6 +156,7 @@ public class TcpClientFactoryBuilder implements StreamFactoryBuilder
             supplyReplyId,
             supplyTraceId,
             supplyTypeId,
+            resolveHost,
             counters);
     }
 }

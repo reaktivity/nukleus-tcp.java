@@ -15,39 +15,31 @@
  */
 package org.reaktivity.nukleus.tcp.internal.util;
 
+import static org.reaktivity.nukleus.tcp.internal.types.ProxyAddressProtocol.STREAM;
+
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.net.UnknownHostException;
-import java.util.function.Consumer;
+import java.util.Arrays;
 import java.util.regex.Pattern;
 
-import org.agrona.DirectBuffer;
-import org.agrona.LangUtil;
-import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
+import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressFW;
 
 public final class IpUtil
 {
     public static final Pattern ACCEPT_HOST_AND_PORT_PATTERN = Pattern.compile("tcp#([^:]+):(\\d+)");
     public static final Pattern CONNECT_HOST_AND_PORT_PATTERN = Pattern.compile("([^:]+):(\\d+)");
 
-    private static final int FIELD_SIZE_IPV4_ADDRESS = 4;
-    private static final int FIELD_SIZE_IPV6_ADDRESS = 16;
-
-    // TODO: thread safety
-    private static final byte[] IPV4_ADDRESS_BYTES = new byte[FIELD_SIZE_IPV4_ADDRESS];
-    private static final byte[] IPV6_ADDRESS_BYTES = new byte[FIELD_SIZE_IPV6_ADDRESS];
-
-    private static final InetAddress UNREACHABLE = null;
-
     private IpUtil()
     {
         // no instances
     }
 
-    public static int compareAddresses(SocketAddress address1, SocketAddress address2)
+    public static int compareAddresses(
+        SocketAddress address1,
+        SocketAddress address2)
     {
         boolean same = false;
         if (address1.equals(address2))
@@ -69,69 +61,35 @@ public final class IpUtil
         return same ? 0 : 1;
     }
 
-    public static void socketAddress(
-        InetSocketAddress ipAddress,
-        Consumer<Consumer<OctetsFW.Builder>> ipv4Address,
-        Consumer<Consumer<OctetsFW.Builder>> ipv6Address)
+    public static void proxyAddress(
+        ProxyAddressFW.Builder builder,
+        InetSocketAddress source,
+        InetSocketAddress destination)
     {
-        inetAddress(ipAddress.getAddress(), ipv4Address, ipv6Address);
-    }
+        InetAddress sourceAddress = source.getAddress();
+        InetAddress destinationAddress = destination.getAddress();
 
-    public static void inetAddress(
-        InetAddress inetAddress,
-        Consumer<Consumer<OctetsFW.Builder>> ipv4Address,
-        Consumer<Consumer<OctetsFW.Builder>> ipv6Address)
-    {
-        if (inetAddress instanceof Inet4Address)
+        if (sourceAddress instanceof Inet4Address &&
+            destinationAddress instanceof Inet4Address)
         {
-            ipv4Address.accept(o -> o.set(inetAddress.getAddress()));
+            builder.inet4(inet4 -> inet4.protocol(p -> p.set(STREAM))
+                                        .source(s -> s.set(sourceAddress.getAddress()))
+                                        .destination(d -> d.set(destinationAddress.getAddress()))
+                                        .sourcePort(source.getPort())
+                                        .destinationPort(destination.getPort()));
         }
-        else if (inetAddress instanceof Inet6Address)
+        else if (sourceAddress instanceof Inet6Address &&
+            destinationAddress instanceof Inet6Address)
         {
-            ipv6Address.accept(o -> o.set(inetAddress.getAddress()));
+            builder.inet6(inet6 -> inet6.protocol(p -> p.set(STREAM))
+                                        .source(s -> s.set(sourceAddress.getAddress()))
+                                        .destination(d -> d.set(destinationAddress.getAddress()))
+                                        .sourcePort(source.getPort())
+                                        .destinationPort(destination.getPort()));
         }
-    }
-
-    public static InetAddress ipv4Address(
-        DirectBuffer buffer,
-        int offset,
-        int limit)
-    {
-        try
+        else
         {
-            assert limit - offset == IPV4_ADDRESS_BYTES.length;
-            buffer.getBytes(offset, IPV4_ADDRESS_BYTES, 0, IPV4_ADDRESS_BYTES.length);
-            return InetAddress.getByAddress(IPV4_ADDRESS_BYTES);
-        }
-        catch (UnknownHostException ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
-            return UNREACHABLE;
+            throw new IllegalArgumentException("Unexpected address types: " + Arrays.asList(source, destination));
         }
     }
-
-    public static InetAddress ipv6Address(
-        DirectBuffer buffer,
-        int offset,
-        int limit)
-    {
-        try
-        {
-            assert limit - offset == IPV6_ADDRESS_BYTES.length;
-            buffer.getBytes(offset, IPV6_ADDRESS_BYTES, 0, IPV6_ADDRESS_BYTES.length);
-            return InetAddress.getByAddress(IPV6_ADDRESS_BYTES);
-        }
-        catch (UnknownHostException ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
-            return UNREACHABLE;
-        }
-    }
-
-    public static String describe(
-        InetSocketAddress localAddress)
-    {
-        return String.format("local.address == %s", localAddress);
-    }
-
 }
