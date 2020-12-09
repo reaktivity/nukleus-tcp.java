@@ -773,7 +773,7 @@ public class TcpServerFactory implements StreamFactory
                 .maximum(maximum)
                 .traceId(traceId)
                 .affinity(streamId)
-                .extension(b -> b.set(proxyBeginEx(localAddress, remoteAddress)))
+                .extension(b -> b.set(proxyBeginEx(remoteAddress, localAddress)))
                 .build();
 
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -897,13 +897,13 @@ public class TcpServerFactory implements StreamFactory
     }
 
     private Flyweight.Builder.Visitor proxyBeginEx(
-        InetSocketAddress localAddress,
-        InetSocketAddress remoteAddress)
+        InetSocketAddress source,
+        InetSocketAddress destination)
     {
         return (buffer, offset, limit) ->
             beginExRW.wrap(buffer, offset, limit)
                      .typeId(proxyTypeId)
-                     .address(a -> proxyAddress(a, localAddress, remoteAddress))
+                     .address(a -> proxyAddress(a, source, destination))
                      .build()
                      .sizeof();
     }
