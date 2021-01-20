@@ -844,7 +844,7 @@ public class TcpClientFactory implements StreamFactory
             doAppAbort(traceId);
             doAppReset(traceId);
 
-            if (!net.socket().isInputShutdown())
+            if (net.isConnected() && !net.socket().isInputShutdown())
             {
                 counters.resetsRead.getAsLong();
             }

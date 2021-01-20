@@ -45,7 +45,7 @@
     <jacoco.coverage.ratio>0.92</jacoco.coverage.ratio>
     <jacoco.missed.count>0</jacoco.missed.count>
 
-    <byteman.version>3.0.13</byteman.version>
+    <byteman.version>4.0.13</byteman.version>
     <jmock.version>2.6.0</jmock.version>
     <junit.version>4.13.1</junit.version>
     <jmh.version>1.17.4</jmh.version>
