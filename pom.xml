@@ -445,12 +445,23 @@
                 <pluginExecution>
                   <pluginExecutionFilter>
                     <groupId>org.jboss.byteman</groupId>
-                    <artifactId>
-                      byteman-rulecheck-maven-plugin
-                    </artifactId>
+                    <artifactId>byteman-rulecheck-maven-plugin</artifactId>
                     <versionRange>[3.0.6,)</versionRange>
                     <goals>
                       <goal>rulecheck</goal>
+                    </goals>
+                  </pluginExecutionFilter>
+                  <action>
+                    <ignore></ignore>
+                  </action>
+                </pluginExecution>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>org.jasig.maven</groupId>
+                    <artifactId>maven-notice-plugin</artifactId>
+                    <versionRange>[1.1.0,)</versionRange>
+                    <goals>
+                      <goal>check</goal>
                     </goals>
                   </pluginExecutionFilter>
                   <action>
