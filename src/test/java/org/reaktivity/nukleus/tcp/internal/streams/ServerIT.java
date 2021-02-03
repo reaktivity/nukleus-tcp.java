@@ -239,7 +239,7 @@ public class ServerIT
     @Test
     @Specification({
         "${control}/route/server/controller",
-        "${server}/connection.established.ipv6/server",
+        "${server}/connection.established/server",
         "${client}/connection.established/client"
     })
     @ScriptProperty("address \"tcp://[::0]:8080\"")
