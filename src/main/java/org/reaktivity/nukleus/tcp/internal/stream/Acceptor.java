@@ -28,9 +28,12 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.NetworkChannel;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 import java.util.regex.Matcher;
@@ -42,11 +45,10 @@ import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
-import org.reaktivity.nukleus.tcp.internal.poller.Poller;
-import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.control.Role;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
+import org.reaktivity.reaktor.poller.PollerKey;
 
 /**
  * The {@code Acceptor} accepts new socket connections and informs the {@code Router}.
@@ -63,8 +65,9 @@ public final class Acceptor
     private final Function<SocketAddress, PollerKey> registerHandler;
     private final ToIntFunction<PollerKey> acceptHandler;
     private final MutableInteger remainingConnections;
+    private final Set<PollerKey> registeredKeys;
 
-    private Poller poller;
+    private Function<SelectableChannel, PollerKey> supplyPollerKey;
     private TcpServerFactory serverFactory;
     private RouteManager router;
     private boolean unbound;
@@ -79,12 +82,7 @@ public final class Acceptor
         this.localAddressByRouteId = new Long2ObjectHashMap<>();
         this.registerHandler = this::handleRegister;
         this.acceptHandler = this::handleAccept;
-    }
-
-    public void setPoller(
-        Poller poller)
-    {
-        this.poller = poller;
+        this.registeredKeys = new LinkedHashSet<>();
     }
 
     public void handleRouted(
@@ -108,6 +106,12 @@ public final class Acceptor
             doUnregister(unrouteId);
             break;
         }
+    }
+
+    public void setPollerKeySupplier(
+        Function<SelectableChannel, PollerKey> supplyPollerKey)
+    {
+        this.supplyPollerKey = supplyPollerKey;
     }
 
     void setServerFactory(
@@ -138,7 +142,8 @@ public final class Acceptor
             final int port = Integer.parseInt(matcher.group(2));
             final InetAddress address = InetAddress.getByName(hostname);
             final InetSocketAddress localAddress = new InetSocketAddress(address, port);
-            findOrRegisterKey(localAddress);
+            PollerKey key = findOrRegisterKey(localAddress);
+            registeredKeys.add(key);
 
             // TODO: maintain register count
             localAddressByRouteId.putIfAbsent(routeId, localAddress);
@@ -161,6 +166,7 @@ public final class Acceptor
             {
                 final PollerKey key = findRegisteredKey(localAddress);
 
+                registeredKeys.remove(key);
                 // TODO: maintain count for auto close when unregistered for last time
                 CloseHelper.quietClose(key.channel());
                 result = true;
@@ -270,7 +276,7 @@ public final class Acceptor
         Function<SocketAddress, PollerKey> mappingFunction)
     {
         final Optional<PollerKey> optional =
-                poller.keys()
+                registeredKeys.stream()
                       .filter(PollerKey::isValid)
                       .filter(k -> ServerSocketChannel.class.isInstance(k.channel()))
                       .filter(k -> hasLocalAddress(channel(k), localAddress))
@@ -290,7 +296,10 @@ public final class Acceptor
             serverChannel.bind(localAddress, backlog);
             serverChannel.configureBlocking(false);
 
-            return poller.doRegister(serverChannel, OP_ACCEPT, acceptHandler);
+            PollerKey pollerKey = supplyPollerKey.apply(serverChannel);
+            pollerKey.handler(OP_ACCEPT, acceptHandler);
+            pollerKey.register(OP_ACCEPT);
+            return pollerKey;
         }
         catch (IOException ex)
         {

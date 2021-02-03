@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.tcp.internal.stream;
 
 import java.net.InetAddress;
+import java.nio.channels.SelectableChannel;
 import java.util.function.Function;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
@@ -32,12 +33,11 @@ import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.TcpCounters;
 import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
-import org.reaktivity.nukleus.tcp.internal.poller.Poller;
+import org.reaktivity.reaktor.poller.PollerKey;
 
 public class TcpClientFactoryBuilder implements StreamFactoryBuilder
 {
     private final TcpConfiguration config;
-    private final Poller poller;
     private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
 
     private RouteManager router;
@@ -51,15 +51,14 @@ public class TcpClientFactoryBuilder implements StreamFactoryBuilder
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
     private Function<String, InetAddress[]> resolveHost;
+    private Function<SelectableChannel, PollerKey> supplyPollerKey;
 
     public TcpClientFactoryBuilder(
         TcpConfiguration config,
-        Long2ObjectHashMap<TcpRouteCounters> countersByRouteId,
-        Poller poller)
+        Long2ObjectHashMap<TcpRouteCounters> countersByRouteId)
     {
         this.config = config;
         this.countersByRouteId = countersByRouteId;
-        this.poller = poller;
     }
 
     @Override
@@ -142,6 +141,14 @@ public class TcpClientFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
+    public StreamFactoryBuilder setPollerKeySupplier(
+        Function<SelectableChannel, PollerKey> supplyPollerKey)
+    {
+        this.supplyPollerKey = supplyPollerKey;
+        return this;
+    }
+
+    @Override
     public StreamFactory build()
     {
         final BufferPool bufferPool = supplyBufferPool.get();
@@ -150,12 +157,12 @@ public class TcpClientFactoryBuilder implements StreamFactoryBuilder
         return new TcpClientFactory(
             config,
             router,
-            poller,
             writeBuffer,
             bufferPool,
             supplyReplyId,
             supplyTraceId,
             supplyTypeId,
+            supplyPollerKey,
             resolveHost,
             counters);
     }

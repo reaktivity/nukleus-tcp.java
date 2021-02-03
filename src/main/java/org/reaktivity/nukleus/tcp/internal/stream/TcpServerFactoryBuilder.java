@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
+import java.nio.channels.SelectableChannel;
 import java.util.function.Function;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
@@ -31,13 +32,12 @@ import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.TcpCounters;
 import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
-import org.reaktivity.nukleus.tcp.internal.poller.Poller;
+import org.reaktivity.reaktor.poller.PollerKey;
 
 public class TcpServerFactoryBuilder implements StreamFactoryBuilder
 {
     private final Acceptor acceptor;
     private final TcpConfiguration config;
-    private final Poller poller;
     private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
 
     private RouteManager router;
@@ -49,17 +49,16 @@ public class TcpServerFactoryBuilder implements StreamFactoryBuilder
     private MutableDirectBuffer writeBuffer;
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
+    private Function<SelectableChannel, PollerKey> supplyPollerKey;
 
     public TcpServerFactoryBuilder(
         TcpConfiguration config,
         Long2ObjectHashMap<TcpRouteCounters> countersByRouteId,
-        Acceptor acceptor,
-        Poller poller)
+        Acceptor acceptor)
     {
         this.config = config;
         this.countersByRouteId = countersByRouteId;
         this.acceptor = acceptor;
-        this.poller = poller;
     }
 
     @Override
@@ -135,6 +134,14 @@ public class TcpServerFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
+    public StreamFactoryBuilder setPollerKeySupplier(
+        Function<SelectableChannel, PollerKey> supplyPollerKey)
+    {
+        this.supplyPollerKey = supplyPollerKey;
+        return this;
+    }
+
+    @Override
     public StreamFactory build()
     {
         final BufferPool bufferPool = supplyBufferPool.get();
@@ -149,7 +156,7 @@ public class TcpServerFactoryBuilder implements StreamFactoryBuilder
             supplyTraceId,
             supplyTypeId,
             supplyReplyId,
-            poller,
+            supplyPollerKey,
             counters,
             acceptor::onChannelClosed);
         acceptor.setServerFactory(factory);

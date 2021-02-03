@@ -18,8 +18,10 @@ package org.reaktivity.nukleus.tcp.internal;
 import static org.reaktivity.nukleus.route.RouteKind.CLIENT;
 import static org.reaktivity.nukleus.route.RouteKind.SERVER;
 
+import java.nio.channels.SelectableChannel;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.agrona.DirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -27,19 +29,18 @@ import org.reaktivity.nukleus.Elektron;
 import org.reaktivity.nukleus.route.AddressFactoryBuilder;
 import org.reaktivity.nukleus.route.RouteKind;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
-import org.reaktivity.nukleus.tcp.internal.poller.Poller;
 import org.reaktivity.nukleus.tcp.internal.stream.Acceptor;
 import org.reaktivity.nukleus.tcp.internal.stream.TcpAddressFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.stream.TcpClientFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.stream.TcpServerFactoryBuilder;
 import org.reaktivity.nukleus.tcp.internal.types.control.UnrouteFW;
+import org.reaktivity.reaktor.poller.PollerKey;
 
 final class TcpElektron implements Elektron
 {
     private final UnrouteFW unrouteRO = new UnrouteFW();
 
     private final Acceptor acceptor;
-    private final Poller poller;
     private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
     private final Map<RouteKind, StreamFactoryBuilder> streamFactoryBuilders;
     private final Map<RouteKind, AddressFactoryBuilder> addressFactoryBuilders;
@@ -48,24 +49,28 @@ final class TcpElektron implements Elektron
         TcpConfiguration config)
     {
         final Acceptor acceptor = new Acceptor(config);
-        Poller poller = new Poller();
-        acceptor.setPoller(poller);
 
         Long2ObjectHashMap<TcpRouteCounters> countersByRouteId = new Long2ObjectHashMap<>();
 
         Map<RouteKind, StreamFactoryBuilder> streamFactoryBuilders = new HashMap<>();
-        streamFactoryBuilders.put(SERVER, new TcpServerFactoryBuilder(config, countersByRouteId, acceptor, poller));
-        streamFactoryBuilders.put(CLIENT, new TcpClientFactoryBuilder(config, countersByRouteId, poller));
+        streamFactoryBuilders.put(SERVER, new TcpServerFactoryBuilder(config, countersByRouteId, acceptor));
+        streamFactoryBuilders.put(CLIENT, new TcpClientFactoryBuilder(config, countersByRouteId));
 
         Map<RouteKind, AddressFactoryBuilder> addressFactoryBuilders = new HashMap<>();
         addressFactoryBuilders.put(SERVER, new TcpAddressFactoryBuilder(this::handleServerRouted));
         addressFactoryBuilders.put(CLIENT, new TcpAddressFactoryBuilder(this::handleRouted));
 
         this.acceptor = acceptor;
-        this.poller = poller;
         this.streamFactoryBuilders = streamFactoryBuilders;
         this.addressFactoryBuilders = addressFactoryBuilders;
         this.countersByRouteId = countersByRouteId;
+    }
+
+    @Override
+    public void setPollerKeySupplier(
+        Function<SelectableChannel, PollerKey> supplyPollerKey)
+    {
+        acceptor.setPollerKeySupplier(supplyPollerKey);
     }
 
     @Override
@@ -80,12 +85,6 @@ final class TcpElektron implements Elektron
         RouteKind kind)
     {
         return addressFactoryBuilders.get(kind);
-    }
-
-    @Override
-    public Poller agent()
-    {
-        return poller;
     }
 
     @Override
