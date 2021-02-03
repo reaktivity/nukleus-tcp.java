@@ -29,7 +29,9 @@ import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SocketChannel;
+import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
@@ -50,8 +52,6 @@ import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.TcpCounters;
 import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
-import org.reaktivity.nukleus.tcp.internal.poller.Poller;
-import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
@@ -62,6 +62,7 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ProxyBeginExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
+import org.reaktivity.reaktor.poller.PollerKey;
 
 public class TcpServerFactory implements StreamFactory
 {
@@ -92,7 +93,7 @@ public class TcpServerFactory implements StreamFactory
     private final LongUnaryOperator supplyReplyId;
     private final LongSupplier supplyTraceId;
     private final Long2ObjectHashMap<TcpServer> correlations;
-    private final Poller poller;
+    private final Function<SelectableChannel, PollerKey> supplyPollerKey;
     private final Runnable onNetworkClosed;
 
     private final BufferPool bufferPool;
@@ -115,7 +116,7 @@ public class TcpServerFactory implements StreamFactory
         LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId,
         LongUnaryOperator supplyReplyId,
-        Poller poller,
+        Function<SelectableChannel, PollerKey> supplyPollerKey,
         TcpCounters counters,
         Runnable onChannelClosed)
     {
@@ -126,7 +127,7 @@ public class TcpServerFactory implements StreamFactory
         this.supplyInitialId = requireNonNull(supplyInitialId);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.supplyTraceId = requireNonNull(supplyTraceId);
-        this.poller = requireNonNull(poller);
+        this.supplyPollerKey = requireNonNull(supplyPollerKey);
         this.counters = requireNonNull(counters);
         this.onNetworkClosed = requireNonNull(onChannelClosed);
         this.proxyTypeId = supplyTypeId.applyAsInt("proxy");
@@ -246,7 +247,7 @@ public class TcpServerFactory implements StreamFactory
             this.replyId = supplyReplyId.applyAsLong(initialId);
             this.app = router.supplyReceiver(initialId);
             this.net = net;
-            this.key = poller.doRegister(net, 0, null);
+            this.key = supplyPollerKey.apply(net);
             this.counters = TcpServerFactory.this.counters.supplyRoute(routeId);
         }
 

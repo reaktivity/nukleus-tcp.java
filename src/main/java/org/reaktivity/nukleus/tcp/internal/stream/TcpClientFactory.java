@@ -35,6 +35,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.UnresolvedAddressException;
 import java.util.Arrays;
@@ -61,8 +62,6 @@ import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.TcpCounters;
 import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
-import org.reaktivity.nukleus.tcp.internal.poller.Poller;
-import org.reaktivity.nukleus.tcp.internal.poller.PollerKey;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressFW;
@@ -78,6 +77,7 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.ProxyBeginExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.tcp.internal.util.Cidr;
+import org.reaktivity.reaktor.poller.PollerKey;
 
 public class TcpClientFactory implements StreamFactory
 {
@@ -105,7 +105,6 @@ public class TcpClientFactory implements StreamFactory
     private final MessageFunction<RouteFW> wrapRoute = (t, b, i, l) -> routeRO.wrap(b, i, i + l);
 
     private final BufferPool bufferPool;
-    private final Poller poller;
     private final RouteManager router;
     private final ByteBuffer readByteBuffer;
     private final MutableDirectBuffer readBuffer;
@@ -113,6 +112,7 @@ public class TcpClientFactory implements StreamFactory
     private final ByteBuffer writeByteBuffer;
     private final LongUnaryOperator supplyReplyId;
     private final LongSupplier supplyTraceId;
+    private final Function<SelectableChannel, PollerKey>  supplyPollerKey;
     private final Function<String, InetAddress[]> resolveHost;
     private final int proxyTypeId;
     private final Map<String, Predicate<? super InetAddress>> targetToCidrMatch;
@@ -121,25 +121,26 @@ public class TcpClientFactory implements StreamFactory
     private final boolean keepalive;
     private final int initialMax;
 
+
     public TcpClientFactory(
         TcpConfiguration config,
         RouteManager router,
-        Poller poller,
         MutableDirectBuffer writeBuffer,
         BufferPool bufferPool,
         LongUnaryOperator supplyReplyId,
         LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId,
+        Function<SelectableChannel, PollerKey> supplyPollerKey,
         Function<String, InetAddress[]> resolveHost,
         TcpCounters counters)
     {
         this.router = requireNonNull(router);
-        this.poller = poller;
         this.writeBuffer = requireNonNull(writeBuffer);
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
         this.bufferPool = requireNonNull(bufferPool);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.supplyTraceId = requireNonNull(supplyTraceId);
+        this.supplyPollerKey = requireNonNull(supplyPollerKey);
         this.resolveHost = requireNonNull(resolveHost);
         this.proxyTypeId = supplyTypeId.applyAsInt("proxy");
 
@@ -396,7 +397,9 @@ public class TcpClientFactory implements StreamFactory
                 }
                 else
                 {
-                    networkKey = poller.doRegister(net, OP_CONNECT, this::onNetConnect);
+                    networkKey = supplyPollerKey.apply(net);
+                    networkKey.handler(OP_CONNECT, this::onNetConnect);
+                    networkKey.register(OP_CONNECT);
                 }
             }
             catch (UnresolvedAddressException | IOException ex)
