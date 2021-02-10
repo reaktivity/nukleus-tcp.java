@@ -13,32 +13,27 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal;
+package org.reaktivity.nukleus.tcp.internal.stream;
 
-import java.util.function.Function;
 import java.util.function.LongConsumer;
-import java.util.function.LongSupplier;
 
 import org.agrona.collections.Long2ObjectHashMap;
+import org.reaktivity.reaktor.nukleus.ElektronContext;
 
 public final class TcpCounters
 {
-    private final Function<String, LongSupplier> supplyCounter;
-    private final Function<String, LongConsumer> supplyAccumulator;
+    private final ElektronContext context;
     private final Long2ObjectHashMap<TcpRouteCounters> countersByRouteId;
 
     public final LongConsumer connections;
 
     public TcpCounters(
-        Function<String, LongSupplier> supplyCounter,
-        Function<String, LongConsumer> supplyAccumulator,
-        Long2ObjectHashMap<TcpRouteCounters> countersByRouteId)
+        ElektronContext context)
     {
-        this.supplyCounter = supplyCounter;
-        this.supplyAccumulator = supplyAccumulator;
-        this.countersByRouteId = countersByRouteId;
+        this.context = context;
+        this.countersByRouteId = new Long2ObjectHashMap<>();
 
-        this.connections = supplyAccumulator.apply("tcp.connections");
+        this.connections = context.supplyAccumulator("tcp.connections");
     }
 
     public TcpRouteCounters supplyRoute(
@@ -56,6 +51,6 @@ public final class TcpCounters
     private TcpRouteCounters newRouteCounters(
         long routeId)
     {
-        return new TcpRouteCounters(routeId, supplyCounter, supplyAccumulator);
+        return new TcpRouteCounters(context, routeId);
     }
 }

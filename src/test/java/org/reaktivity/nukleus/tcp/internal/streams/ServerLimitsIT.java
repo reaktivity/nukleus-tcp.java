@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -47,15 +46,13 @@ public class ServerLimitsIT
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
-        .nukleus("tcp"::equals)
-        .controller("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
         // Initial window size for output to network:
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
-        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
+        //.affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
     @Rule

@@ -48,8 +48,6 @@ public class ClientIOExceptionFromWriteIT
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
-        .nukleus("tcp"::equals)
-        .controller("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)

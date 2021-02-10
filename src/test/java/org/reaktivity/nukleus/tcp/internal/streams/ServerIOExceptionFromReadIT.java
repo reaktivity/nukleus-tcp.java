@@ -17,7 +17,6 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
@@ -43,12 +42,11 @@ public class ServerIOExceptionFromReadIT
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
-        .nukleus("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
-        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
+        //.affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
         .configure(ReaktorConfiguration.REAKTOR_DRAIN_ON_CLOSE, false)
         .clean();
 

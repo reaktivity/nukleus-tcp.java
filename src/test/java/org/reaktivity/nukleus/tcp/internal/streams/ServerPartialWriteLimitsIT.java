@@ -23,7 +23,6 @@ import static java.util.stream.IntStream.of;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ALL;
-import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -64,7 +63,6 @@ public class ServerPartialWriteLimitsIT
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
-        .nukleus("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
@@ -73,7 +71,7 @@ public class ServerPartialWriteLimitsIT
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
         // Overall buffer pool size same as slot size so maximum concurrent streams with partial writes = 1
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_POOL_CAPACITY, 16)
-        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
+        //.affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);

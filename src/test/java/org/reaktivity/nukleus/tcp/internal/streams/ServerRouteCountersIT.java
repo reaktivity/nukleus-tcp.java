@@ -20,7 +20,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -45,13 +44,11 @@ public class ServerRouteCountersIT
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
-        .nukleus("tcp"::equals)
-        .controller("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
-        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
+        //.affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
         .configure(ReaktorConfiguration.REAKTOR_DRAIN_ON_CLOSE, false)
         .clean();
 

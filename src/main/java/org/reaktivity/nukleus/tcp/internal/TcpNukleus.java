@@ -15,9 +15,10 @@
  */
 package org.reaktivity.nukleus.tcp.internal;
 
-import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.Elektron;
-import org.reaktivity.nukleus.Nukleus;
+import org.reaktivity.reaktor.nukleus.Configuration;
+import org.reaktivity.reaktor.nukleus.Elektron;
+import org.reaktivity.reaktor.nukleus.ElektronContext;
+import org.reaktivity.reaktor.nukleus.Nukleus;
 
 public final class TcpNukleus implements Nukleus
 {
@@ -46,8 +47,9 @@ public final class TcpNukleus implements Nukleus
     }
 
     @Override
-    public Elektron supplyElektron()
+    public Elektron supplyElektron(
+        ElektronContext context)
     {
-        return new TcpElektron(config);
+        return new TcpElektron(config, context);
     }
 }

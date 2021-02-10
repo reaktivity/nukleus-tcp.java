@@ -13,33 +13,32 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal;
+package org.reaktivity.nukleus.tcp.internal.config;
 
-import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.ControllerBuilder;
-import org.reaktivity.nukleus.ControllerFactorySpi;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 
-public final class TcpControllerFactorySpi implements ControllerFactorySpi<TcpController>
+import org.reaktivity.nukleus.tcp.internal.util.Cidr;
+
+public final class TcpMatcher
 {
-    @Override
-    public String name()
+    public final Cidr cidr;
+
+    public TcpMatcher(
+        TcpCondition condition)
     {
-        return "tcp";
+        this.cidr = condition.cidr != null ? new Cidr(condition.cidr) : null;
     }
 
-    @Override
-    public Class<TcpController> kind()
+    public boolean matches(
+        InetSocketAddress remote)
     {
-        return TcpController.class;
+        return matches(remote.getAddress());
     }
 
-    @Override
-    public TcpController create(
-        Configuration config,
-        ControllerBuilder<TcpController> builder)
+    public boolean matches(
+        InetAddress remote)
     {
-        return builder.setFactory(TcpController::new)
-                      .build();
+        return cidr == null || cidr.matches(remote);
     }
-
 }

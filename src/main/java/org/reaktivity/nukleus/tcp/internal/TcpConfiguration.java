@@ -15,7 +15,7 @@
  */
 package org.reaktivity.nukleus.tcp.internal;
 
-import org.reaktivity.nukleus.Configuration;
+import org.reaktivity.reaktor.nukleus.Configuration;
 
 public class TcpConfiguration extends Configuration
 {

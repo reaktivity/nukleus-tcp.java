@@ -13,24 +13,29 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.stream;
+package org.reaktivity.nukleus.tcp.internal.config;
 
-import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.route.AddressFactoryBuilder;
+import org.reaktivity.reaktor.config.Options;
 
-public final class TcpAddressFactoryBuilder implements AddressFactoryBuilder
+public final class TcpOptions extends Options
 {
-    private final MessageConsumer routeHandler;
+    public final String host;
+    public final int port;
+    public final int backlog;
+    public final boolean nodelay;
+    public final boolean keepalive;
 
-    public TcpAddressFactoryBuilder(
-        MessageConsumer routeHandler)
+    public TcpOptions(
+        String host,
+        int port,
+        int backlog,
+        boolean nodelay,
+        boolean keepalive)
     {
-        this.routeHandler = routeHandler;
-    }
-
-    @Override
-    public TcpAddressFactory build()
-    {
-        return new TcpAddressFactory(routeHandler);
+        this.host = host;
+        this.port = port;
+        this.backlog = backlog;
+        this.nodelay = nodelay;
+        this.keepalive = keepalive;
     }
 }

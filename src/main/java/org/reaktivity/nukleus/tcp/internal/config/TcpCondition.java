@@ -13,24 +13,17 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal;
+package org.reaktivity.nukleus.tcp.internal.config;
 
-import org.reaktivity.reaktor.nukleus.Configuration;
-import org.reaktivity.reaktor.nukleus.Nukleus;
-import org.reaktivity.reaktor.nukleus.NukleusFactorySpi;
+import org.reaktivity.reaktor.config.Condition;
 
-public final class TcpNukleusFactorySpi implements NukleusFactorySpi
+public final class TcpCondition extends Condition
 {
-    @Override
-    public String name()
-    {
-        return TcpNukleus.NAME;
-    }
+    public final String cidr;
 
-    @Override
-    public Nukleus create(
-        Configuration config)
+    public TcpCondition(
+        String cidr)
     {
-        return new TcpNukleus(new TcpConfiguration(config));
+        this.cidr = cidr;
     }
 }

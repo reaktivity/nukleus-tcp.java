@@ -13,13 +13,26 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-module org.reaktivity.nukleus.tcp
+package org.reaktivity.nukleus.tcp.internal.config;
+
+import static java.util.stream.Collectors.toList;
+
+import java.util.List;
+
+import org.reaktivity.reaktor.config.Route;
+
+public final class TcpRoute
 {
-    requires org.reaktivity.nukleus;
+    public final long id;
+    public final List<TcpMatcher> when;
 
-    provides org.reaktivity.nukleus.NukleusFactorySpi
-        with org.reaktivity.nukleus.tcp.internal.TcpNukleusFactorySpi;
-
-    provides org.reaktivity.nukleus.ControllerFactorySpi
-        with org.reaktivity.nukleus.tcp.internal.TcpControllerFactorySpi;
+    public TcpRoute(
+        Route route)
+    {
+        this.id = route.id;
+        this.when = route.when.stream()
+            .map(TcpCondition.class::cast)
+            .map(TcpMatcher::new)
+            .collect(toList());
+    }
 }
