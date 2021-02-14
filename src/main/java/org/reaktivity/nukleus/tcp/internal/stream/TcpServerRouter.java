@@ -93,19 +93,9 @@ public final class TcpServerRouter
     {
         SocketChannel channel = null;
 
-        if (!unbound && remainingConnections <= 0)
+        if (remainingConnections > 0)
         {
-            bindings.values().stream()
-                .filter(b -> b.kind == SERVER)
-                .forEach(this::unregister);
-            unbound = true;
-        }
-        else
-        {
-            if (remainingConnections > 0)
-            {
-                channel = server.accept();
-            }
+            channel = server.accept();
 
             if (channel != null)
             {
@@ -114,13 +104,21 @@ public final class TcpServerRouter
             }
         }
 
+        if (!unbound && remainingConnections <= 0)
+        {
+            bindings.values().stream()
+                .filter(b -> b.kind == SERVER)
+                .forEach(this::unregister);
+            unbound = true;
+        }
+
         return channel;
     }
 
     public void close(
         SocketChannel channel)
     {
-        CloseHelper.quietCloseAll(channel);
+        CloseHelper.quietClose(channel);
         remainingConnections++;
         counters.connections.accept(-1);
 
@@ -154,7 +152,6 @@ public final class TcpServerRouter
 
             tcpBinding.attach(acceptKey);
             acceptKey.attach(tcpBinding);
-
         }
         catch (IOException ex)
         {

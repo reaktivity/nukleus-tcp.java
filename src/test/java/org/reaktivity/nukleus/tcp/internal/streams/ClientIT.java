@@ -36,18 +36,16 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configuration;
 
 /**
  * Tests the TCP nukleus when acting as a client.
  */
 public class ClientIT
 {
-    private static final long CLIENT_ROUTE_ID = 0x0002000310000001L;
-
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
-        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
+        .addScriptRoot("net", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
+        .addScriptRoot("app", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -56,6 +54,7 @@ public class ClientIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(4096)
+        .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -64,10 +63,10 @@ public class ClientIT
     public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.and.server.sent.data.multiple.frames/client",
-        "${server}/client.and.server.sent.data.multiple.frames/server"
+        "${app}/client.and.server.sent.data.multiple.frames/client",
+        "${net}/client.and.server.sent.data.multiple.frames/server"
     })
     public void shouldSendAndReceiveData() throws Exception
     {
@@ -75,10 +74,10 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-            "${route}/client.host/controller",
-            "${client}/client.and.server.sent.data.with.padding/client",
-            "${server}/client.and.server.sent.data.with.padding/server"
+        "${app}/client.and.server.sent.data.with.padding/client",
+        "${net}/client.and.server.sent.data.with.padding/server"
     })
     public void shouldSendAndReceiveDataWithPadding() throws Exception
     {
@@ -86,10 +85,10 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.close/client",
-        "${server}/client.close/server"
+        "${app}/client.close/client",
+        "${net}/client.close/server"
     })
     public void shouldInitiateClientClose() throws Exception
     {
@@ -97,10 +96,10 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.sent.data/client",
-        "${server}/client.sent.data/server"
+        "${app}/client.sent.data/client",
+        "${net}/client.sent.data/server"
     })
     public void shouldReceiveClientSentData() throws Exception
     {
@@ -109,10 +108,10 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.sent.data.multiple.frames/client",
-        "${server}/client.sent.data.multiple.frames/server"
+        "${app}/client.sent.data.multiple.frames/client",
+        "${net}/client.sent.data.multiple.frames/server"
     })
     public void shouldReceiveClientSentDataMultipleFrames() throws Exception
     {
@@ -120,10 +119,10 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.sent.data.multiple.streams/client",
-        "${server}/client.sent.data.multiple.streams/server"
+        "${app}/client.sent.data.multiple.streams/client",
+        "${net}/client.sent.data.multiple.streams/server"
     })
     public void shouldReceiveClientSentDataMultipleStreams() throws Exception
     {
@@ -132,9 +131,9 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.sent.data.then.end/client"
+        "${app}/client.sent.data.then.end/client"
         // No support for "read closed" in k3po tcp
     })
     public void shouldReceiveClientSentDataAndEnd() throws Exception
@@ -142,10 +141,9 @@ public class ClientIT
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.bind(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
@@ -165,9 +163,9 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.sent.end.then.received.data/client"
+        "${app}/client.sent.end.then.received.data/client"
         // No support for "read closed" in k3po tcp
     })
     public void shouldWriteDataAfterReceivingEndOfRead() throws Exception
@@ -175,10 +173,9 @@ public class ClientIT
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.bind(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
@@ -195,10 +192,10 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/connection.established/client",
-        "${server}/connection.established/server"
+        "${app}/connection.established/client",
+        "${net}/connection.established/server"
     })
     public void shouldEstablishConnection() throws Exception
     {
@@ -206,22 +203,34 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.ipv6.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/connection.failed/client"
+        "${app}/connection.established.ipv6/client",
+        "${net}/connection.established/server"
+    })
+    @ScriptProperty("address \"tcp://[::1]:8080\"")
+    public void shouldEstablishConnectionIPv6() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Configuration("client.host.json")
+    @Specification({
+        "${app}/connection.failed/client"
     })
     public void connnectionFailed() throws Exception
     {
         k3po.finish();
         Thread.sleep(250); // TODO: reaktor quiese instead of close
-        assertEquals(1, reaktor.resetsRead("tcp", CLIENT_ROUTE_ID));
+        assertEquals(1, reaktor.resetsRead("tcp", Long.toString(0x0000000200000003L)));
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/server.close/client",
-        "${server}/server.close/server"
+        "${app}/server.close/client",
+        "${net}/server.close/server"
     })
     public void shouldInitiateServerClose() throws Exception
     {
@@ -229,10 +238,10 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/server.sent.data/client",
-        "${server}/server.sent.data/server"
+        "${app}/server.sent.data/client",
+        "${net}/server.sent.data/server"
     })
     public void shouldReceiveServerSentData() throws Exception
     {
@@ -242,10 +251,10 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/server.sent.data/client",
-        "${server}/server.sent.data/server"
+        "${app}/server.sent.data/client",
+        "${net}/server.sent.data/server"
     })
     @ScriptProperty("clientInitialWindow \"6\"")
     public void shouldReceiveServerSentDataWithFlowControl() throws Exception
@@ -256,10 +265,10 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/server.sent.data.multiple.frames/client",
-        "${server}/server.sent.data.multiple.frames/server"
+        "${app}/server.sent.data.multiple.frames/client",
+        "${net}/server.sent.data.multiple.frames/server"
     })
     public void shouldReceiveServerSentDataMultipleFrames() throws Exception
     {
@@ -267,10 +276,10 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/server.sent.data.multiple.streams/client",
-        "${server}/server.sent.data.multiple.streams/server"
+        "${app}/server.sent.data.multiple.streams/client",
+        "${net}/server.sent.data.multiple.streams/server"
     })
     public void shouldReceiveServerSentDataMultipleStreams() throws Exception
     {
@@ -280,9 +289,9 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/server.sent.data.then.end/client"
+        "${app}/server.sent.data.then.end/client"
         // No support for half close output in k3po tcp
     })
     public void shouldReceiveServerSentDataAndEnd() throws Exception
@@ -290,10 +299,9 @@ public class ClientIT
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.bind(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
@@ -307,9 +315,9 @@ public class ClientIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/server.sent.end.then.received.data/client"
+        "${app}/server.sent.end.then.received.data/client"
         // No support for "write close" in k3po tcp
     })
     public void shouldWriteDataAfterReceiveEnd() throws Exception
@@ -317,10 +325,9 @@ public class ClientIT
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.bind(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {

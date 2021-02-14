@@ -19,22 +19,16 @@ import org.reaktivity.reaktor.nukleus.Configuration;
 
 public class TcpConfiguration extends Configuration
 {
-    public static final IntPropertyDef TCP_MAXIMUM_BACKLOG;
     public static final IntPropertyDef TCP_WINDOW_THRESHOLD;
     public static final IntPropertyDef TCP_MAX_CONNECTIONS;
-    public static final BooleanPropertyDef TCP_KEEPALIVE;
-    public static final BooleanPropertyDef TCP_NODELAY;
 
     private static final ConfigurationDef TCP_CONFIG;
 
     static
     {
         ConfigurationDef config = new ConfigurationDef("nukleus.tcp");
-        TCP_MAXIMUM_BACKLOG = config.property("maximum.backlog", 0);
         TCP_WINDOW_THRESHOLD = config.property("window.threshold", 0);
         TCP_MAX_CONNECTIONS = config.property("max.connections", Integer.MAX_VALUE);
-        TCP_KEEPALIVE = config.property("keepalive", false);
-        TCP_NODELAY = config.property("nodelay", true);
         TCP_CONFIG = config;
     }
 
@@ -44,24 +38,10 @@ public class TcpConfiguration extends Configuration
         super(TCP_CONFIG, config);
     }
 
-    /**
-     * @see java.nio.channels.ServerSocketChannel#bind(java.net.SocketAddress, int)
-     */
-    public int maximumBacklog()
-    {
-        return TCP_MAXIMUM_BACKLOG.getAsInt(this);
-    }
-
-    // accumulates window until the threshold and sends it once it reaches over the threshold
     public int windowThreshold()
     {
         int threshold = TCP_WINDOW_THRESHOLD.getAsInt(this);
-        if (threshold < 0 || threshold > 100)
-        {
-            String message = String.format(
-                    "TCP write window threshold is %d (should be between 0 and 100 inclusive)", threshold);
-            throw new IllegalArgumentException(message);
-        }
+        assert threshold >= 0 && threshold <= 100;
         return threshold;
     }
 
@@ -69,15 +49,4 @@ public class TcpConfiguration extends Configuration
     {
         return TCP_MAX_CONNECTIONS.getAsInt(this);
     }
-
-    public boolean keepalive()
-    {
-        return TCP_KEEPALIVE.getAsBoolean(this);
-    }
-
-    public boolean nodelay()
-    {
-        return TCP_NODELAY.getAsBoolean(this);
-    }
-
 }

@@ -19,6 +19,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -56,17 +57,47 @@ public final class TcpClientRouter
         bindings.put(binding.routeId, binding);
     }
 
+    public TcpBinding lookup(
+        long routeId)
+    {
+        return bindings.get(routeId);
+    }
+
     public InetSocketAddress resolve(
-        long routeId,
+        TcpBinding binding,
         long authorization,
         ProxyBeginExFW beginEx)
     {
+        final TcpOptions options = binding.options;
+
         InetSocketAddress resolved = null;
 
-        TcpBinding binding = bindings.get(routeId);
-        if (binding != null)
+        if (beginEx == null)
         {
-            resolved = resolve(binding, authorization, beginEx);
+            resolved = new InetSocketAddress(options.host, options.port);
+        }
+        else
+        {
+            final ProxyAddressFW address = beginEx.address();
+
+            for (TcpRoute route : binding.routes)
+            {
+                Predicate<? super InetAddress> matchSubnet = a -> route.when.stream().anyMatch(m -> m.matches(a));
+
+                resolved = resolve(address, authorization, matchSubnet);
+
+                if (resolved != null)
+                {
+                    break;
+                }
+            }
+
+            if (resolved == null && binding.exit != null)
+            {
+                final List<InetAddress> host = Arrays.asList(resolveHost.apply(options.host));
+
+                resolved = resolve(address, authorization, host::contains);
+            }
         }
 
         return resolved;
@@ -85,72 +116,38 @@ public final class TcpClientRouter
     }
 
     private InetSocketAddress resolve(
-        TcpBinding binding,
+        ProxyAddressFW address,
         long authorization,
-        ProxyBeginExFW beginEx)
+        Predicate<? super InetAddress> filter)
     {
         InetSocketAddress resolved = null;
 
-        if (beginEx == null)
+        try
         {
-            final TcpOptions options = binding.options;
-            resolved = new InetSocketAddress(options.host, options.port);
-        }
-        else
-        {
-            final ProxyAddressFW address = beginEx.address();
-
-            subnet:
-            for (TcpRoute route : binding.routes)
+            switch (address.kind())
             {
-                try
-                {
-                    Predicate<? super InetAddress> matchSubnet =
-                        a -> route.when.stream().filter(m -> m.matches(a)).findFirst().isPresent();
-
-                    switch (address.kind())
-                    {
-                    case INET:
-                        ProxyAddressInetFW addressInet = address.inet();
-                        resolved = resolveInet(addressInet, matchSubnet);
-                        break subnet;
-                    case INET4:
-                        ProxyAddressInet4FW addressInet4 = address.inet4();
-                        resolved = resolveInet4(addressInet4, matchSubnet);
-                        break subnet;
-                    case INET6:
-                        ProxyAddressInet6FW addressInet6 = address.inet6();
-                        resolved = resolveInet6(addressInet6, matchSubnet);
-                        break subnet;
-                    default:
-                        throw new RuntimeException("Unexpected address kind");
-                    }
-                }
-                catch (UnknownHostException ex)
-                {
-                   // ignore
-                }
+            case INET:
+                ProxyAddressInetFW addressInet = address.inet();
+                resolved = resolveInet(addressInet, filter);
+                break;
+            case INET4:
+                ProxyAddressInet4FW addressInet4 = address.inet4();
+                resolved = resolveInet4(addressInet4, filter);
+                break;
+            case INET6:
+                ProxyAddressInet6FW addressInet6 = address.inet6();
+                resolved = resolveInet6(addressInet6, filter);
+                break;
+            default:
+                throw new RuntimeException("Unexpected address kind");
             }
+        }
+        catch (UnknownHostException ex)
+        {
+           // ignore
         }
 
         return resolved;
-    }
-
-    private InetSocketAddress resolveInet6(
-        ProxyAddressInet6FW address,
-        Predicate<? super InetAddress> filter) throws UnknownHostException
-    {
-        OctetsFW destination = address.destination();
-        int destinationPort = address.destinationPort();
-
-        byte[] ipv6 = ipv6ros;
-        destination.buffer().getBytes(destination.offset(), ipv6);
-
-        return Optional
-                .of(InetAddress.getByAddress(ipv6))
-                .filter(filter)
-                .map(a -> new InetSocketAddress(a, destinationPort))
-                .orElse(null);
     }
 
     private InetSocketAddress resolveInet(
@@ -177,6 +174,23 @@ public final class TcpClientRouter
 
         return Optional
                 .of(InetAddress.getByAddress(ipv4))
+                .filter(filter)
+                .map(a -> new InetSocketAddress(a, destinationPort))
+                .orElse(null);
+    }
+
+    private InetSocketAddress resolveInet6(
+        ProxyAddressInet6FW address,
+        Predicate<? super InetAddress> filter) throws UnknownHostException
+    {
+        OctetsFW destination = address.destination();
+        int destinationPort = address.destinationPort();
+
+        byte[] ipv6 = ipv6ros;
+        destination.buffer().getBytes(destination.offset(), ipv6);
+
+        return Optional
+                .of(InetAddress.getByAddress(ipv6))
                 .filter(filter)
                 .map(a -> new InetSocketAddress(a, destinationPort))
                 .orElse(null);

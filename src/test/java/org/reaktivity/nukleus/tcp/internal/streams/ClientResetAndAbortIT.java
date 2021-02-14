@@ -39,13 +39,13 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.CountDownHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configuration;
 
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 public class ClientResetAndAbortIT
 {
     private final K3poRule k3po = new K3poRule()
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
+        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -54,6 +54,7 @@ public class ClientResetAndAbortIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(4096)
+        .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -63,8 +64,8 @@ public class ClientResetAndAbortIT
             .around(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.abort/client"
     })
     public void shouldShutdownOutputWhenClientSendsAbort() throws Exception
@@ -72,10 +73,9 @@ public class ClientResetAndAbortIT
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.bind(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
@@ -91,8 +91,8 @@ public class ClientResetAndAbortIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.abort.and.reset/client"
     })
     @BMRule(name = "shutdownInput",
@@ -110,10 +110,9 @@ public class ClientResetAndAbortIT
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.bind(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
@@ -130,8 +129,8 @@ public class ClientResetAndAbortIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.reset/client"
     })
     @BMRule(name = "shutdownInput",
@@ -149,10 +148,9 @@ public class ClientResetAndAbortIT
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.bind(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {
@@ -172,8 +170,8 @@ public class ClientResetAndAbortIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.reset.and.end/client"
     })
     @BMRule(name = "shutdownInput",
@@ -191,10 +189,9 @@ public class ClientResetAndAbortIT
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.bind(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {

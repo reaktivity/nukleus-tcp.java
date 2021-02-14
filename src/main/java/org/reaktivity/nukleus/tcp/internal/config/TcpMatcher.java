@@ -16,7 +16,6 @@
 package org.reaktivity.nukleus.tcp.internal.config;
 
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 
 import org.reaktivity.nukleus.tcp.internal.util.Cidr;
 
@@ -28,12 +27,6 @@ public final class TcpMatcher
         TcpCondition condition)
     {
         this.cidr = condition.cidr != null ? new Cidr(condition.cidr) : null;
-    }
-
-    public boolean matches(
-        InetSocketAddress remote)
-    {
-        return matches(remote.getAddress());
     }
 
     public boolean matches(

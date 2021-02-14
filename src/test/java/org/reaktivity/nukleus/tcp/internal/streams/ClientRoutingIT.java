@@ -28,6 +28,7 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configuration;
 
 /**
  * Tests the TCP nukleus when acting as a client.
@@ -35,9 +36,8 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ClientRoutingIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-        .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/routing")
-        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/routing");
+        .addScriptRoot("net", "org/reaktivity/specification/nukleus/tcp/streams/network/routing")
+        .addScriptRoot("app", "org/reaktivity/specification/nukleus/tcp/streams/application/routing");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -46,6 +46,7 @@ public class ClientRoutingIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
+        .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -54,10 +55,10 @@ public class ClientRoutingIT
     public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
-        "${client}/client.connect.with.host.extension/client",
-        "${server}/client.connect.with.host.extension/server"
+        "${app}/client.connect.with.host.extension/client",
+        "${net}/client.connect.with.host.extension/server"
     })
     public void clientConnectHostExtWhenRoutedViaHost() throws Exception
     {
@@ -65,10 +66,10 @@ public class ClientRoutingIT
     }
 
     @Test
+    @Configuration("client.subnet.json")
     @Specification({
-        "${route}/client.subnet/controller",
-        "${client}/client.connect.with.ipv4.extension/client",
-        "${server}/client.connect.with.ipv4.extension/server"
+        "${app}/client.connect.with.ipv4.extension/client",
+        "${net}/client.connect.with.ipv4.extension/server"
     })
     public void shouldConnectIpv4ExtWhenRoutedViaSubnet() throws Exception
     {
@@ -76,10 +77,10 @@ public class ClientRoutingIT
     }
 
     @Test
+    @Configuration("client.host.and.subnet.json")
     @Specification({
-        "${route}/client.host.and.subnet/controller",
-        "${client}/client.connect.with.ipv4.extension/client",
-        "${server}/client.connect.with.ipv4.extension/server"
+        "${app}/client.connect.with.ipv4.extension/client",
+        "${net}/client.connect.with.ipv4.extension/server"
     })
     public void shouldConnectIpv4ExtWhenRoutedViaSubnetMultipleRoutes() throws Exception
     {
@@ -88,10 +89,10 @@ public class ClientRoutingIT
 
     @Ignore("TODO")
     @Test
+    @Configuration("client.subnet.ipv6.json")
     @Specification({
-        "${route}/client.subnet.ipv6/controller",
-        "${client}/client.connect.with.ipv6.extension/client",
-        "${server}/client.connect.with.ipv6.extension/server"
+        "${app}/client.connect.with.ipv6.extension/client",
+        "${net}/client.connect.with.ipv6.extension/server"
     })
     public void shouldConnectIpv6ExtWhenRoutedViaSubnet() throws Exception
     {
@@ -100,10 +101,10 @@ public class ClientRoutingIT
 
     @Ignore("TODO")
     @Test
+    @Configuration("client.host.and.subnet.ipv6.json")
     @Specification({
-        "${route}/client.host.and.subnet.ipv6/controller",
-        "${client}/client.connect.with.ipv6.extension/client",
-        "${server}/client.connect.with.ipv6.extension/server"
+        "${app}/client.connect.with.ipv6.extension/client",
+        "${net}/client.connect.with.ipv6.extension/server"
     })
     public void shouldConnectIpv6ExtWhenRoutedViaSubnetMultipleRoutes() throws Exception
     {
@@ -111,10 +112,10 @@ public class ClientRoutingIT
     }
 
     @Test
+    @Configuration("client.subnet.json")
     @Specification({
-        "${route}/client.subnet/controller",
-        "${client}/client.connect.with.host.extension/client",
-        "${server}/client.connect.with.host.extension/server"
+        "${app}/client.connect.with.host.extension/client",
+        "${net}/client.connect.with.host.extension/server"
     })
     public void shouldConnectHostExtWhenRoutedViaSubnet() throws Exception
     {
@@ -122,9 +123,9 @@ public class ClientRoutingIT
     }
 
     @Test
+    @Configuration("client.subnet.json")
     @Specification({
-        "${route}/client.subnet/controller",
-        "${client}/client.reset.with.no.subnet.match/client"
+        "${app}/client.reset.with.no.subnet.match/client"
     })
     public void shouldResetClientWithNoSubnetMatch() throws Exception
     {

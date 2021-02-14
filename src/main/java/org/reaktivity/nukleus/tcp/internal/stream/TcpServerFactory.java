@@ -185,9 +185,9 @@ public class TcpServerFactory implements TcpStreamFactory
     {
         // TODO: optimize
         final TcpRoute route = binding.routes.stream()
-            .filter(r -> r.when.stream().allMatch(c -> c.matches(remote)))
+            .filter(r -> r.when.stream().allMatch(c -> c.matches(remote.getAddress())))
             .findFirst()
-            .orElse(null);
+            .orElse(binding.exit);
 
         if (route != null)
         {

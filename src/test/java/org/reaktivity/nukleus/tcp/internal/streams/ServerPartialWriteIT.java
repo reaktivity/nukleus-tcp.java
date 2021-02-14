@@ -46,6 +46,7 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.HandleWriteHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configuration;
 
 /**
  * This test verifies the handling of incomplete writes, when attempts to write data to a socket channel
@@ -60,7 +61,6 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ServerPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
         .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
         .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
@@ -71,15 +71,16 @@ public class ServerPartialWriteIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
-        //.affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
+        .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
+        .external("app#0")
         .clean();
 
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(reaktor).around(k3po).around(timeout);
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.data/server",
         "${client}/server.sent.data/client"
     })
@@ -91,8 +92,8 @@ public class ServerPartialWriteIT
     }
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.data/server",
         "${client}/server.sent.data/client"
     })
@@ -103,8 +104,8 @@ public class ServerPartialWriteIT
     }
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.data/server",
         "${client}/server.sent.data/client"
     })
@@ -116,8 +117,8 @@ public class ServerPartialWriteIT
     }
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.data.multiple.frames/server",
         "${client}/server.sent.data.multiple.frames/client"
     })
@@ -135,10 +136,10 @@ public class ServerPartialWriteIT
     }
 
     @Test
+    @Configuration("server.json")
     @Specification({
-            "${route}/server/controller",
-            "${server}/server.sent.data.multiple.frames/server",
-            "${client}/server.sent.data.multiple.frames/client"
+        "${server}/server.sent.data.multiple.frames/server",
+        "${client}/server.sent.data.multiple.frames/client"
     })
     public void shouldPartiallyWriteWhenMoreDataArrivesWhileAwaitingSocketWritable() throws Exception
     {
@@ -154,8 +155,8 @@ public class ServerPartialWriteIT
     }
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.data.then.end/server"
     })
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
@@ -165,11 +166,10 @@ public class ServerPartialWriteIT
         HandleWriteHelper.fragmentWrites(generate(() -> endWritten.get() ? ALL : 0));
 
         k3po.start();
-        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
-            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.connect(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.awaitBarrier("END_WRITTEN");
             endWritten.set(true);

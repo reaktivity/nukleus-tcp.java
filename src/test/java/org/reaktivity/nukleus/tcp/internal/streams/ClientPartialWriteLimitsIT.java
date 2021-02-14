@@ -48,6 +48,7 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configuration;
 
 /**
  * Tests the handling of capacity exceeded conditions in the context of incomplete writes
@@ -58,7 +59,6 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ClientPartialWriteLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
         .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
         .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
@@ -71,6 +71,7 @@ public class ClientPartialWriteLimitsIT
         .counterValuesBufferCapacity(4096)
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_POOL_CAPACITY, 16)
+        .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -80,8 +81,8 @@ public class ClientPartialWriteLimitsIT
                                   .around(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.data.multiple.frames/client",
         "${server}/client.sent.data.multiple.frames/server"
     })
@@ -98,8 +99,8 @@ public class ClientPartialWriteLimitsIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.data.multiple.streams.second.was.reset/client"
     })
     public void shouldResetStreamsExceedingPartialWriteStreamsLimit() throws Exception
@@ -111,10 +112,9 @@ public class ClientPartialWriteLimitsIT
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.bind(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel1 = server.accept();
                  SocketChannel channel2 = server.accept())

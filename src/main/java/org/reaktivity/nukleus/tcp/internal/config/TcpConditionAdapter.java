@@ -18,12 +18,13 @@ package org.reaktivity.nukleus.tcp.internal.config;
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
+import javax.json.bind.adapter.JsonbAdapter;
 
 import org.reaktivity.nukleus.tcp.internal.TcpNukleus;
 import org.reaktivity.reaktor.config.Condition;
 import org.reaktivity.reaktor.config.ConditionAdapterSpi;
 
-public class TcpConditionAdapter implements ConditionAdapterSpi
+public final class TcpConditionAdapter implements ConditionAdapterSpi, JsonbAdapter<Condition, JsonObject>
 {
     private static final String CIDR_NAME = "cidr";
 

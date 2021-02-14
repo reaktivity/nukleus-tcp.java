@@ -18,7 +18,7 @@ package org.reaktivity.nukleus.tcp.internal;
 import static org.reaktivity.reaktor.config.Role.CLIENT;
 import static org.reaktivity.reaktor.config.Role.SERVER;
 
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 
 import org.reaktivity.nukleus.tcp.internal.stream.TcpClientFactory;
@@ -38,7 +38,7 @@ final class TcpElektron implements Elektron
         TcpConfiguration config,
         ElektronContext context)
     {
-        Map<Role, TcpStreamFactory> factories = new HashMap<>();
+        Map<Role, TcpStreamFactory> factories = new EnumMap<>(Role.class);
         factories.put(SERVER, new TcpServerFactory(config, context));
         factories.put(CLIENT, new TcpClientFactory(config, context));
 
