@@ -15,6 +15,10 @@
  */
 package org.reaktivity.nukleus.tcp.internal;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import org.reaktivity.nukleus.tcp.internal.config.TcpServerBinding;
 import org.reaktivity.reaktor.nukleus.Configuration;
 import org.reaktivity.reaktor.nukleus.Elektron;
 import org.reaktivity.reaktor.nukleus.ElektronContext;
@@ -27,11 +31,13 @@ public final class TcpNukleus implements Nukleus
     public static final int WRITE_SPIN_COUNT = 16;
 
     private final TcpConfiguration config;
+    private final ConcurrentMap<Long, TcpServerBinding> servers;
 
     TcpNukleus(
         TcpConfiguration config)
     {
         this.config = config;
+        this.servers = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -50,6 +56,12 @@ public final class TcpNukleus implements Nukleus
     public Elektron supplyElektron(
         ElektronContext context)
     {
-        return new TcpElektron(config, context);
+        return new TcpElektron(config, context, this::supplyServer);
+    }
+
+    private TcpServerBinding supplyServer(
+        long routeId)
+    {
+        return servers.computeIfAbsent(routeId, TcpServerBinding::new);
     }
 }

@@ -15,26 +15,22 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
-import static java.net.StandardSocketOptions.SO_REUSEADDR;
-import static java.net.StandardSocketOptions.SO_REUSEPORT;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 import static org.reaktivity.reaktor.config.Role.SERVER;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.function.Function;
+import java.util.function.LongFunction;
 import java.util.function.ToIntFunction;
 
 import org.agrona.CloseHelper;
-import org.agrona.LangUtil;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.config.TcpBinding;
-import org.reaktivity.nukleus.tcp.internal.config.TcpOptions;
+import org.reaktivity.nukleus.tcp.internal.config.TcpServerBinding;
 import org.reaktivity.reaktor.nukleus.ElektronContext;
 import org.reaktivity.reaktor.nukleus.poller.PollerKey;
 
@@ -44,6 +40,7 @@ public final class TcpServerRouter
     private final Long2ObjectHashMap<TcpBinding> bindings;
     private final ToIntFunction<PollerKey> acceptHandler;
     private final Function<SelectableChannel, PollerKey> supplyPollerKey;
+    private final LongFunction<TcpServerBinding> lookupServer;
 
     private int remainingConnections;
     private boolean unbound;
@@ -51,13 +48,15 @@ public final class TcpServerRouter
     public TcpServerRouter(
         TcpConfiguration config,
         ElektronContext context,
-        ToIntFunction<PollerKey> acceptHandler)
+        ToIntFunction<PollerKey> acceptHandler,
+        LongFunction<TcpServerBinding> lookupServer)
     {
         this.remainingConnections = config.maxConnections();
         this.counters = new TcpCounters(context);
         this.bindings = new Long2ObjectHashMap<>();
         this.supplyPollerKey = context::supplyPollerKey;
         this.acceptHandler = acceptHandler;
+        this.lookupServer = lookupServer;
     }
 
     public void attach(
@@ -132,37 +131,30 @@ public final class TcpServerRouter
     }
 
     private void register(
-        TcpBinding tcpBinding)
+        TcpBinding binding)
     {
-        try
-        {
-            TcpOptions options = tcpBinding.options;
-            InetAddress address = InetAddress.getByName(options.host);
-            InetSocketAddress local = new InetSocketAddress(address, options.port);
+        TcpServerBinding server = lookupServer.apply(binding.routeId);
 
-            ServerSocketChannel channel = ServerSocketChannel.open();
-            channel.setOption(SO_REUSEADDR, true);
-            channel.setOption(SO_REUSEPORT, true);
-            channel.bind(local, options.backlog);
-            channel.configureBlocking(false);
+        ServerSocketChannel channel = server.bind(binding.options);
 
-            PollerKey acceptKey = supplyPollerKey.apply(channel);
-            acceptKey.handler(OP_ACCEPT, acceptHandler);
-            acceptKey.register(OP_ACCEPT);
+        PollerKey acceptKey = supplyPollerKey.apply(channel);
+        acceptKey.handler(OP_ACCEPT, acceptHandler);
+        acceptKey.register(OP_ACCEPT);
 
-            tcpBinding.attach(acceptKey);
-            acceptKey.attach(tcpBinding);
-        }
-        catch (IOException ex)
-        {
-            LangUtil.rethrowUnchecked(ex);
-        }
+        binding.attach(acceptKey);
+        acceptKey.attach(binding);
     }
 
     private void unregister(
         TcpBinding binding)
     {
         PollerKey acceptKey = binding.attach(null);
-        CloseHelper.quietClose(acceptKey.channel());
+        if (acceptKey != null)
+        {
+            TcpServerBinding server = lookupServer.apply(binding.routeId);
+
+            acceptKey.cancel();
+            server.unbind();
+        }
     }
 }

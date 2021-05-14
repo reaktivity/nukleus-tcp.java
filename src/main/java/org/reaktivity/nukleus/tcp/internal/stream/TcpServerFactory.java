@@ -33,6 +33,7 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.function.Function;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 
@@ -45,6 +46,7 @@ import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.config.TcpBinding;
 import org.reaktivity.nukleus.tcp.internal.config.TcpOptions;
 import org.reaktivity.nukleus.tcp.internal.config.TcpRoute;
+import org.reaktivity.nukleus.tcp.internal.config.TcpServerBinding;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
@@ -101,10 +103,11 @@ public class TcpServerFactory implements TcpStreamFactory
 
     public TcpServerFactory(
         TcpConfiguration config,
-        ElektronContext context)
+        ElektronContext context,
+        LongFunction<TcpServerBinding> servers)
     {
         this.context = context;
-        this.router = new TcpServerRouter(config, context, this::handleAccept);
+        this.router = new TcpServerRouter(config, context, this::handleAccept, servers);
         this.writeBuffer = context.writeBuffer();
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
         this.bufferPool = context.bufferPool();
