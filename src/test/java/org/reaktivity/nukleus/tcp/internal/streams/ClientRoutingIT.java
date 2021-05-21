@@ -77,6 +77,17 @@ public class ClientRoutingIT
     }
 
     @Test
+    @Configuration("client.authority.json")
+    @Specification({
+        "${app}/client.connect.with.ipv4.extension/client",
+        "${net}/client.connect.with.ipv4.extension/server"
+    })
+    public void shouldConnectIpv4ExtWhenRoutedViaAuthority() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
     @Configuration("client.host.and.subnet.json")
     @Specification({
         "${app}/client.connect.with.ipv4.extension/client",

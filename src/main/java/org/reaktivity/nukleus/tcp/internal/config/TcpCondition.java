@@ -20,10 +20,13 @@ import org.reaktivity.reaktor.config.Condition;
 public final class TcpCondition extends Condition
 {
     public final String cidr;
+    public final String authority;
 
     public TcpCondition(
-        String cidr)
+        String cidr,
+        String authority)
     {
         this.cidr = cidr;
+        this.authority = authority;
     }
 }

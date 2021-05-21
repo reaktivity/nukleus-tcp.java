@@ -27,6 +27,7 @@ import org.reaktivity.reaktor.config.ConditionAdapterSpi;
 public final class TcpConditionAdapter implements ConditionAdapterSpi, JsonbAdapter<Condition, JsonObject>
 {
     private static final String CIDR_NAME = "cidr";
+    private static final String AUTHORITY_NAME = "authority";
 
     @Override
     public String type()
@@ -47,6 +48,11 @@ public final class TcpConditionAdapter implements ConditionAdapterSpi, JsonbAdap
             object.add(CIDR_NAME, tcpCondition.cidr);
         }
 
+        if (tcpCondition.authority != null)
+        {
+            object.add(AUTHORITY_NAME, tcpCondition.authority);
+        }
+
         return object.build();
     }
 
@@ -54,8 +60,9 @@ public final class TcpConditionAdapter implements ConditionAdapterSpi, JsonbAdap
     public Condition adaptFromJson(
         JsonObject object)
     {
-        String cidr = object.getString(CIDR_NAME, null);
+        String cidr = object.containsKey(CIDR_NAME) ? object.getString(CIDR_NAME) : null;
+        String authority = object.containsKey(AUTHORITY_NAME) ? object.getString(AUTHORITY_NAME) : null;
 
-        return new TcpCondition(cidr);
+        return new TcpCondition(cidr, authority);
     }
 }

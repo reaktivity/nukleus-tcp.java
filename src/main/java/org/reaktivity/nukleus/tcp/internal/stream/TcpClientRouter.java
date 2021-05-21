@@ -15,6 +15,8 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
+import static org.reaktivity.nukleus.tcp.internal.types.ProxyInfoType.AUTHORITY;
+
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -28,11 +30,13 @@ import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.tcp.internal.config.TcpBinding;
 import org.reaktivity.nukleus.tcp.internal.config.TcpOptions;
 import org.reaktivity.nukleus.tcp.internal.config.TcpRoute;
+import org.reaktivity.nukleus.tcp.internal.types.Array32FW;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressFW;
 import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressInet4FW;
 import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressInet6FW;
 import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressInetFW;
+import org.reaktivity.nukleus.tcp.internal.types.ProxyInfoFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ProxyBeginExFW;
 import org.reaktivity.reaktor.nukleus.ElektronContext;
 
@@ -82,9 +86,30 @@ public final class TcpClientRouter
 
             for (TcpRoute route : binding.routes)
             {
-                Predicate<? super InetAddress> matchSubnet = a -> route.when.stream().anyMatch(m -> m.matches(a));
+                Array32FW<ProxyInfoFW> infos = beginEx.infos();
+                ProxyInfoFW authorityInfo = infos.matchFirst(i -> i.kind() == AUTHORITY);
+                if (authorityInfo != null && route.when.stream().anyMatch(r -> r.authority != null))
+                {
+                    final List<InetAddress> authorities = Arrays.asList(resolveHost.apply(authorityInfo.authority().asString()));
+                    for (InetAddress authority : authorities)
+                    {
+                        resolved = route.when.stream().anyMatch(m -> m.matches(authority))
+                                ? new InetSocketAddress(authority, options.port)
+                                : null;
 
-                resolved = resolve(address, authorization, matchSubnet);
+                        if (resolved != null)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if (resolved == null)
+                {
+                    Predicate<? super InetAddress> matches = a -> route.when.stream().anyMatch(m -> m.matches(a));
+
+                    resolved = resolve(address, authorization, matches);
+                }
 
                 if (resolved != null)
                 {

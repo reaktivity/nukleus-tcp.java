@@ -44,23 +44,25 @@ public class TcpConditionAdapterTest
     {
         String text =
                 "{" +
-                    "\"cidr\": \"127.0.0.0/24\"" +
+                    "\"cidr\": \"127.0.0.0/24\"," +
+                    "\"authority\": \"*.example.net\"" +
                 "}";
 
         TcpCondition condition = jsonb.fromJson(text, TcpCondition.class);
 
         assertThat(condition, not(nullValue()));
         assertThat(condition.cidr, equalTo("127.0.0.0/24"));
+        assertThat(condition.authority, equalTo("*.example.net"));
     }
 
     @Test
     public void shouldWriteCondition()
     {
-        TcpCondition condition = new TcpCondition("127.0.0.0/24");
+        TcpCondition condition = new TcpCondition("127.0.0.0/24", "*.example.net");
 
         String text = jsonb.toJson(condition);
 
         assertThat(text, not(nullValue()));
-        assertThat(text, equalTo("{\"cidr\":\"127.0.0.0/24\"}"));
+        assertThat(text, equalTo("{\"cidr\":\"127.0.0.0/24\",\"authority\":\"*.example.net\"}"));
     }
 }
