@@ -52,9 +52,9 @@ public final class TcpMatcher
         return authority == null || authority.reset(remote.getHostName()).matches();
     }
 
-    private Matcher asMatcher(
-        String pattern)
+    private static Matcher asMatcher(
+        String wildcard)
     {
-        return Pattern.compile(pattern.replaceAll("\\*", ".*")).matcher("");
+        return Pattern.compile(wildcard.replace(".", "\\.").replace("*", ".*")).matcher("");
     }
 }
