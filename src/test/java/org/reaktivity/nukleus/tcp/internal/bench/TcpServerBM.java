@@ -57,7 +57,7 @@ import org.reaktivity.reaktor.nukleus.Configuration;
 public class TcpServerBM
 {
     private final Reaktor reaktor;
-    private long routeId;
+    //private long routeId;
 
     {
         Properties properties = new Properties();

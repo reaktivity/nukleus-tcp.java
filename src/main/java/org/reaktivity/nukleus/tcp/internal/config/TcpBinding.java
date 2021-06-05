@@ -31,6 +31,7 @@ public final class TcpBinding
     public final Role kind;
     public final TcpOptions options;
     public final List<TcpRoute> routes;
+    public final TcpRoute exit;
     public final TcpRouteCounters counters;
 
     private PollerKey attached;
@@ -44,6 +45,7 @@ public final class TcpBinding
         this.kind = binding.kind;
         this.options = TcpOptions.class.cast(binding.options);
         this.routes = binding.routes.stream().map(TcpRoute::new).collect(toList());
+        this.exit = binding.exit != null ? new TcpRoute(binding.exit) : null;
         this.counters = counters;
     }
 

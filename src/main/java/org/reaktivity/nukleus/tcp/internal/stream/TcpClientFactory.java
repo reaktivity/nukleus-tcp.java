@@ -43,6 +43,7 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
 import org.reaktivity.nukleus.tcp.internal.config.TcpBinding;
+import org.reaktivity.nukleus.tcp.internal.config.TcpOptions;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
@@ -91,7 +92,6 @@ public class TcpClientFactory implements TcpStreamFactory
     private final Function<SelectableChannel, PollerKey>  supplyPollerKey;
     private final int proxyTypeId;
     private final int windowThreshold;
-    private final boolean keepalive;
     private final int initialMax;
 
     public TcpClientFactory(
@@ -114,7 +114,6 @@ public class TcpClientFactory implements TcpStreamFactory
 
         this.initialMax = bufferPool.slotCapacity();
         this.windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
-        this.keepalive = config.keepalive();
     }
 
     @Override
@@ -129,9 +128,15 @@ public class TcpClientFactory implements TcpStreamFactory
         final long routeId = begin.routeId();
         final long authorization = begin.authorization();
         final OctetsFW extension = begin.extension();
-        final ProxyBeginExFW beginEx = extension.get(beginExRO::wrap);
+        final ProxyBeginExFW beginEx = extension.get(beginExRO::tryWrap);
 
-        final InetSocketAddress route = router.resolve(routeId, authorization, beginEx);
+        InetSocketAddress route = null;
+
+        TcpBinding binding = router.lookup(routeId);
+        if (binding != null)
+        {
+            route = router.resolve(binding, authorization, beginEx);
+        }
 
         MessageConsumer newStream = null;
 
@@ -142,7 +147,7 @@ public class TcpClientFactory implements TcpStreamFactory
             final TcpRouteCounters counters = new TcpRouteCounters(context, routeId);
 
             final TcpClient client = new TcpClient(application, routeId, initialId, channel, counters);
-            client.doNetConnect(route);
+            client.doNetConnect(route, binding.options);
             newStream = client::onAppMessage;
         }
 
@@ -230,13 +235,14 @@ public class TcpClientFactory implements TcpStreamFactory
         }
 
         private void doNetConnect(
-            InetSocketAddress remoteAddress)
+            InetSocketAddress remoteAddress,
+            TcpOptions options)
         {
             try
             {
                 state = TcpState.openingInitial(state);
                 counters.opensWritten.getAsLong();
-                net.setOption(SO_KEEPALIVE, keepalive);
+                net.setOption(SO_KEEPALIVE, options.keepalive);
 
                 if (net.connect(remoteAddress))
                 {

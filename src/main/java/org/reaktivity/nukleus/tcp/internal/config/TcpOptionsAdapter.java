@@ -18,12 +18,13 @@ package org.reaktivity.nukleus.tcp.internal.config;
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
+import javax.json.bind.adapter.JsonbAdapter;
 
 import org.reaktivity.nukleus.tcp.internal.TcpNukleus;
 import org.reaktivity.reaktor.config.Options;
 import org.reaktivity.reaktor.config.OptionsAdapterSpi;
 
-public class TcpOptionsAdapter implements OptionsAdapterSpi
+public final class TcpOptionsAdapter implements OptionsAdapterSpi, JsonbAdapter<Options, JsonObject>
 {
     private static final String HOST_NAME = "host";
     private static final String PORT_NAME = "port";
@@ -67,7 +68,7 @@ public class TcpOptionsAdapter implements OptionsAdapterSpi
     {
         String host = object.getString(HOST_NAME);
         int port = object.getJsonNumber(PORT_NAME).intValue();
-        int backlog = object.getJsonNumber(BACKLOG_NAME).intValue();
+        int backlog = object.containsKey(BACKLOG_NAME) ? object.getJsonNumber(BACKLOG_NAME).intValue() : BACKLOG_DEFAULT;
         boolean nodelay = NODELAY_DEFAULT;
         boolean keepalive = KEEPALIVE_DEFAULT;
 

@@ -18,14 +18,16 @@ package org.reaktivity.nukleus.tcp.internal.config;
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
+import javax.json.bind.adapter.JsonbAdapter;
 
 import org.reaktivity.nukleus.tcp.internal.TcpNukleus;
 import org.reaktivity.reaktor.config.Condition;
 import org.reaktivity.reaktor.config.ConditionAdapterSpi;
 
-public class TcpConditionAdapter implements ConditionAdapterSpi
+public final class TcpConditionAdapter implements ConditionAdapterSpi, JsonbAdapter<Condition, JsonObject>
 {
     private static final String CIDR_NAME = "cidr";
+    private static final String AUTHORITY_NAME = "authority";
 
     @Override
     public String type()
@@ -46,6 +48,11 @@ public class TcpConditionAdapter implements ConditionAdapterSpi
             object.add(CIDR_NAME, tcpCondition.cidr);
         }
 
+        if (tcpCondition.authority != null)
+        {
+            object.add(AUTHORITY_NAME, tcpCondition.authority);
+        }
+
         return object.build();
     }
 
@@ -53,8 +60,9 @@ public class TcpConditionAdapter implements ConditionAdapterSpi
     public Condition adaptFromJson(
         JsonObject object)
     {
-        String cidr = object.getString(CIDR_NAME, null);
+        String cidr = object.containsKey(CIDR_NAME) ? object.getString(CIDR_NAME) : null;
+        String authority = object.containsKey(AUTHORITY_NAME) ? object.getString(AUTHORITY_NAME) : null;
 
-        return new TcpCondition(cidr);
+        return new TcpCondition(cidr, authority);
     }
 }

@@ -16,29 +16,45 @@
 package org.reaktivity.nukleus.tcp.internal.config;
 
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.reaktivity.nukleus.tcp.internal.util.Cidr;
 
 public final class TcpMatcher
 {
     public final Cidr cidr;
+    public final Matcher authority;
 
     public TcpMatcher(
         TcpCondition condition)
     {
         this.cidr = condition.cidr != null ? new Cidr(condition.cidr) : null;
-    }
-
-    public boolean matches(
-        InetSocketAddress remote)
-    {
-        return matches(remote.getAddress());
+        this.authority = condition.authority != null ? asMatcher(condition.authority) : null;
     }
 
     public boolean matches(
         InetAddress remote)
     {
+        return matchesCidr(remote) &&
+                matchesAuthority(remote);
+    }
+
+    private boolean matchesCidr(
+        InetAddress remote)
+    {
         return cidr == null || cidr.matches(remote);
+    }
+
+    private boolean matchesAuthority(
+        InetAddress remote)
+    {
+        return authority == null || authority.reset(remote.getHostName()).matches();
+    }
+
+    private static Matcher asMatcher(
+        String wildcard)
+    {
+        return Pattern.compile(wildcard.replace(".", "\\.").replace("*", ".*")).matcher("");
     }
 }
