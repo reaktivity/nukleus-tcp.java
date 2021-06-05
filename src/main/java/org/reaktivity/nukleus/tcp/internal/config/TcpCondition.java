@@ -13,24 +13,20 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal.stream;
+package org.reaktivity.nukleus.tcp.internal.config;
 
-import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.route.AddressFactoryBuilder;
+import org.reaktivity.reaktor.config.Condition;
 
-public final class TcpAddressFactoryBuilder implements AddressFactoryBuilder
+public final class TcpCondition extends Condition
 {
-    private final MessageConsumer routeHandler;
+    public final String cidr;
+    public final String authority;
 
-    public TcpAddressFactoryBuilder(
-        MessageConsumer routeHandler)
+    public TcpCondition(
+        String cidr,
+        String authority)
     {
-        this.routeHandler = routeHandler;
-    }
-
-    @Override
-    public TcpAddressFactory build()
-    {
-        return new TcpAddressFactory(routeHandler);
+        this.cidr = cidr;
+        this.authority = authority;
     }
 }

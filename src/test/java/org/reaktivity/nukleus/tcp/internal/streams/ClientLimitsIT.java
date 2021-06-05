@@ -35,22 +35,22 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configuration;
 
 public class ClientLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
         .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
-        .nukleus("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(4096)
         .configure(REAKTOR_BUFFER_SLOT_CAPACITY, 16)
+        .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -59,8 +59,8 @@ public class ClientLimitsIT
     public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.data.received.reset/client"
     })
     public void shouldResetWhenWindowExceeded() throws Exception
@@ -68,10 +68,9 @@ public class ClientLimitsIT
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.bind(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {

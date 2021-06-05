@@ -23,7 +23,6 @@ import static java.util.stream.IntStream.of;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.ALL;
-import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -47,6 +46,7 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configuration;
 
 /**
  * Tests the handling of capacity exceeded conditions in the context of incomplete writes
@@ -57,14 +57,12 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ServerPartialWriteLimitsIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
         .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
         .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
-        .nukleus("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
@@ -73,7 +71,8 @@ public class ServerPartialWriteLimitsIT
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY, 16)
         // Overall buffer pool size same as slot size so maximum concurrent streams with partial writes = 1
         .configure(ReaktorConfiguration.REAKTOR_BUFFER_POOL_CAPACITY, 16)
-        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
+        .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
+        .external("app#0")
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -83,8 +82,8 @@ public class ServerPartialWriteLimitsIT
                                   .around(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.data.multiple.frames/server",
         "${client}/server.sent.data.multiple.frames/client"
     })
@@ -101,8 +100,8 @@ public class ServerPartialWriteLimitsIT
     }
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.data.multiple.streams.second.was.reset/server"
     })
     public void shouldResetStreamsExceedingPartialWriteStreamsLimit() throws Exception
@@ -112,13 +111,12 @@ public class ServerPartialWriteLimitsIT
         HandleWriteHelper.fragmentWrites(generate(() -> resetReceived.get() ? ALL : 0));
 
         k3po.start();
-        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel1 = SocketChannel.open();
              SocketChannel channel2 = SocketChannel.open())
         {
-            channel1.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
-            channel2.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel1.connect(new InetSocketAddress("127.0.0.1", 8080));
+            channel2.connect(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.awaitBarrier("SECOND_STREAM_RESET_RECEIVED");
             resetReceived.set(true);

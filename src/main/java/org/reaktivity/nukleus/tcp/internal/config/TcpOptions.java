@@ -13,13 +13,29 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-module org.reaktivity.nukleus.tcp
+package org.reaktivity.nukleus.tcp.internal.config;
+
+import org.reaktivity.reaktor.config.Options;
+
+public final class TcpOptions extends Options
 {
-    requires org.reaktivity.nukleus;
+    public final String host;
+    public final int port;
+    public final int backlog;
+    public final boolean nodelay;
+    public final boolean keepalive;
 
-    provides org.reaktivity.nukleus.NukleusFactorySpi
-        with org.reaktivity.nukleus.tcp.internal.TcpNukleusFactorySpi;
-
-    provides org.reaktivity.nukleus.ControllerFactorySpi
-        with org.reaktivity.nukleus.tcp.internal.TcpControllerFactorySpi;
+    public TcpOptions(
+        String host,
+        int port,
+        int backlog,
+        boolean nodelay,
+        boolean keepalive)
+    {
+        this.host = host;
+        this.port = port;
+        this.backlog = backlog;
+        this.nodelay = nodelay;
+        this.keepalive = keepalive;
+    }
 }

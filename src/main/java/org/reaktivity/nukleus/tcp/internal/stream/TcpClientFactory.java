@@ -15,60 +15,37 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
-import static java.lang.Integer.parseInt;
 import static java.net.StandardSocketOptions.SO_KEEPALIVE;
 import static java.net.StandardSocketOptions.TCP_NODELAY;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static java.util.Objects.requireNonNull;
 import static org.agrona.LangUtil.rethrowUnchecked;
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.tcp.internal.TcpNukleus.WRITE_SPIN_COUNT;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.CONNECT_HOST_AND_PORT_PATTERN;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.proxyAddress;
+import static org.reaktivity.reaktor.nukleus.buffer.BufferPool.NO_SLOT;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.UnresolvedAddressException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
-import java.util.function.Predicate;
-import java.util.function.ToIntFunction;
-import java.util.regex.Matcher;
 
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
-import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.function.MessageFunction;
-import org.reaktivity.nukleus.function.MessagePredicate;
-import org.reaktivity.nukleus.route.RouteManager;
-import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
-import org.reaktivity.nukleus.tcp.internal.TcpCounters;
-import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
+import org.reaktivity.nukleus.tcp.internal.config.TcpBinding;
+import org.reaktivity.nukleus.tcp.internal.config.TcpOptions;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
-import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressFW;
-import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressInet4FW;
-import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressInet6FW;
-import org.reaktivity.nukleus.tcp.internal.types.ProxyAddressInetFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
@@ -76,13 +53,14 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ProxyBeginExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
-import org.reaktivity.nukleus.tcp.internal.util.Cidr;
-import org.reaktivity.reaktor.poller.PollerKey;
+import org.reaktivity.reaktor.config.Binding;
+import org.reaktivity.reaktor.nukleus.ElektronContext;
+import org.reaktivity.reaktor.nukleus.buffer.BufferPool;
+import org.reaktivity.reaktor.nukleus.function.MessageConsumer;
+import org.reaktivity.reaktor.nukleus.poller.PollerKey;
 
-public class TcpClientFactory implements StreamFactory
+public class TcpClientFactory implements TcpStreamFactory
 {
-    private final RouteFW routeRO = new RouteFW();
-
     private final BeginFW beginRO = new BeginFW();
     private final DataFW dataRO = new DataFW();
     private final EndFW endRO = new EndFW();
@@ -102,10 +80,9 @@ public class TcpClientFactory implements StreamFactory
     private final ProxyBeginExFW beginExRO = new ProxyBeginExFW();
     private final ProxyBeginExFW.Builder beginExRW = new ProxyBeginExFW.Builder();
 
-    private final MessageFunction<RouteFW> wrapRoute = (t, b, i, l) -> routeRO.wrap(b, i, i + l);
-
+    private final ElektronContext context;
+    private final TcpClientRouter router;
     private final BufferPool bufferPool;
-    private final RouteManager router;
     private final ByteBuffer readByteBuffer;
     private final MutableDirectBuffer readBuffer;
     private final MutableDirectBuffer writeBuffer;
@@ -113,46 +90,30 @@ public class TcpClientFactory implements StreamFactory
     private final LongUnaryOperator supplyReplyId;
     private final LongSupplier supplyTraceId;
     private final Function<SelectableChannel, PollerKey>  supplyPollerKey;
-    private final Function<String, InetAddress[]> resolveHost;
     private final int proxyTypeId;
-    private final Map<String, Predicate<? super InetAddress>> targetToCidrMatch;
-    private final TcpCounters counters;
     private final int windowThreshold;
-    private final boolean keepalive;
     private final int initialMax;
-
 
     public TcpClientFactory(
         TcpConfiguration config,
-        RouteManager router,
-        MutableDirectBuffer writeBuffer,
-        BufferPool bufferPool,
-        LongUnaryOperator supplyReplyId,
-        LongSupplier supplyTraceId,
-        ToIntFunction<String> supplyTypeId,
-        Function<SelectableChannel, PollerKey> supplyPollerKey,
-        Function<String, InetAddress[]> resolveHost,
-        TcpCounters counters)
+        ElektronContext context)
     {
-        this.router = requireNonNull(router);
-        this.writeBuffer = requireNonNull(writeBuffer);
+        this.context = context;
+        this.router = new TcpClientRouter(context);
+        this.writeBuffer = context.writeBuffer();
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
-        this.bufferPool = requireNonNull(bufferPool);
-        this.supplyReplyId = requireNonNull(supplyReplyId);
-        this.supplyTraceId = requireNonNull(supplyTraceId);
-        this.supplyPollerKey = requireNonNull(supplyPollerKey);
-        this.resolveHost = requireNonNull(resolveHost);
-        this.proxyTypeId = supplyTypeId.applyAsInt("proxy");
+        this.bufferPool = context.bufferPool();
+        this.supplyReplyId = context::supplyReplyId;
+        this.supplyTraceId = context::supplyTraceId;
+        this.supplyPollerKey = context::supplyPollerKey;
+        this.proxyTypeId = context.supplyTypeId("proxy");
 
         final int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
-        this.targetToCidrMatch = new HashMap<>();
 
-        this.counters = counters;
         this.initialMax = bufferPool.slotCapacity();
         this.windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
-        this.keepalive = config.keepalive();
     }
 
     @Override
@@ -161,161 +122,52 @@ public class TcpClientFactory implements StreamFactory
         DirectBuffer buffer,
         int index,
         int length,
-        MessageConsumer throttle)
-    {
-        final BeginFW begin = beginRO.wrap(buffer, index, index + length);
-        final long streamId = begin.streamId();
-
-        MessageConsumer result = null;
-
-        if ((streamId & 0x0000_0000_0000_0001L) != 0L)
-        {
-            result = newInitialStream(begin, throttle);
-        }
-
-        return result;
-    }
-
-    private MessageConsumer newInitialStream(
-        BeginFW begin,
         MessageConsumer application)
     {
+        final BeginFW begin = beginRO.wrap(buffer, index, index + length);
         final long routeId = begin.routeId();
-        final long initialId = begin.streamId();
+        final long authorization = begin.authorization();
         final OctetsFW extension = begin.extension();
-        final boolean hasExtension = extension.sizeof() > 0;
+        final ProxyBeginExFW beginEx = extension.get(beginExRO::tryWrap);
 
-        MessagePredicate filter = (t, b, o, l) ->
+        InetSocketAddress route = null;
+
+        TcpBinding binding = router.lookup(routeId);
+        if (binding != null)
         {
-            final RouteFW route = routeRO.wrap(b, o, o + l);
-            final String remoteAddressAndPort = route.remoteAddress().asString();
-            final Matcher matcher = CONNECT_HOST_AND_PORT_PATTERN.matcher(remoteAddressAndPort);
-            return !hasExtension ||
-                    (matcher.matches() &&
-                            resolveRemoteAddressExt(extension, matcher.group(1),
-                                                               parseInt(matcher.group(2))) != null);
-        };
-
-        final RouteFW route = router.resolve(routeId, begin.authorization(), filter, wrapRoute);
+            route = router.resolve(binding, authorization, beginEx);
+        }
 
         MessageConsumer newStream = null;
 
         if (route != null)
         {
-            final String remoteAddressAndPort = route.remoteAddress().asString();
-            final Matcher matcher = CONNECT_HOST_AND_PORT_PATTERN.matcher(remoteAddressAndPort);
-            matcher.matches();
-            final String remoteHost = matcher.group(1);
-            final int remotePort = parseInt(matcher.group(2));
-            InetSocketAddress remoteAddress = hasExtension ? resolveRemoteAddressExt(extension, remoteHost, remotePort) :
-                                                             new InetSocketAddress(remoteHost, remotePort);
-            assert remoteAddress != null;
-
+            final long initialId = begin.streamId();
             final SocketChannel channel = newSocketChannel();
-            final TcpRouteCounters routeCounters = counters.supplyRoute(route.correlationId());
+            final TcpRouteCounters counters = new TcpRouteCounters(context, routeId);
 
-            final TcpClient client = new TcpClient(application, routeId, initialId, channel, routeCounters);
-            client.doNetConnect(remoteAddress);
+            final TcpClient client = new TcpClient(application, routeId, initialId, channel, counters);
+            client.doNetConnect(route, binding.options);
             newStream = client::onAppMessage;
         }
 
         return newStream;
     }
 
-    private InetSocketAddress resolveRemoteAddressExt(
-        OctetsFW extension,
-        String targetName,
-        long targetRef)
+    @Override
+    public void attach(
+        Binding binding)
     {
-        final ProxyBeginExFW beginEx = extension.get(beginExRO::wrap);
-        final ProxyAddressFW address = beginEx.address();
-
-        InetSocketAddress resolved = null;
-        try
-        {
-            Predicate<? super InetAddress> matchSubnet = extensionMatcher(targetName);
-
-            switch (address.kind())
-            {
-            case INET:
-                ProxyAddressInetFW addressInet = address.inet();
-                resolved = Arrays
-                        .stream(resolveHost.apply(addressInet.destination().asString()))
-                        .filter(matchSubnet)
-                        .findFirst()
-                        .map(a -> new InetSocketAddress(a, addressInet.destinationPort()))
-                        .orElse(null);
-                break;
-            case INET4:
-                ProxyAddressInet4FW addressInet4 = address.inet4();
-                OctetsFW destinationInet4 = addressInet4.destination();
-                int destinationPortInet4 = addressInet4.destinationPort();
-                byte[] ipv4 = new byte[4];
-                destinationInet4.buffer().getBytes(destinationInet4.offset(), ipv4);
-                resolved = Optional
-                        .of(InetAddress.getByAddress(ipv4))
-                        .filter(matchSubnet)
-                        .map(a -> new InetSocketAddress(a, destinationPortInet4))
-                        .orElse(null);
-                break;
-            case INET6:
-                ProxyAddressInet6FW addressInet6 = address.inet6();
-                OctetsFW destinationInet6 = addressInet6.destination();
-                int destinationPortInet6 = addressInet6.destinationPort();
-                byte[] ipv6 = new byte[16];
-                destinationInet6.buffer().getBytes(destinationInet6.offset(), ipv6);
-                resolved = Optional
-                        .of(InetAddress.getByAddress(ipv6))
-                        .filter(matchSubnet)
-                        .map(a -> new InetSocketAddress(a, destinationPortInet6))
-                        .orElse(null);
-                break;
-            default:
-                throw new RuntimeException("Unexpected address kind");
-            }
-        }
-        catch (UnknownHostException ignore)
-        {
-           // NOOP
-        }
-
-        return resolved;
+        TcpRouteCounters counters = new TcpRouteCounters(context, binding.id);
+        TcpBinding tcpBinding = new TcpBinding(binding, counters);
+        router.attach(tcpBinding);
     }
 
-    private Predicate<? super InetAddress> extensionMatcher(
-        String targetName) throws UnknownHostException
+    @Override
+    public void detach(
+        long bindingId)
     {
-        Predicate<? super InetAddress> result;
-        if (targetName.contains("/"))
-        {
-            result = targetToCidrMatch.computeIfAbsent(targetName, this::inetMatchesCidr);
-        }
-        else
-        {
-            InetAddress.getByName(targetName);
-            result = targetToCidrMatch.computeIfAbsent(targetName, this::inetMatchesInet);
-        }
-        return result;
-    }
-
-    private Predicate<InetAddress> inetMatchesCidr(
-        String targetName)
-    {
-        return new Cidr(targetName)::matches;
-    }
-
-    private Predicate<InetAddress> inetMatchesInet(
-        String targetName)
-    {
-        try
-        {
-            return InetAddress.getByName(targetName)::equals;
-        }
-        catch (UnknownHostException e)
-        {
-            rethrowUnchecked(e);
-        }
-        return candidate -> false;
+        router.detach(bindingId);
     }
 
     private SocketChannel newSocketChannel()
@@ -383,13 +235,14 @@ public class TcpClientFactory implements StreamFactory
         }
 
         private void doNetConnect(
-            InetSocketAddress remoteAddress)
+            InetSocketAddress remoteAddress,
+            TcpOptions options)
         {
             try
             {
                 state = TcpState.openingInitial(state);
                 counters.opensWritten.getAsLong();
-                net.setOption(SO_KEEPALIVE, keepalive);
+                net.setOption(SO_KEEPALIVE, options.keepalive);
 
                 if (net.connect(remoteAddress))
                 {
@@ -846,7 +699,6 @@ public class TcpClientFactory implements StreamFactory
             final InetSocketAddress localAddress = (InetSocketAddress) net.getLocalAddress();
             final InetSocketAddress remoteAddress = (InetSocketAddress) net.getRemoteAddress();
 
-            router.setThrottle(replyId, this::onAppMessage);
             doBegin(app, routeId, replyId, replySeq, replyAck, replyMax, traceId, localAddress, remoteAddress);
             state = TcpState.openingReply(state);
         }

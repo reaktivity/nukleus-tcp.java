@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.IntStream.generate;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
@@ -36,32 +35,31 @@ import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configuration;
 
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 public class ServerIOExceptionFromWriteIT
 {
     private final K3poRule k3po = new K3poRule()
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
+        .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
-        .nukleus("tcp"::equals)
-        .controller("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
-        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
+        .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
+        .external("app#0")
         .clean();
 
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(reaktor).around(k3po).around(timeout);
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.data.received.reset.and.abort/server"
     })
     @BMRule(name = "onApplicationData",
@@ -73,19 +71,18 @@ public class ServerIOExceptionFromWriteIT
     public void shouldResetWhenImmediateWriteThrowsIOException() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
-            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.connect(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.finish();
         }
     }
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.data.received.reset.and.abort/server"
     })
     @BMRules(rules = {
@@ -107,11 +104,10 @@ public class ServerIOExceptionFromWriteIT
     {
         OnDataHelper.fragmentWrites(generate(() -> 0));
         k3po.start();
-        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
-            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.connect(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.finish();
         }

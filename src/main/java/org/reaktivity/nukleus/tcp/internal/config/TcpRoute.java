@@ -13,24 +13,26 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.tcp.internal;
+package org.reaktivity.nukleus.tcp.internal.config;
 
-import org.reaktivity.reaktor.nukleus.Configuration;
-import org.reaktivity.reaktor.nukleus.Nukleus;
-import org.reaktivity.reaktor.nukleus.NukleusFactorySpi;
+import static java.util.stream.Collectors.toList;
 
-public final class TcpNukleusFactorySpi implements NukleusFactorySpi
+import java.util.List;
+
+import org.reaktivity.reaktor.config.Route;
+
+public final class TcpRoute
 {
-    @Override
-    public String name()
-    {
-        return TcpNukleus.NAME;
-    }
+    public final long id;
+    public final List<TcpMatcher> when;
 
-    @Override
-    public Nukleus create(
-        Configuration config)
+    public TcpRoute(
+        Route route)
     {
-        return new TcpNukleus(new TcpConfiguration(config));
+        this.id = route.id;
+        this.when = route.when.stream()
+            .map(TcpCondition.class::cast)
+            .map(TcpMatcher::new)
+            .collect(toList());
     }
 }

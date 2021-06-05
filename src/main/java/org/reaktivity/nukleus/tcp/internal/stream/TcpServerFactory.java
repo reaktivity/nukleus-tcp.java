@@ -15,14 +15,14 @@
  */
 package org.reaktivity.nukleus.tcp.internal.stream;
 
+import static java.net.StandardSocketOptions.SO_KEEPALIVE;
+import static java.net.StandardSocketOptions.TCP_NODELAY;
 import static java.nio.ByteOrder.nativeOrder;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static java.util.Objects.requireNonNull;
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.tcp.internal.TcpNukleus.WRITE_SPIN_COUNT;
-import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.compareAddresses;
 import static org.reaktivity.nukleus.tcp.internal.util.IpUtil.proxyAddress;
+import static org.reaktivity.reaktor.nukleus.buffer.BufferPool.NO_SLOT;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -30,31 +30,25 @@ import java.net.StandardSocketOptions;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
+import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
-import java.util.function.ToIntFunction;
 
 import org.agrona.CloseHelper;
 import org.agrona.DirectBuffer;
 import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.UnsafeBuffer;
-import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.function.MessageFunction;
-import org.reaktivity.nukleus.function.MessagePredicate;
-import org.reaktivity.nukleus.route.RouteManager;
-import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.tcp.internal.TcpConfiguration;
-import org.reaktivity.nukleus.tcp.internal.TcpCounters;
-import org.reaktivity.nukleus.tcp.internal.TcpRouteCounters;
+import org.reaktivity.nukleus.tcp.internal.config.TcpBinding;
+import org.reaktivity.nukleus.tcp.internal.config.TcpOptions;
+import org.reaktivity.nukleus.tcp.internal.config.TcpRoute;
+import org.reaktivity.nukleus.tcp.internal.config.TcpServerBinding;
 import org.reaktivity.nukleus.tcp.internal.types.Flyweight;
 import org.reaktivity.nukleus.tcp.internal.types.OctetsFW;
-import org.reaktivity.nukleus.tcp.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.DataFW;
@@ -62,12 +56,15 @@ import org.reaktivity.nukleus.tcp.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ProxyBeginExFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.tcp.internal.types.stream.WindowFW;
-import org.reaktivity.reaktor.poller.PollerKey;
+import org.reaktivity.reaktor.config.Binding;
+import org.reaktivity.reaktor.nukleus.ElektronContext;
+import org.reaktivity.reaktor.nukleus.buffer.BufferPool;
+import org.reaktivity.reaktor.nukleus.function.MessageConsumer;
+import org.reaktivity.reaktor.nukleus.poller.PollerKey;
+import org.reaktivity.reaktor.nukleus.stream.StreamFactory;
 
-public class TcpServerFactory implements StreamFactory
+public class TcpServerFactory implements TcpStreamFactory
 {
-    private final RouteFW routeRO = new RouteFW();
-
     private final BeginFW beginRO = new BeginFW();
     private final DataFW dataRO = new DataFW();
     private final EndFW endRO = new EndFW();
@@ -86,15 +83,13 @@ public class TcpServerFactory implements StreamFactory
 
     private final ProxyBeginExFW.Builder beginExRW = new ProxyBeginExFW.Builder();
 
-    private final MessageFunction<RouteFW> wrapRoute = (t, b, i, l) -> routeRO.wrap(b, i, i + l);
+    private final ElektronContext context;
+    private final TcpServerRouter router;
 
-    private final RouteManager router;
     private final LongUnaryOperator supplyInitialId;
     private final LongUnaryOperator supplyReplyId;
     private final LongSupplier supplyTraceId;
-    private final Long2ObjectHashMap<TcpServer> correlations;
     private final Function<SelectableChannel, PollerKey> supplyPollerKey;
-    private final Runnable onNetworkClosed;
 
     private final BufferPool bufferPool;
     private final ByteBuffer readByteBuffer;
@@ -104,40 +99,30 @@ public class TcpServerFactory implements StreamFactory
     private final int replyMax;
     private final int windowThreshold;
     private final int proxyTypeId;
-
-    final TcpCounters counters;
+    private final StreamFactory streamFactory;
 
     public TcpServerFactory(
         TcpConfiguration config,
-        RouteManager router,
-        MutableDirectBuffer writeBuffer,
-        BufferPool bufferPool,
-        LongUnaryOperator supplyInitialId,
-        LongSupplier supplyTraceId,
-        ToIntFunction<String> supplyTypeId,
-        LongUnaryOperator supplyReplyId,
-        Function<SelectableChannel, PollerKey> supplyPollerKey,
-        TcpCounters counters,
-        Runnable onChannelClosed)
+        ElektronContext context,
+        LongFunction<TcpServerBinding> servers)
     {
-        this.router = requireNonNull(router);
-        this.writeBuffer = requireNonNull(writeBuffer);
+        this.context = context;
+        this.router = new TcpServerRouter(config, context, this::handleAccept, servers);
+        this.writeBuffer = context.writeBuffer();
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
-        this.bufferPool = requireNonNull(bufferPool);
-        this.supplyInitialId = requireNonNull(supplyInitialId);
-        this.supplyReplyId = requireNonNull(supplyReplyId);
-        this.supplyTraceId = requireNonNull(supplyTraceId);
-        this.supplyPollerKey = requireNonNull(supplyPollerKey);
-        this.counters = requireNonNull(counters);
-        this.onNetworkClosed = requireNonNull(onChannelClosed);
-        this.proxyTypeId = supplyTypeId.applyAsInt("proxy");
+        this.bufferPool = context.bufferPool();
+        this.supplyInitialId = context::supplyInitialId;
+        this.supplyReplyId = context::supplyReplyId;
+        this.supplyTraceId = context::supplyTraceId;
+        this.supplyPollerKey = context::supplyPollerKey;
+        this.streamFactory = context.streamFactory();
+        this.proxyTypeId = context.supplyTypeId("proxy");
 
         final int readBufferSize = writeBuffer.capacity() - DataFW.FIELD_OFFSET_PAYLOAD;
         this.readByteBuffer = ByteBuffer.allocateDirect(readBufferSize).order(nativeOrder());
         this.readBuffer = new UnsafeBuffer(readByteBuffer);
         this.replyMax = bufferPool.slotCapacity();
         this.windowThreshold = (bufferPool.slotCapacity() * config.windowThreshold()) / 100;
-        this.correlations = new Long2ObjectHashMap<>();
     }
 
     @Override
@@ -146,43 +131,70 @@ public class TcpServerFactory implements StreamFactory
         DirectBuffer buffer,
         int index,
         int length,
-        MessageConsumer throttle)
+        MessageConsumer sender)
     {
-        final BeginFW begin = beginRO.wrap(buffer, index, index + length);
-        final long streamId = begin.streamId();
-
-        MessageConsumer newStream = null;
-
-        if ((streamId & 0x0000_0000_0000_0001L) == 0L)
-        {
-            newStream = newReplyStream(begin, throttle);
-        }
-
-        return newStream;
+        return null;
     }
 
-    void onAccepted(
-        SocketChannel network,
-        InetSocketAddress address,
-        LongFunction<InetSocketAddress> lookupAddress)
+    @Override
+    public void attach(
+        Binding binding)
     {
-        final MessagePredicate filter = (t, b, i, l) ->
-        {
-            final RouteFW route = wrapRoute.apply(t, b, i, l);
-            final long routeId = route.correlationId();
-            final InetSocketAddress routedAddress = lookupAddress.apply(routeId);
-            return compareAddresses(address, routedAddress) == 0;
-        };
+        TcpRouteCounters counters = new TcpRouteCounters(context, binding.id);
+        TcpBinding tcpBinding = new TcpBinding(binding, counters);
+        router.attach(tcpBinding);
+    }
 
-        final RouteFW route = router.resolveExternal(0L, filter, wrapRoute);
+    @Override
+    public void detach(
+        long bindingId)
+    {
+        router.detach(bindingId);
+    }
+
+    private int handleAccept(
+        PollerKey acceptKey)
+    {
+        try
+        {
+            TcpBinding binding = (TcpBinding) acceptKey.attachment();
+            TcpOptions options = binding.options;
+
+            ServerSocketChannel server = (ServerSocketChannel) acceptKey.channel();
+
+            for (SocketChannel channel = router.accept(server); channel != null; channel = router.accept(server))
+            {
+                channel.configureBlocking(false);
+                channel.setOption(TCP_NODELAY, options.nodelay);
+                channel.setOption(SO_KEEPALIVE, options.keepalive);
+
+                InetSocketAddress remote = (InetSocketAddress) channel.getRemoteAddress();
+
+                onAccepted(binding, channel, remote);
+            }
+        }
+        catch (Exception ex)
+        {
+            LangUtil.rethrowUnchecked(ex);
+        }
+
+        return 1;
+    }
+
+    private void onAccepted(
+        TcpBinding binding,
+        SocketChannel network,
+        InetSocketAddress remote)
+    {
+        // TODO: optimize
+        final TcpRoute route = binding.routes.stream()
+            .filter(r -> r.when.stream().allMatch(c -> c.matches(remote.getAddress())))
+            .findFirst()
+            .orElse(binding.exit);
 
         if (route != null)
         {
-            final long routeId = route.correlationId();
-
-            final TcpServer server = new TcpServer(routeId, network);
-            correlations.put(server.replyId, server);
-
+            final TcpServer server = new TcpServer(binding.counters, route.id, network);
             server.onNetAccepted();
         }
         else
@@ -191,27 +203,10 @@ public class TcpServerFactory implements StreamFactory
         }
     }
 
-    private MessageConsumer newReplyStream(
-        BeginFW begin,
-        MessageConsumer throttle)
-    {
-        final long replyId = begin.streamId();
-        final TcpServer server = correlations.remove(replyId);
-
-        MessageConsumer newStream = null;
-        if (server != null)
-        {
-            newStream = server::onAppMessage;
-        }
-
-        return newStream;
-    }
-
     private void closeNet(
         SocketChannel network)
     {
-        CloseHelper.quietClose(network);
-        onNetworkClosed.run();
+        router.close(network);
     }
 
     private final class TcpServer
@@ -219,10 +214,11 @@ public class TcpServerFactory implements StreamFactory
         private final long routeId;
         private final long initialId;
         private final long replyId;
-        private final MessageConsumer app;
         private final SocketChannel net;
         private final PollerKey key;
         private final TcpRouteCounters counters;
+
+        private MessageConsumer app;
 
         private long initialSeq;
         private long initialAck;
@@ -239,16 +235,16 @@ public class TcpServerFactory implements StreamFactory
         private int bytesFlushed;
 
         private TcpServer(
+            TcpRouteCounters counters,
             long routeId,
             SocketChannel net)
         {
             this.routeId = routeId;
             this.initialId = supplyInitialId.applyAsLong(routeId);
             this.replyId = supplyReplyId.applyAsLong(initialId);
-            this.app = router.supplyReceiver(initialId);
             this.net = net;
             this.key = supplyPollerKey.apply(net);
-            this.counters = TcpServerFactory.this.counters.supplyRoute(routeId);
+            this.counters = counters;
         }
 
         private void onNetAccepted()
@@ -591,7 +587,7 @@ public class TcpServerFactory implements StreamFactory
             state = TcpState.closeInitial(state);
             CloseHelper.quietClose(net::shutdownInput);
 
-            final boolean abortiveRelease = correlations.containsKey(replyId);
+            final boolean abortiveRelease = !TcpState.replyOpened(state);
 
             cleanup(traceId, abortiveRelease);
         }
@@ -642,9 +638,8 @@ public class TcpServerFactory implements StreamFactory
             final InetSocketAddress localAddress = (InetSocketAddress) net.getLocalAddress();
             final InetSocketAddress remoteAddress = (InetSocketAddress) net.getRemoteAddress();
 
-            router.setThrottle(initialId, this::onAppMessage);
-            doBegin(app, routeId, initialId, initialSeq, initialAck, initialMax, traceId,
-                    localAddress, remoteAddress);
+            app = newStream(this::onAppMessage, routeId, initialId, initialSeq, initialAck, initialMax,
+                    traceId, localAddress, remoteAddress);
             counters.opensWritten.getAsLong();
             state = TcpState.openingInitial(state);
         }
@@ -687,18 +682,9 @@ public class TcpServerFactory implements StreamFactory
         {
             if (!TcpState.replyClosing(state))
             {
-                if (TcpState.replyOpened(state))
-                {
-                    assert !correlations.containsKey(replyId);
-
-                    doReset(app, routeId, replyId, replySeq, replyAck, replyMax, traceId);
-                    counters.resetsWritten.getAsLong();
-                    state = TcpState.closeReply(state);
-                }
-                else
-                {
-                    correlations.remove(replyId);
-                }
+                doReset(app, routeId, replyId, replySeq, replyAck, replyMax, traceId);
+                counters.resetsWritten.getAsLong();
+                state = TcpState.closeReply(state);
             }
         }
 
@@ -755,8 +741,8 @@ public class TcpServerFactory implements StreamFactory
         }
     }
 
-    private void doBegin(
-        MessageConsumer receiver,
+    private MessageConsumer newStream(
+        MessageConsumer sender,
         long routeId,
         long streamId,
         long sequence,
@@ -777,7 +763,14 @@ public class TcpServerFactory implements StreamFactory
                 .extension(b -> b.set(proxyBeginEx(remoteAddress, localAddress)))
                 .build();
 
+        MessageConsumer receiver =
+                streamFactory.newStream(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof(), sender);
+
+        assert receiver != null;
+
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+
+        return receiver;
     }
 
     private void doData(

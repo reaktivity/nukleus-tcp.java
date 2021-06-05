@@ -17,9 +17,12 @@ module org.reaktivity.nukleus.tcp
 {
     requires org.reaktivity.reaktor;
 
-    provides org.reaktivity.nukleus.NukleusFactorySpi
+    provides org.reaktivity.reaktor.nukleus.NukleusFactorySpi
         with org.reaktivity.nukleus.tcp.internal.TcpNukleusFactorySpi;
 
-    provides org.reaktivity.nukleus.ControllerFactorySpi
-        with org.reaktivity.nukleus.tcp.internal.TcpControllerFactorySpi;
+    provides org.reaktivity.reaktor.config.OptionsAdapterSpi
+        with org.reaktivity.nukleus.tcp.internal.config.TcpOptionsAdapter;
+
+    provides org.reaktivity.reaktor.config.ConditionAdapterSpi
+        with org.reaktivity.nukleus.tcp.internal.config.TcpConditionAdapter;
 }

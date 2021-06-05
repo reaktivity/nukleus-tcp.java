@@ -48,6 +48,7 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.HandleWriteHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configuration;
 
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 @BMUnitConfig(loadDirectory = "src/test/resources")
@@ -55,27 +56,26 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 public class ClientPartialWriteIT
 {
     private final K3poRule k3po = new K3poRule()
-        .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
         .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
         .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
-        .nukleus("tcp"::equals)
-        .controller("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(4096)
+        .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
+        .external("app#0")
         .clean();
 
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE).around(reaktor).around(k3po).around(timeout);
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.data/client",
         "${server}/client.sent.data/server"
     })
@@ -87,8 +87,8 @@ public class ClientPartialWriteIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.data/client",
         "${server}/client.sent.data/server"
     })
@@ -99,8 +99,8 @@ public class ClientPartialWriteIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.data/client",
         "${server}/client.sent.data/server"
     })
@@ -112,8 +112,8 @@ public class ClientPartialWriteIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.data.multiple.frames/client",
         "${server}/client.sent.data.multiple.frames/server"
     })
@@ -130,8 +130,8 @@ public class ClientPartialWriteIT
     }
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.sent.data.then.end/client"
     })
     public void shouldHandleEndOfStreamWithPendingWrite() throws Exception
@@ -143,10 +143,9 @@ public class ClientPartialWriteIT
         try (ServerSocketChannel server = ServerSocketChannel.open())
         {
             server.setOption(SO_REUSEADDR, true);
-            server.bind(new InetSocketAddress("127.0.0.1", 0x1f90));
+            server.bind(new InetSocketAddress("127.0.0.1", 8080));
 
             k3po.start();
-            k3po.awaitBarrier("ROUTED_CLIENT");
 
             try (SocketChannel channel = server.accept())
             {

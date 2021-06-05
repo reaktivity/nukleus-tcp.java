@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -39,26 +38,23 @@ import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.CountDownHelper;
 import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configuration;
 
-/**
- * Tests use of the nukleus as an HTTP server.
- */
 @RunWith(org.jboss.byteman.contrib.bmunit.BMUnitRunner.class)
 public class ServerResetAndAbortIT
 {
     private final K3poRule k3po = new K3poRule()
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
+        .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
-        .nukleus("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
-        .affinityMask("app#0", EXTERNAL_AFFINITY_MASK)
+        .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
+        .external("app#0")
         .clean();
 
     private final TcpCountersRule counters = new TcpCountersRule(reaktor);
@@ -68,18 +64,17 @@ public class ServerResetAndAbortIT
             .around(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.abort/server"
     })
     public void shouldShutdownOutputWhenServerSendsAbort() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
-            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.connect(new InetSocketAddress("127.0.0.1", 8080));
 
             ByteBuffer buf = ByteBuffer.allocate(20);
             int len = channel.read(buf);
@@ -92,8 +87,8 @@ public class ServerResetAndAbortIT
     }
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.abort.and.reset/server"
     })
     @BMRule(name = "shutdownInput",
@@ -108,11 +103,10 @@ public class ServerResetAndAbortIT
         CountDownLatch shutdownInputCalled = new CountDownLatch(1);
         CountDownHelper.initialize(shutdownInputCalled);
         k3po.start();
-        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
-            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.connect(new InetSocketAddress("127.0.0.1", 8080));
 
             ByteBuffer buf = ByteBuffer.allocate(20);
             int len = channel.read(buf);
@@ -126,8 +120,8 @@ public class ServerResetAndAbortIT
     }
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.reset/server"
     })
     @BMRule(name = "shutdownInput",
@@ -142,11 +136,10 @@ public class ServerResetAndAbortIT
         CountDownLatch shutdownInputCalled = new CountDownLatch(1);
         CountDownHelper.initialize(shutdownInputCalled);
         k3po.start();
-        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
-            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.connect(new InetSocketAddress("127.0.0.1", 8080));
 
             channel.configureBlocking(false);
 
@@ -169,8 +162,8 @@ public class ServerResetAndAbortIT
     }
 
     @Test
+    @Configuration("server.json")
     @Specification({
-        "${route}/server/controller",
         "${server}/server.sent.reset.and.end/server"
     })
     @BMRule(name = "shutdownInput",
@@ -185,11 +178,10 @@ public class ServerResetAndAbortIT
         CountDownLatch shutdownInputCalled = new CountDownLatch(1);
         CountDownHelper.initialize(shutdownInputCalled);
         k3po.start();
-        k3po.awaitBarrier("ROUTED_SERVER");
 
         try (SocketChannel channel = SocketChannel.open())
         {
-            channel.connect(new InetSocketAddress("127.0.0.1", 0x1f90));
+            channel.connect(new InetSocketAddress("127.0.0.1", 8080));
 
             ByteBuffer buf = ByteBuffer.allocate(20);
             int len = channel.read(buf);

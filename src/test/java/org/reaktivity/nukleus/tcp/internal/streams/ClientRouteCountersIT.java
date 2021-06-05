@@ -28,36 +28,33 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configuration;
 
 /**
  * Tests the TCP nukleus when acting as a client.
  */
 public class ClientRouteCountersIT
 {
-    private static final long CLIENT_ROUTE_ID = 0x0002000310000001L;
-
     private final K3poRule k3po = new K3poRule()
-            .addScriptRoot("route", "org/reaktivity/specification/nukleus/tcp/control/route")
-            .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
-            .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
+        .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
+        .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/application/rfc793");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
-        .nukleus("tcp"::equals)
-        .controller("tcp"::equals)
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(8192)
+        .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
         .clean();
 
     @Rule
     public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Test
+    @Configuration("client.host.json")
     @Specification({
-        "${route}/client.host/controller",
         "${client}/client.and.server.sent.data.multiple.frames/client",
         "${server}/client.and.server.sent.data.multiple.frames/server"
     })
@@ -65,7 +62,7 @@ public class ClientRouteCountersIT
     {
         k3po.finish();
 
-        assertThat(reaktor.bytesWritten("tcp", CLIENT_ROUTE_ID), equalTo(26L));
-        assertThat(reaktor.bytesRead("tcp", CLIENT_ROUTE_ID), equalTo(26L));
+        assertThat(reaktor.bytesWritten("tcp", Long.toString(0x0000000200000003L)), equalTo(26L));
+        assertThat(reaktor.bytesRead("tcp", Long.toString(0x0000000200000003L)), equalTo(26L));
     }
 }
