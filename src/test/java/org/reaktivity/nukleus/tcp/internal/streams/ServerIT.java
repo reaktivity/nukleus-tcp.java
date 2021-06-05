@@ -28,6 +28,7 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -220,6 +221,7 @@ public class ServerIT
         assertEquals(0, counters.overflows());
     }
 
+    @Ignore("GitHub Actions")
     @Test
     @Configuration("server.json")
     @Specification({
@@ -234,6 +236,7 @@ public class ServerIT
         assertEquals(0, counters.overflows());
     }
 
+    @Ignore("GitHub Actions")
     @Test
     @Configuration("server.ipv6.json")
     @Specification({
