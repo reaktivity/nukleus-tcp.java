@@ -34,7 +34,6 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.ScriptProperty;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 import org.reaktivity.reaktor.test.annotation.Configuration;
 
@@ -57,10 +56,8 @@ public class ClientIT
         .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
         .clean();
 
-    private final TcpCountersRule counters = new TcpCountersRule(reaktor);
-
     @Rule
-    public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Test
     @Configuration("client.host.json")
@@ -104,7 +101,6 @@ public class ClientIT
     public void shouldReceiveClientSentData() throws Exception
     {
         k3po.finish();
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -127,7 +123,6 @@ public class ClientIT
     public void shouldReceiveClientSentDataMultipleStreams() throws Exception
     {
         k3po.finish();
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -223,7 +218,7 @@ public class ClientIT
     {
         k3po.finish();
         Thread.sleep(250); // TODO: reaktor quiese instead of close
-        assertEquals(1, reaktor.resetsRead("tcp", Long.toString(0x0000000200000003L)));
+        assertEquals(1, reaktor.initialErrors("default", "app#0"));
     }
 
     @Test
@@ -246,8 +241,6 @@ public class ClientIT
     public void shouldReceiveServerSentData() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -260,8 +253,6 @@ public class ClientIT
     public void shouldReceiveServerSentDataWithFlowControl() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -284,8 +275,6 @@ public class ClientIT
     public void shouldReceiveServerSentDataMultipleStreams() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test

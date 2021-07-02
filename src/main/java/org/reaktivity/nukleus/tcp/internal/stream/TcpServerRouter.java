@@ -36,7 +36,6 @@ import org.reaktivity.reaktor.nukleus.poller.PollerKey;
 
 public final class TcpServerRouter
 {
-    private final TcpCounters counters;
     private final Long2ObjectHashMap<TcpBinding> bindings;
     private final ToIntFunction<PollerKey> acceptHandler;
     private final Function<SelectableChannel, PollerKey> supplyPollerKey;
@@ -52,7 +51,6 @@ public final class TcpServerRouter
         LongFunction<TcpServerBinding> lookupServer)
     {
         this.remainingConnections = config.maxConnections();
-        this.counters = new TcpCounters(context);
         this.bindings = new Long2ObjectHashMap<>();
         this.supplyPollerKey = context::supplyPollerKey;
         this.acceptHandler = acceptHandler;
@@ -99,7 +97,6 @@ public final class TcpServerRouter
             if (channel != null)
             {
                 remainingConnections--;
-                counters.connections.accept(1);
             }
         }
 
@@ -119,7 +116,6 @@ public final class TcpServerRouter
     {
         CloseHelper.quietClose(channel);
         remainingConnections++;
-        counters.connections.accept(-1);
 
         if (unbound && remainingConnections > 0)
         {

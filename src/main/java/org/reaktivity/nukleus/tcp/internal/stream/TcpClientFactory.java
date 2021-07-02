@@ -144,9 +144,8 @@ public class TcpClientFactory implements TcpStreamFactory
         {
             final long initialId = begin.streamId();
             final SocketChannel channel = newSocketChannel();
-            final TcpRouteCounters counters = new TcpRouteCounters(context, routeId);
 
-            final TcpClient client = new TcpClient(application, routeId, initialId, channel, counters);
+            final TcpClient client = new TcpClient(application, routeId, initialId, channel);
             client.doNetConnect(route, binding.options);
             newStream = client::onAppMessage;
         }
@@ -158,8 +157,7 @@ public class TcpClientFactory implements TcpStreamFactory
     public void attach(
         Binding binding)
     {
-        TcpRouteCounters counters = new TcpRouteCounters(context, binding.id);
-        TcpBinding tcpBinding = new TcpBinding(binding, counters);
+        TcpBinding tcpBinding = new TcpBinding(binding);
         router.attach(tcpBinding);
     }
 
@@ -201,7 +199,6 @@ public class TcpClientFactory implements TcpStreamFactory
         private final long initialId;
         private final long replyId;
         private final SocketChannel net;
-        private final TcpRouteCounters counters;
 
         private PollerKey networkKey;
 
@@ -223,15 +220,13 @@ public class TcpClientFactory implements TcpStreamFactory
             MessageConsumer app,
             long routeId,
             long initialId,
-            SocketChannel net,
-            TcpRouteCounters counters)
+            SocketChannel net)
         {
             this.app = app;
             this.routeId = routeId;
             this.initialId = initialId;
             this.replyId = supplyReplyId.applyAsLong(initialId);
             this.net = net;
-            this.counters = counters;
         }
 
         private void doNetConnect(
@@ -241,7 +236,7 @@ public class TcpClientFactory implements TcpStreamFactory
             try
             {
                 state = TcpState.openingInitial(state);
-                counters.opensWritten.getAsLong();
+                context.initialOpened(routeId);
                 net.setOption(SO_KEEPALIVE, options.keepalive);
 
                 if (net.connect(remoteAddress))
@@ -283,7 +278,6 @@ public class TcpClientFactory implements TcpStreamFactory
             final long traceId = supplyTraceId.getAsLong();
 
             state = TcpState.openInitial(state);
-            counters.opensRead.getAsLong();
 
             try
             {
@@ -302,8 +296,6 @@ public class TcpClientFactory implements TcpStreamFactory
         private void onNetRejected()
         {
             final long traceId = supplyTraceId.getAsLong();
-
-            counters.resetsRead.getAsLong();
 
             cleanup(traceId);
         }
@@ -328,7 +320,6 @@ public class TcpClientFactory implements TcpStreamFactory
                 {
                     key.clear(OP_READ);
                     CloseHelper.close(net::shutdownInput);
-                    counters.closesRead.getAsLong();
 
                     doAppEnd(supplyTraceId.getAsLong());
 
@@ -339,7 +330,6 @@ public class TcpClientFactory implements TcpStreamFactory
                 }
                 else if (bytesRead != 0)
                 {
-                    counters.bytesRead.accept(bytesRead);
                     doAppData(readBuffer, 0, bytesRead);
                 }
             }
@@ -356,7 +346,6 @@ public class TcpClientFactory implements TcpStreamFactory
         {
             if (writeSlot == NO_SLOT)
             {
-                counters.writeopsNoSlot.getAsLong();
                 assert key == networkKey;
                 return 0;
             }
@@ -389,8 +378,6 @@ public class TcpClientFactory implements TcpStreamFactory
                     bytesWritten = net.write(byteBuffer);
                 }
 
-                counters.bytesWritten.accept(bytesWritten);
-
                 bytesFlushed += bytesWritten;
 
                 if (bytesWritten < length)
@@ -402,7 +389,6 @@ public class TcpClientFactory implements TcpStreamFactory
 
                     if (writeSlot == NO_SLOT)
                     {
-                        counters.overflows.getAsLong();
                         doAppReset(traceId);
                         cleanup(traceId);
                     }
@@ -413,7 +399,6 @@ public class TcpClientFactory implements TcpStreamFactory
                         writeSlotOffset = length - bytesWritten;
 
                         networkKey.register(OP_WRITE);
-                        counters.writeops.getAsLong();
                     }
                 }
                 else
@@ -454,13 +439,11 @@ public class TcpClientFactory implements TcpStreamFactory
                 {
                     networkKey.clear(OP_CONNECT);
                     closeNet(net);
-                    counters.closesWritten.getAsLong();
                 }
                 else
                 {
                     networkKey.clear(OP_WRITE);
                     net.shutdownOutput();
-                    counters.closesWritten.getAsLong();
 
                     if (net.socket().isInputShutdown())
                     {
@@ -689,7 +672,6 @@ public class TcpClientFactory implements TcpStreamFactory
             if (replySeq + replyPad < replyAck + replyMax && !TcpState.replyClosed(state))
             {
                 networkKey.register(OP_READ);
-                counters.readops.getAsLong();
             }
         }
 
@@ -760,16 +742,6 @@ public class TcpClientFactory implements TcpStreamFactory
         {
             doAppAbort(traceId);
             doAppReset(traceId);
-
-            if (net.isConnected() && !net.socket().isInputShutdown())
-            {
-                counters.resetsRead.getAsLong();
-            }
-
-            if (!net.socket().isOutputShutdown())
-            {
-                counters.abortsWritten.getAsLong();
-            }
 
             closeNet(net);
 

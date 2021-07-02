@@ -31,7 +31,6 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 import org.reaktivity.reaktor.test.annotation.Configuration;
 
@@ -50,10 +49,8 @@ public class ClientIOExceptionFromReadIT
         .configurationRoot("org/reaktivity/specification/nukleus/tcp/config")
         .clean();
 
-    private final TcpCountersRule counters = new TcpCountersRule(reaktor);
-
     @Rule
-    public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Test
     @Configuration("client.host.json")

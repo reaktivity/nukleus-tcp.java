@@ -43,7 +43,6 @@ import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.HandleWriteHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.OnDataHelper;
-import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 import org.reaktivity.reaktor.test.annotation.Configuration;
@@ -75,11 +74,9 @@ public class ServerPartialWriteLimitsIT
         .external("app#0")
         .clean();
 
-    private final TcpCountersRule counters = new TcpCountersRule(reaktor);
-
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE)
-                                  .around(reaktor).around(counters).around(k3po).around(timeout);
+                                  .around(reaktor).around(k3po).around(timeout);
 
     @Test
     @Configuration("server.json")
@@ -95,8 +92,6 @@ public class ServerPartialWriteLimitsIT
         HandleWriteHelper.fragmentWrites(generate(() -> dataFramesReceived.get() >= 2 ? ALL : 0));
 
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -151,8 +146,6 @@ public class ServerPartialWriteLimitsIT
 
             k3po.finish();
         }
-
-        assertEquals(1, counters.overflows());
     }
 }
 

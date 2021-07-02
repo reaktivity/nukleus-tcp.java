@@ -37,7 +37,6 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.ScriptProperty;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 import org.reaktivity.reaktor.test.annotation.Configuration;
@@ -61,10 +60,8 @@ public class ServerIT
         .external("app#0")
         .clean();
 
-    private final TcpCountersRule counters = new TcpCountersRule(reaktor);
-
     @Rule
-    public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Test
     @Configuration("server.json")
@@ -108,8 +105,6 @@ public class ServerIT
     public void shouldReceiveClientSentData() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -122,8 +117,6 @@ public class ServerIT
     public void shouldReceiveClientSentDataWithFlowControl() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -146,8 +139,6 @@ public class ServerIT
     public void shouldReceiveClientSentDataMultipleStreams() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -204,8 +195,6 @@ public class ServerIT
     public void shouldEstablishConcurrentFullDuplexConnection() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -217,8 +206,6 @@ public class ServerIT
     public void shouldEstablishConnection() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Ignore("GitHub Actions")
@@ -232,8 +219,6 @@ public class ServerIT
     public void shouldEstablishConnectionToAddressAnyIPv4() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Ignore("GitHub Actions")
@@ -247,8 +232,6 @@ public class ServerIT
     public void shouldEstablishConnectionToAddressAnyIPv6() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test(expected = IOException.class)
@@ -274,8 +257,6 @@ public class ServerIT
                 k3po.finish();
             }
         }
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -298,8 +279,6 @@ public class ServerIT
     public void shouldReceiveServerSentData() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -340,8 +319,6 @@ public class ServerIT
     public void shouldReceiveServerSentDataMultipleStreams() throws Exception
     {
         k3po.finish();
-
-        assertEquals(0, counters.overflows());
     }
 
     @Test
@@ -421,7 +398,10 @@ public class ServerIT
         k3po.awaitBarrier("CONNECTION_ACCEPTED_2");
         k3po.awaitBarrier("CONNECTION_ACCEPTED_3");
 
-        assertEquals(3, counters.connections());
+        assertEquals(3, reaktor.initialOpens("default", "net#0"));
+        assertEquals(0, reaktor.initialCloses("default", "net#0"));
+        assertEquals(3, reaktor.replyOpens("default", "net#0"));
+        assertEquals(0, reaktor.replyCloses("default", "net#0"));
 
         SocketChannel channel4 = SocketChannel.open();
         try
@@ -433,7 +413,10 @@ public class ServerIT
         {
             // expected
         }
-        assertEquals(3, counters.connections());
+        assertEquals(3, reaktor.initialOpens("default", "net#0"));
+        assertEquals(0, reaktor.initialCloses("default", "net#0"));
+        assertEquals(3, reaktor.replyOpens("default", "net#0"));
+        assertEquals(0, reaktor.replyCloses("default", "net#0"));
 
 
         channel1.close();
@@ -443,18 +426,27 @@ public class ServerIT
 
         // sleep so that rebind happens
         Thread.sleep(200);
-        assertEquals(2, counters.connections());
+        assertEquals(3, reaktor.initialOpens("default", "net#0"));
+        assertEquals(1, reaktor.initialCloses("default", "net#0"));
+        assertEquals(3, reaktor.replyOpens("default", "net#0"));
+        assertEquals(1, reaktor.replyCloses("default", "net#0"));
 
         SocketChannel channel5 = SocketChannel.open();
         channel5.connect(new InetSocketAddress("127.0.0.1", 8080));
         k3po.awaitBarrier("CONNECTION_ACCEPTED_4");
-        assertEquals(3, counters.connections());
+        assertEquals(4, reaktor.initialOpens("default", "net#0"));
+        assertEquals(1, reaktor.initialCloses("default", "net#0"));
+        assertEquals(4, reaktor.replyOpens("default", "net#0"));
+        assertEquals(1, reaktor.replyCloses("default", "net#0"));
 
         channel2.close();
         channel3.close();
         channel5.close();
         Thread.sleep(500);
-        assertEquals(0, counters.connections());
+        assertEquals(4, reaktor.initialOpens("default", "net#0"));
+        assertEquals(4, reaktor.initialCloses("default", "net#0"));
+        assertEquals(4, reaktor.replyOpens("default", "net#0"));
+        assertEquals(4, reaktor.replyCloses("default", "net#0"));
 
         k3po.finish();
     }
