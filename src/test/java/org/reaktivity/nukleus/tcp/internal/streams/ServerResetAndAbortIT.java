@@ -36,7 +36,6 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper;
 import org.reaktivity.nukleus.tcp.internal.SocketChannelHelper.CountDownHelper;
-import org.reaktivity.nukleus.tcp.internal.TcpCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 import org.reaktivity.reaktor.test.annotation.Configuration;
 
@@ -57,11 +56,9 @@ public class ServerResetAndAbortIT
         .external("app#0")
         .clean();
 
-    private final TcpCountersRule counters = new TcpCountersRule(reaktor);
-
     @Rule
     public final TestRule chain = outerRule(SocketChannelHelper.RULE)
-            .around(reaktor).around(counters).around(k3po).around(timeout);
+            .around(reaktor).around(k3po).around(timeout);
 
     @Test
     @Configuration("server.json")

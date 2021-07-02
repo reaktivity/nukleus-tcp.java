@@ -19,7 +19,6 @@ import static java.util.stream.Collectors.toList;
 
 import java.util.List;
 
-import org.reaktivity.nukleus.tcp.internal.stream.TcpRouteCounters;
 import org.reaktivity.reaktor.config.Binding;
 import org.reaktivity.reaktor.config.Role;
 import org.reaktivity.reaktor.nukleus.poller.PollerKey;
@@ -32,13 +31,11 @@ public final class TcpBinding
     public final TcpOptions options;
     public final List<TcpRoute> routes;
     public final TcpRoute exit;
-    public final TcpRouteCounters counters;
 
     private PollerKey attached;
 
     public TcpBinding(
-        Binding binding,
-        TcpRouteCounters counters)
+        Binding binding)
     {
         this.routeId = binding.id;
         this.entry = binding.entry;
@@ -46,7 +43,6 @@ public final class TcpBinding
         this.options = TcpOptions.class.cast(binding.options);
         this.routes = binding.routes.stream().map(TcpRoute::new).collect(toList());
         this.exit = binding.exit != null ? new TcpRoute(binding.exit) : null;
-        this.counters = counters;
     }
 
     public PollerKey attach(

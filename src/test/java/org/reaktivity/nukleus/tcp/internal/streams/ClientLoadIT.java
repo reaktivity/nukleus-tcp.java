@@ -30,10 +30,7 @@ import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 import org.reaktivity.reaktor.test.annotation.Configuration;
 
-/**
- * Tests the TCP nukleus when acting as a client.
- */
-public class ClientRouteCountersIT
+public class ClientLoadIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("server", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
@@ -62,7 +59,7 @@ public class ClientRouteCountersIT
     {
         k3po.finish();
 
-        assertThat(reaktor.bytesWritten("tcp", Long.toString(0x0000000200000003L)), equalTo(26L));
-        assertThat(reaktor.bytesRead("tcp", Long.toString(0x0000000200000003L)), equalTo(26L));
+        assertThat(reaktor.initialBytes("default", "app#0"), equalTo(26L));
+        assertThat(reaktor.replyBytes("default", "app#0"), equalTo(26L));
     }
 }

@@ -15,8 +15,6 @@
  */
 package org.reaktivity.nukleus.tcp.internal;
 
-import static org.junit.Assert.assertEquals;
-
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
@@ -40,15 +38,9 @@ public class TcpCountersRule implements TestRule
             @Override
             public void evaluate() throws Throwable
             {
-                assertEquals(0, overflows());
                 base.evaluate();
             }
         };
-    }
-
-    public long overflows()
-    {
-        return reaktor.counter("tcp.overflows");
     }
 
     public long connections()

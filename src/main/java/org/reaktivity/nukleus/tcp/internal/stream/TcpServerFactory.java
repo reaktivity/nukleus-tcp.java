@@ -140,8 +140,7 @@ public class TcpServerFactory implements TcpStreamFactory
     public void attach(
         Binding binding)
     {
-        TcpRouteCounters counters = new TcpRouteCounters(context, binding.id);
-        TcpBinding tcpBinding = new TcpBinding(binding, counters);
+        TcpBinding tcpBinding = new TcpBinding(binding);
         router.attach(tcpBinding);
     }
 
@@ -194,7 +193,7 @@ public class TcpServerFactory implements TcpStreamFactory
 
         if (route != null)
         {
-            final TcpServer server = new TcpServer(binding.counters, route.id, network);
+            final TcpServer server = new TcpServer(binding.routeId, route.id, network);
             server.onNetAccepted();
         }
         else
@@ -211,12 +210,12 @@ public class TcpServerFactory implements TcpStreamFactory
 
     private final class TcpServer
     {
+        private final long networkId;
         private final long routeId;
         private final long initialId;
         private final long replyId;
         private final SocketChannel net;
         private final PollerKey key;
-        private final TcpRouteCounters counters;
 
         private MessageConsumer app;
 
@@ -235,16 +234,16 @@ public class TcpServerFactory implements TcpStreamFactory
         private int bytesFlushed;
 
         private TcpServer(
-            TcpRouteCounters counters,
+            long networkId,
             long routeId,
             SocketChannel net)
         {
+            this.networkId = networkId;
             this.routeId = routeId;
             this.initialId = supplyInitialId.applyAsLong(routeId);
             this.replyId = supplyReplyId.applyAsLong(initialId);
             this.net = net;
             this.key = supplyPollerKey.apply(net);
-            this.counters = counters;
         }
 
         private void onNetAccepted()
@@ -253,6 +252,9 @@ public class TcpServerFactory implements TcpStreamFactory
             {
                 key.handler(OP_READ, this::onNetReadable);
                 key.handler(OP_WRITE, this::onNetWritable);
+
+                context.initialOpened(networkId);
+                context.replyOpened(networkId);
 
                 doAppBegin();
             }
@@ -278,6 +280,8 @@ public class TcpServerFactory implements TcpStreamFactory
 
                 if (bytesRead == -1)
                 {
+                    context.initialClosed(networkId);
+
                     key.clear(OP_READ);
                     CloseHelper.close(net::shutdownInput);
 
@@ -290,11 +294,14 @@ public class TcpServerFactory implements TcpStreamFactory
                 }
                 else if (bytesRead != 0)
                 {
+                    context.initialBytes(networkId, bytesRead);
+
                     doAppData(readBuffer, 0, bytesRead);
                 }
             }
             catch (IOException ex)
             {
+                context.initialErrored(networkId);
                 cleanup(supplyTraceId.getAsLong());
             }
 
@@ -306,7 +313,6 @@ public class TcpServerFactory implements TcpStreamFactory
         {
             if (writeSlot == NO_SLOT)
             {
-                counters.writeopsNoSlot.getAsLong();
                 assert key == this.key;
                 return 0;
             }
@@ -341,6 +347,11 @@ public class TcpServerFactory implements TcpStreamFactory
 
                 bytesFlushed += bytesWritten;
 
+                if (bytesWritten > 0)
+                {
+                    context.replyBytes(networkId, bytesWritten);
+                }
+
                 if (bytesWritten < length)
                 {
                     if (writeSlot == NO_SLOT)
@@ -350,7 +361,6 @@ public class TcpServerFactory implements TcpStreamFactory
 
                     if (writeSlot == NO_SLOT)
                     {
-                        counters.overflows.getAsLong();
                         doAppReset(traceId);
                         cleanup(traceId);
                     }
@@ -361,7 +371,6 @@ public class TcpServerFactory implements TcpStreamFactory
                         writeSlotOffset = length - bytesWritten;
 
                         key.register(OP_WRITE);
-                        counters.writeops.getAsLong();
                     }
                 }
                 else
@@ -396,6 +405,8 @@ public class TcpServerFactory implements TcpStreamFactory
 
             try
             {
+                context.replyClosed(networkId);
+
                 key.clear(OP_WRITE);
                 net.shutdownOutput();
                 state = TcpState.closeReply(state);
@@ -407,6 +418,7 @@ public class TcpServerFactory implements TcpStreamFactory
             }
             catch (IOException ex)
             {
+                context.replyErrored(networkId);
                 cleanup(traceId);
             }
         }
@@ -463,7 +475,6 @@ public class TcpServerFactory implements TcpStreamFactory
             assert replyAck <= replySeq;
 
             state = TcpState.openReply(state);
-            counters.opensRead.getAsLong();
 
             doAppWindow(traceId);
         }
@@ -628,7 +639,6 @@ public class TcpServerFactory implements TcpStreamFactory
             if (initialSeq + initialPad < initialAck + initialMax && !TcpState.initialClosed(state))
             {
                 key.register(OP_READ);
-                counters.readops.getAsLong();
             }
         }
 
@@ -640,7 +650,6 @@ public class TcpServerFactory implements TcpStreamFactory
 
             app = newStream(this::onAppMessage, routeId, initialId, initialSeq, initialAck, initialMax,
                     traceId, localAddress, remoteAddress);
-            counters.opensWritten.getAsLong();
             state = TcpState.openingInitial(state);
         }
 
@@ -667,7 +676,6 @@ public class TcpServerFactory implements TcpStreamFactory
             long traceId)
         {
             doEnd(app, routeId, initialId, initialSeq, initialAck, initialMax, traceId);
-            counters.closesWritten.getAsLong();
             state = TcpState.closeInitial(state);
         }
 
@@ -683,7 +691,6 @@ public class TcpServerFactory implements TcpStreamFactory
             if (!TcpState.replyClosing(state))
             {
                 doReset(app, routeId, replyId, replySeq, replyAck, replyMax, traceId);
-                counters.resetsWritten.getAsLong();
                 state = TcpState.closeReply(state);
             }
         }
@@ -694,7 +701,6 @@ public class TcpServerFactory implements TcpStreamFactory
             if (TcpState.initialOpened(state) && !TcpState.initialClosed(state))
             {
                 doAbort(app, routeId, initialId, initialSeq, initialAck, initialMax, traceId);
-                counters.abortsWritten.getAsLong();
                 state = TcpState.closeInitial(state);
             }
         }

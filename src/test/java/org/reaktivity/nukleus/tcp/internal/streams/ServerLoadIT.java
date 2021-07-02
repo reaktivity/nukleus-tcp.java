@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.tcp.internal.streams;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.rules.RuleChain.outerRule;
 
 import org.junit.Rule;
@@ -32,7 +31,7 @@ import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 import org.reaktivity.reaktor.test.annotation.Configuration;
 
-public class ServerRouteCountersIT
+public class ServerLoadIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("client", "org/reaktivity/specification/nukleus/tcp/streams/network/rfc793")
@@ -63,10 +62,10 @@ public class ServerRouteCountersIT
     {
         k3po.finish();
 
-        assertThat(reaktor.bytesWritten("default", "app#0"), equalTo(26L));
-        assertThat(reaktor.bytesRead("default", "app#0"), equalTo(26L));
-        assertThat(reaktor.framesWritten("default", "app#0"), greaterThanOrEqualTo(1L));
-        assertThat(reaktor.framesRead("default", "app#0"), greaterThanOrEqualTo(1L));
+        assertThat(reaktor.initialOpens("default", "net#0"), equalTo(1L));
+        assertThat(reaktor.replyOpens("default", "net#0"), equalTo(1L));
+        assertThat(reaktor.initialBytes("default", "net#0"), equalTo(26L));
+        assertThat(reaktor.replyBytes("default", "net#0"), equalTo(26L));
     }
 
 }
