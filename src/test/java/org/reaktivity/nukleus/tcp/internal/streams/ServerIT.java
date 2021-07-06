@@ -38,6 +38,7 @@ import org.kaazing.k3po.junit.annotation.ScriptProperty;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.ReaktorConfiguration;
+import org.reaktivity.reaktor.ReaktorLoad;
 import org.reaktivity.reaktor.test.ReaktorRule;
 import org.reaktivity.reaktor.test.annotation.Configuration;
 
@@ -398,10 +399,12 @@ public class ServerIT
         k3po.awaitBarrier("CONNECTION_ACCEPTED_2");
         k3po.awaitBarrier("CONNECTION_ACCEPTED_3");
 
-        assertEquals(3, reaktor.initialOpens("default", "net#0"));
-        assertEquals(0, reaktor.initialCloses("default", "net#0"));
-        assertEquals(3, reaktor.replyOpens("default", "net#0"));
-        assertEquals(0, reaktor.replyCloses("default", "net#0"));
+        ReaktorLoad load = reaktor.load("default", "net#0");
+
+        assertEquals(3, load.initialOpens());
+        assertEquals(0, load.initialCloses());
+        assertEquals(3, load.replyOpens());
+        assertEquals(0, load.replyCloses());
 
         SocketChannel channel4 = SocketChannel.open();
         try
@@ -413,11 +416,11 @@ public class ServerIT
         {
             // expected
         }
-        assertEquals(3, reaktor.initialOpens("default", "net#0"));
-        assertEquals(0, reaktor.initialCloses("default", "net#0"));
-        assertEquals(3, reaktor.replyOpens("default", "net#0"));
-        assertEquals(0, reaktor.replyCloses("default", "net#0"));
 
+        assertEquals(3, load.initialOpens());
+        assertEquals(0, load.initialCloses());
+        assertEquals(3, load.replyOpens());
+        assertEquals(0, load.replyCloses());
 
         channel1.close();
         channel4.close();
@@ -426,29 +429,28 @@ public class ServerIT
 
         // sleep so that rebind happens
         Thread.sleep(200);
-        assertEquals(3, reaktor.initialOpens("default", "net#0"));
-        assertEquals(1, reaktor.initialCloses("default", "net#0"));
-        assertEquals(3, reaktor.replyOpens("default", "net#0"));
-        assertEquals(1, reaktor.replyCloses("default", "net#0"));
+        assertEquals(3, load.initialOpens());
+        assertEquals(1, load.initialCloses());
+        assertEquals(3, load.replyOpens());
+        assertEquals(1, load.replyCloses());
 
         SocketChannel channel5 = SocketChannel.open();
         channel5.connect(new InetSocketAddress("127.0.0.1", 8080));
         k3po.awaitBarrier("CONNECTION_ACCEPTED_4");
-        assertEquals(4, reaktor.initialOpens("default", "net#0"));
-        assertEquals(1, reaktor.initialCloses("default", "net#0"));
-        assertEquals(4, reaktor.replyOpens("default", "net#0"));
-        assertEquals(1, reaktor.replyCloses("default", "net#0"));
+        assertEquals(4, load.initialOpens());
+        assertEquals(1, load.initialCloses());
+        assertEquals(4, load.replyOpens());
+        assertEquals(1, load.replyCloses());
 
         channel2.close();
         channel3.close();
         channel5.close();
         Thread.sleep(500);
-        assertEquals(4, reaktor.initialOpens("default", "net#0"));
-        assertEquals(4, reaktor.initialCloses("default", "net#0"));
-        assertEquals(4, reaktor.replyOpens("default", "net#0"));
-        assertEquals(4, reaktor.replyCloses("default", "net#0"));
+        assertEquals(4, load.initialOpens());
+        assertEquals(4, load.initialCloses());
+        assertEquals(4, load.replyOpens());
+        assertEquals(4, load.replyCloses());
 
         k3po.finish();
     }
-
 }

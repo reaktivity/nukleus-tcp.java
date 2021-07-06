@@ -218,7 +218,7 @@ public class ClientIT
     {
         k3po.finish();
         Thread.sleep(250); // TODO: reaktor quiese instead of close
-        assertEquals(1, reaktor.initialErrors("default", "app#0"));
+        assertEquals(1, reaktor.load("default", "app#0").initialErrors());
     }
 
     @Test
