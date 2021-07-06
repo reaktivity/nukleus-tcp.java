@@ -62,7 +62,7 @@
     <nukleus.plugin.version>0.85</nukleus.plugin.version>
 
     <nukleus.tcp.spec.version>0.74</nukleus.tcp.spec.version>
-    <reaktor.version>0.170</reaktor.version>
+    <reaktor.version>0.171</reaktor.version>
   </properties>
 
   <dependencies>
