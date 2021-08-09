@@ -80,7 +80,6 @@ public class TcpClientFactory implements TcpStreamFactory
     private final ProxyBeginExFW beginExRO = new ProxyBeginExFW();
     private final ProxyBeginExFW.Builder beginExRW = new ProxyBeginExFW.Builder();
 
-    private final ElektronContext context;
     private final TcpClientRouter router;
     private final BufferPool bufferPool;
     private final ByteBuffer readByteBuffer;
@@ -98,7 +97,6 @@ public class TcpClientFactory implements TcpStreamFactory
         TcpConfiguration config,
         ElektronContext context)
     {
-        this.context = context;
         this.router = new TcpClientRouter(context);
         this.writeBuffer = context.writeBuffer();
         this.writeByteBuffer = ByteBuffer.allocateDirect(writeBuffer.capacity()).order(nativeOrder());
@@ -236,7 +234,6 @@ public class TcpClientFactory implements TcpStreamFactory
             try
             {
                 state = TcpState.openingInitial(state);
-                context.initialOpened(routeId);
                 net.setOption(SO_KEEPALIVE, options.keepalive);
 
                 if (net.connect(remoteAddress))
